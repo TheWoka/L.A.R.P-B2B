@@ -1,0 +1,222 @@
+{
+  "report_id": "rep_7f3a2c91",
+  "document_id": "doc_5b8e14d0",
+  "filename": "Проект_контракта_оргтехника.docx",
+  "purpose": "publication",
+  "overall": "red",
+  "created_at": "2026-10-15T09:30:00Z",
+  "processing_ms": 8420,
+  "stats": {
+    "TRADE_SECRET": 1,
+    "BANK_ACCOUNT": 1,
+    "PERSON": 2,
+    "PHONE": 1,
+    "EMAIL": 1,
+    "PASSPORT": 1,
+    "SNILS": 1
+  },
+  "entities": [
+    {
+      "type": "TRADE_SECRET",
+      "category": "trade_secret",
+      "start": 160,
+      "end": 171,
+      "page": 2,
+      "section": "4. Цена контракта",
+      "value_masked": "Себестоимость ***",
+      "confidence": 0.82,
+      "detector": "dict"
+    },
+    {
+      "type": "BANK_ACCOUNT",
+      "category": "financial",
+      "start": 220,
+      "end": 240,
+      "page": 2,
+      "section": "4. Цена контракта",
+      "value_masked": "4070**************45",
+      "confidence": 0.97,
+      "detector": "regex"
+    },
+    {
+      "type": "PERSON",
+      "category": "pd",
+      "start": 294,
+      "end": 319,
+      "page": 3,
+      "section": "9. Контактные лица",
+      "value_masked": "Карпова В***",
+      "confidence": 0.93,
+      "detector": "ner"
+    },
+    {
+      "type": "PHONE",
+      "category": "pd",
+      "start": 326,
+      "end": 344,
+      "page": 3,
+      "section": "9. Контактные лица",
+      "value_masked": "+7 (***) ***-**-33",
+      "confidence": 0.99,
+      "detector": "regex"
+    },
+    {
+      "type": "EMAIL",
+      "category": "pd",
+      "start": 353,
+      "end": 374,
+      "page": 3,
+      "section": "9. Контактные лица",
+      "value_masked": "v***@example.org",
+      "confidence": 0.99,
+      "detector": "regex"
+    },
+    {
+      "type": "PERSON",
+      "category": "pd",
+      "start": 402,
+      "end": 425,
+      "page": 3,
+      "section": "9. Контактные лица",
+      "value_masked": "Лыткин А***",
+      "confidence": 0.91,
+      "detector": "ner"
+    },
+    {
+      "type": "PASSPORT",
+      "category": "pd",
+      "start": 435,
+      "end": 446,
+      "page": 3,
+      "section": "9. Контактные лица",
+      "value_masked": "69** ***456",
+      "confidence": 0.96,
+      "detector": "regex"
+    },
+    {
+      "type": "SNILS",
+      "category": "pd",
+      "start": 454,
+      "end": 468,
+      "page": 3,
+      "section": "9. Контактные лица",
+      "value_masked": "***-***-*** 00",
+      "confidence": 0.98,
+      "detector": "regex"
+    }
+  ],
+  "checklist": [
+    {
+      "category": "approvals",
+      "status": "ok",
+      "comment": "Лист согласования найден: есть визы юридического отдела и отдела закупок.",
+      "evidence": {
+        "quote": "Лист согласования: юридический отдел — согласовано; отдел закупок — согласовано.",
+        "start": 488,
+        "end": 568,
+        "page": 4,
+        "section": "Лист согласования"
+      }
+    },
+    {
+      "category": "classification",
+      "status": "missing",
+      "comment": "Документ содержит сведения о себестоимости и наценке, но гриф «Коммерческая тайна» не проставлен.",
+      "evidence": null
+    },
+    {
+      "category": "retention",
+      "status": "missing",
+      "comment": "Не указан срок хранения персональных данных контактных лиц и порядок их уничтожения.",
+      "evidence": null
+    }
+  ],
+  "violations": [
+    {
+      "rule_id": "PD_IN_PUBLICATION",
+      "title": "Персональные данные в документе для публикации",
+      "severity": "red",
+      "law_refs": [
+        {
+          "law": "152-ФЗ",
+          "article": "ст. 7",
+          "title": "Конфиденциальность персональных данных",
+          "url": null
+        },
+        {
+          "law": "152-ФЗ",
+          "article": "ст. 10.1",
+          "title": "Особенности обработки ПДн, разрешённых для распространения",
+          "url": null
+        }
+      ],
+      "evidence": [
+        {
+          "quote": "Ответственный исполнитель: К██████ В███████ О███████, тел. +█ (████ 1████████",
+          "start": 267,
+          "end": 344,
+          "page": 3,
+          "section": "9. Контактные лица"
+        },
+        {
+          "quote": "Л█████ А██████ П███████, паспорт 6███ 1█████, СНИЛС 1██████████ 0█",
+          "start": 402,
+          "end": 468,
+          "page": 3,
+          "section": "9. Контактные лица"
+        }
+      ],
+      "recommendation": "Удалите или обезличьте персональные данные перед публикацией либо получите согласие на распространение.",
+      "source": "rule"
+    },
+    {
+      "rule_id": "TRADE_SECRET_WITHOUT_MARK",
+      "title": "Коммерческая тайна без грифа",
+      "severity": "red",
+      "law_refs": [
+        {
+          "law": "98-ФЗ",
+          "article": "ст. 10",
+          "title": "Меры по охране конфиденциальности информации",
+          "url": null
+        }
+      ],
+      "evidence": [
+        {
+          "quote": "Себестоимость единицы товара для Поставщика составляет 38 400 руб., торговая наценка 12%.",
+          "start": 105,
+          "end": 194,
+          "page": 2,
+          "section": "4. Цена контракта"
+        }
+      ],
+      "recommendation": "Нанесите гриф «Коммерческая тайна» с указанием обладателя информации.",
+      "source": "rule"
+    },
+    {
+      "rule_id": "PD_RETENTION_NOT_SET",
+      "title": "Не указан срок хранения персональных данных",
+      "severity": "yellow",
+      "law_refs": [
+        {
+          "law": "152-ФЗ",
+          "article": "ст. 5 ч. 7",
+          "title": "Принципы обработки персональных данных",
+          "url": null
+        }
+      ],
+      "evidence": [
+        {
+          "quote": "Представитель Поставщика: Л█████ А██████ П███████",
+          "start": 376,
+          "end": 425,
+          "page": 3,
+          "section": "9. Контактные лица"
+        }
+      ],
+      "recommendation": "Укажите срок хранения персональных данных контактных лиц и порядок их уничтожения по достижении цели обработки.",
+      "source": "rule"
+    }
+  ],
+  "llm_used": false
+}

@@ -1,0 +1,37 @@
+# --- Секреты ---
+.env
+.env.*
+!.env.example
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+.coverage
+htmlcov/
+
+# --- Node / фронтенд ---
+node_modules/
+dist/
+*.tsbuildinfo
+npm-debug.log*
+
+# --- Данные: загрузки и результаты оценки не коммитим ---
+data/uploads/*
+!data/uploads/.gitkeep
+eval/results/*
+!eval/results/.gitkeep
+
+# --- IDE и ОС ---
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+eval/corpus/
+Claude outputs/

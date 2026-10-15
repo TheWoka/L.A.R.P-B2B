@@ -1,0 +1,17 @@
+[project]
+name = "ai-auditor-backend"
+version = "0.1.0"
+description = "ИИ-аудитор безопасности документов закупок (хакатон B2B-РТС, задача 7)"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+# E/W — стиль, F — ошибки, I — порядок импортов, B — типичные баги
+select = ["E", "W", "F", "I", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

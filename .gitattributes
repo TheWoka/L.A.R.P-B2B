@@ -1,0 +1,10 @@
+# Вся команда на Windows: в репозитории храним только LF.
+# CRLF ломает shell-скрипты и entrypoint'ы внутри Linux-контейнеров.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.pdf binary
+*.docx binary
+*.xlsx binary
+*.pptx binary

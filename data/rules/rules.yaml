@@ -1,0 +1,25 @@
+# Стартовый набор правил. Формат — docs/contracts.md, раздел 2.
+# Человекочитаемый каталог — docs/rules.md (Алина). Каждое правило валидируется
+# моделью Rule в backend/tests/test_schemas.py.
+
+- id: PD_IN_PUBLICATION
+  title: Персональные данные в документе для публикации
+  description: Документ предназначен для открытого доступа, но содержит персональные данные физлиц.
+  severity: red
+  law_refs:
+    - {law: 152-ФЗ, article: ст. 7}
+    - {law: 152-ФЗ, article: ст. 10.1}
+  applies_to: [publication]
+  condition: {type: entity_present, categories: [pd, pd_special], min_count: 1}
+  recommendation: Удалите или обезличьте персональные данные перед публикацией либо получите согласие на распространение.
+
+- id: TRADE_SECRET_WITHOUT_MARK
+  title: Коммерческая тайна без грифа
+  description: В документе есть сведения, составляющие коммерческую тайну, но нет грифа.
+  severity: red
+  law_refs: [{law: 98-ФЗ, article: ст. 10}]
+  condition:
+    all:
+      - {type: entity_present, categories: [trade_secret]}
+      - {type: marker_absent, marker: classification_mark}
+  recommendation: Нанесите гриф «Коммерческая тайна» с указанием обладателя информации.

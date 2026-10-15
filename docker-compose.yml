@@ -1,0 +1,71 @@
+# Запуск: cp .env.example .env && docker-compose up --build
+# Ключ "version" не указываем: он устарел и вызывает предупреждение в Compose v2.
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    env_file: .env
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    env_file: .env
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    build: ./backend
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    env_file: .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - uploads:/data/uploads
+      - ./data/rules:/data/rules:ro
+      - ./data/legal:/data/legal:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    # Тот же Dockerfile, что у api: второй build берёт слои из кэша.
+    build: ./backend
+    command: celery -A app.worker.celery_app worker --loglevel=info
+    env_file: .env
+    volumes:
+      - uploads:/data/uploads
+      - ./data/rules:/data/rules:ro
+      - ./data/legal:/data/legal:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    env_file: .env
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  uploads:

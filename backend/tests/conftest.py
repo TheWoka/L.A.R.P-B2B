@@ -1,0 +1,28 @@
+"""Общие фикстуры тестов. Тесты не требуют запущенных PostgreSQL и Redis."""
+
+import os
+from collections.abc import Iterator
+from pathlib import Path
+
+import pytest
+
+# До импорта приложения: тесты всегда в режиме mock, без ключей (AGENTS.md, правило 7).
+os.environ.setdefault("LLM_PROVIDER", "mock")
+
+from fastapi.testclient import TestClient  # noqa: E402
+
+from app.main import app  # noqa: E402
+
+# backend/tests/conftest.py -> корень репозитория
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+@pytest.fixture
+def client() -> Iterator[TestClient]:
+    """TestClient без запуска lifespan: init_db() не вызывается, БД не нужна."""
+    yield TestClient(app)
+
+
+@pytest.fixture
+def repo_root() -> Path:
+    return REPO_ROOT
