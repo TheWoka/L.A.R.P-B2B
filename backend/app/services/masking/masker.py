@@ -3,7 +3,30 @@
 mapping содержит исходные значения: НЕ логировать, НЕ сохранять в БД (AGENTS.md, правила 4–5).
 """
 
+import re
+
 from app.schemas import Entity, MaskResult, MaskSpan
+
+MASK_CHAR = "█"
+_WORD_RE = re.compile(r"\w+")
+
+
+def _mask_word(match: re.Match[str]) -> str:
+    word = match.group(0)
+    if word[0].isalpha():
+        return word[0] + MASK_CHAR * (len(word) - 1)
+    return MASK_CHAR * len(word)
+
+
+def mask_value(value: str) -> str:
+    """Маскирование одной строки с сохранением длины (contracts.md, раздел 4.1).
+
+    Слово = \\w+: начинается с буквы — первая буква видна, остальное → "█";
+    иначе (цифра, "_") — всё слово → "█". Прочие символы не меняются.
+    "Иванов Иван" → "И█████ И███", "+7 (912) 345-67-89" → "+█ (███) ███-██-██".
+    Длина результата всегда равна len(value). Переиспользуется в mask_preserving_length (T-008).
+    """
+    return _WORD_RE.sub(_mask_word, value)
 
 
 def mask(text: str, entities: list[Entity]) -> MaskResult:
