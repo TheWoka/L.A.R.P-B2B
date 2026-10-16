@@ -13,7 +13,10 @@ from app.schemas import Entity, EntityCategory, EntityType, ExtractedDocument, T
 from app.services.detection.regex_detector import (
     CONF_ACCOUNT_NO_BIK,
     CONF_CHECKSUM,
+    CONF_FORMAT,
+    CONF_PHONE_LOCAL,
     CONF_ROLE_EMAIL,
+    CONF_TOLL_FREE,
     detect_regex,
 )
 from tests.test_validators import (
@@ -76,9 +79,9 @@ POSITIVES: list[tuple[EntityType, str, str]] = [
     # Паспорт
     (T.PASSPORT, "Паспорт гражданина РФ {} выдан ОВД района.", "45 06 123456"),
     (T.PASSPORT, "паспорт: {}", "4506 654321"),
-    (T.PASSPORT, "Документ {}, выдан 12.03.2010.", "4512987654"),
+    (T.PASSPORT, "Документ: серия {}, выдан 12.03.2010.", "4512987654"),
     (T.PASSPORT, "Паспорт серия {} выдан отделом УФМС.", "4510 № 112233"),
-    (T.PASSPORT, "серии {} — данные представителя", "63 01 445566"),
+    (T.PASSPORT, "паспорт серии {} выдан ОВД", "45 06 № 123456"),
     # Карта
     (T.CARD, "Оплата картой {} принята.", make_card("4276", 1)),
     (T.CARD, "Номер {} для возврата средств.", make_card("5469", 2, sep="-")),
@@ -94,6 +97,9 @@ POSITIVES: list[tuple[EntityType, str, str]] = [
     (T.PHONE, "Тел.: {}", "+79123456789"),
     (T.PHONE, "Приёмная: {}, доб. 12.", "8(3822)12-34-56"),
     (T.PHONE, "WhatsApp {} — менеджер", "8-923-111-22-33"),
+    (T.PHONE, "Тел.: {}, с 9 до 18", "(912) 345-67-89"),
+    (T.PHONE, "моб. {} (Иван)", "912 345-67-89"),
+    (T.PHONE, "Телефон/факс {}", "(3822) 12-34-56"),
     # Email
     (T.EMAIL, "Пишите на {} до пятницы.", "ivan.petrov@mail.ru"),
     (T.EMAIL, "Почта: {}.", "petrov_a@почта.рф"),
@@ -197,6 +203,13 @@ NEGATIVES: list[str] = [
     "Телефон 8 (112) 345-67-89",
     "Телефон +1 202 555 0143",
     "Версия 1.2.1990 протокола",
+    # Ревью T-007: «серия» без паспорта, телефон без кода страны и без метки
+    "Серия поставки 2023 номер 123456",
+    "Серия лекарственного препарата 4521 номер партии 210987",
+    "серии 63 01 445566 — данные представителя",
+    "Код позиции (912) 345-67-89 в каталоге",
+    "Номер 912 345-67-89 по реестру",
+    "Артикул (3822) 12-34-56",
 ]
 
 
@@ -204,6 +217,66 @@ NEGATIVES: list[str] = [
 def test_negative(text: str) -> None:
     found = run(text)
     assert found == [], [(e.type, text[e.start:e.end]) for e in found]
+
+
+# ---------- Ревью T-007: паспорт и телефон ----------
+def test_passport_context_word_counts_once() -> None:
+    text = "Паспорт 4506 123456, тел. 4012 345678"
+    passports = [text[e.start:e.end] for e in run(text) if e.type == T.PASSPORT]
+    assert passports == ["4506 123456"]
+
+
+def test_passport_series_word_alone_is_not_context() -> None:
+    assert run("Серия поставки 2023 номер 123456") == []
+    assert run("Серия лекарственного препарата 4521 номер партии 210987") == []
+    assert run("серия 4506 № 123456") == []          # нет «выдан» / «паспорт»
+    text = "паспорт серии 45 06 № 123456 выдан ОВД"
+    assert [e.type for e in run(text)] == [T.PASSPORT]
+
+
+def test_passport_series_needs_adjacency() -> None:
+    # «серия» далеко от числа — даже с «выдан» не контекст
+    assert run("Серия бланков обновлена, номер 4506 123456 выдан") == []
+    assert [e.type for e in run("Серия: 4506 № 123456, выдан ОВД")] == [T.PASSPORT]
+
+
+def test_issued_word_does_not_jump_over_other_number() -> None:
+    text = "серия 4506 123456; код 4512 987654 выдан"
+    found = [text[e.start:e.end] for e in run(text) if e.type == T.PASSPORT]
+    assert found == []  # первое число: «выдан» за другим числом; второе: «серия» не рядом
+
+
+@pytest.mark.parametrize("value", ["(912) 345-67-89", "912 345-67-89", "(3822) 12-34-56"])
+def test_local_phone_requires_label(value: str) -> None:
+    ent = assert_found(f"тел. {value}", T.PHONE, value)
+    assert ent.confidence == CONF_PHONE_LOCAL
+    assert run(f"Номер {value} в реестре") == []
+
+
+def test_local_phone_label_window() -> None:
+    far = "Телефон указан в приложении к договору поставки. " + "(912) 345-67-89"
+    assert run(far) == []  # метка дальше 30 символов
+    assert [e.type for e in run("Phone: (912) 345-67-89")] == [T.PHONE]
+
+
+def test_local_phone_inside_full_phone_is_merged() -> None:
+    text = "Тел. 8 (912) 345-67-89"
+    entities = run(text)
+    assert [(text[e.start:e.end], e.confidence) for e in entities] == [
+        ("8 (912) 345-67-89", CONF_FORMAT)
+    ]
+
+
+@pytest.mark.parametrize(
+    "text, value",
+    [
+        ("Горячая линия {}", "8 800 123-45-67"),
+        ("Звонок бесплатный: {}", "+7 (804) 123-45-67"),
+        ("тел. {}", "(800) 123-45-67"),
+    ],
+)
+def test_toll_free_low_confidence(text: str, value: str) -> None:
+    assert assert_found(text.format(value), T.PHONE, value).confidence == CONF_TOLL_FREE
 
 
 # ---------- Пересечения ----------

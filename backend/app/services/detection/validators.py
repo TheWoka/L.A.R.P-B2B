@@ -126,15 +126,31 @@ def is_valid_passport_series(series: str, today: date | None = None) -> bool:
     return region >= 1 and (year >= 97 or year <= current)
 
 
-def is_valid_ru_phone(value: str) -> bool:
-    """Российский номер: 11 цифр, начинается с 7 или 8, код начинается с 3, 4, 8 или 9."""
+def ru_phone_national(value: str) -> str | None:
+    """10-значный национальный номер РФ или None.
+
+    Принимает 11 цифр с 7/8 в начале ("+7 (912) 345-67-89") или 10 цифр без кода
+    страны ("(912) 345-67-89"). Код зоны должен начинаться с 3, 4, 8 или 9.
+    """
     digits = only_digits("".join(ch for ch in value if ch not in "+()"))
-    return (
-        digits is not None
-        and len(digits) == 11
-        and digits[0] in "78"
-        and digits[1] in "3489"
-    )
+    if digits is None:
+        return None
+    if len(digits) == 11 and digits[0] in "78":
+        digits = digits[1:]
+    if len(digits) != 10 or digits[0] not in "3489":
+        return None
+    return digits
+
+
+def is_valid_ru_phone(value: str) -> bool:
+    """Российский номер с кодом страны: 11 цифр, начинается с 7 или 8, код — с 3, 4, 8 или 9."""
+    digits = only_digits("".join(ch for ch in value if ch not in "+()"))
+    return digits is not None and len(digits) == 11 and ru_phone_national(value) is not None
+
+
+def is_toll_free(national: str) -> bool:
+    """Бесплатные линии 8-800 и 8-804 — номера организаций, а не физлиц."""
+    return national[:3] in ("800", "804")
 
 
 def is_valid_birth_date(day: int, month: int, year: int, today: date | None = None) -> bool:

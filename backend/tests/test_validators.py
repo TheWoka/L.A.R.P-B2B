@@ -11,6 +11,7 @@ from datetime import date
 import pytest
 
 from app.services.detection.validators import (
+    is_toll_free,
     is_valid_account_key,
     is_valid_bik,
     is_valid_birth_date,
@@ -21,6 +22,7 @@ from app.services.detection.validators import (
     is_valid_snils,
     luhn_ok,
     only_digits,
+    ru_phone_national,
     snils_checksum,
 )
 
@@ -251,6 +253,31 @@ def test_passport_series() -> None:
 )
 def test_ru_phone(value: str, ok: bool) -> None:
     assert is_valid_ru_phone(value) is ok
+
+
+@pytest.mark.parametrize(
+    ("value", "national"),
+    [
+        ("+7 (912) 345-67-89", "9123456789"),
+        ("8 (3822) 12-34-56", "3822123456"),
+        ("(912) 345-67-89", "9123456789"),
+        ("912 345-67-89", "9123456789"),
+        ("(3822) 12-34-56", "3822123456"),
+        ("(112) 345-67-89", None),      # код с 1
+        ("612 345-67-89", None),        # код с 6
+        ("12345678", None),
+        ("+7 (912) 345-67-8", None),
+    ],
+)
+def test_ru_phone_national(value: str, national: str | None) -> None:
+    assert ru_phone_national(value) == national
+
+
+def test_toll_free() -> None:
+    assert is_toll_free("8001234567")
+    assert is_toll_free("8041234567")
+    assert not is_toll_free("9123456789")
+    assert not is_toll_free("8121234567")  # Санкт-Петербург, не бесплатная линия
 
 
 def test_birth_date() -> None:

@@ -23,7 +23,9 @@ from app.services.masking.masker import mask_value
 # ---------- Уверенность ----------
 CONF_CHECKSUM = 0.98        # прошла контрольная сумма
 CONF_CONTEXT = 0.95         # формат + обязательный контекст
-CONF_FORMAT = 0.9           # только формат (телефон)
+CONF_FORMAT = 0.9           # только формат (телефон с кодом страны)
+CONF_PHONE_LOCAL = 0.85     # телефон без кода страны, рядом метка "тел."
+CONF_TOLL_FREE = 0.5        # 8-800 / 8-804 — бесплатные линии организаций
 CONF_ACCOUNT_NO_BIK = 0.8   # счёт физлица, рядом нет БИК для проверки ключа
 CONF_EMAIL = 0.95
 CONF_ROLE_EMAIL = 0.5       # ролевой ящик организации: info@, zakupki@ …
@@ -54,6 +56,8 @@ WIN_BIRTH = 40
 WIN_BIRTH_RIGHT = 15        # "01.02.1990 г.р." — сокращение стоит после даты
 WIN_BIK = 120
 WIN_LABEL = 30
+WIN_PHONE_LABEL = 30
+SERIES_MAX_GAP = 3          # "серия 4506 …": между словом и числом не больше 3 символов
 
 # ---------- Регулярные выражения (компилируются один раз) ----------
 S = r"[   ‐‑–—-]"   # разделитель внутри номера
@@ -82,6 +86,13 @@ PHONE_RE = re.compile(
     rf"\d{{1,3}}(?:{S}?\d{{2}}){{2}}"
     rf"(?!\d)(?!{S}\d{{3}})"
 )
+# Без кода страны: "(912) 345-67-89", "912 345-67-89", "(3822) 12-34-56" — 10 цифр.
+PHONE_LOCAL_RE = re.compile(
+    rf"(?<![\d+])(?<!\d{S})"
+    rf"(?:\({S}?\d{{3,5}}{S}?\)|\d{{3,5}}){S}?"
+    rf"\d{{1,3}}(?:{S}?\d{{2}}){{2}}"
+    rf"(?!\d)(?!{S}\d{{3}})"
+)
 EMAIL_RE = re.compile(r"(?<![\w.+-])[\w.+-]+@[\w-]+(?:\.[\w-]+)*\.[^\W\d_]{2,}(?![\w-])")
 
 MONTHS = {
@@ -99,7 +110,10 @@ DATE_TEXT_RE = re.compile(
 
 # Контекст ищется в нормализованном окне: нижний регистр, "ё" → "е".
 KW_SNILS = re.compile(r"снилс|страхов")
-KW_PASSPORT = re.compile(r"паспорт|сери[яи]|выдан")
+KW_PASSPORT = re.compile(r"паспорт")
+KW_ISSUED = re.compile(r"выдан")
+KW_SERIES_BEFORE = re.compile(rf"сери[яи]\W{{0,{SERIES_MAX_GAP}}}$")
+PHONE_LABEL = re.compile(r"(?<!\w)(?:тел|моб|факс|phone)")
 KW_CARD = re.compile(r"карт|card")
 KW_BIRTH = re.compile(r"рожд|родил(?:ся|ась)|г\.\s?р\.|д\.\s?р\.")
 KW_BIRTH_RIGHT = re.compile(r"^[\s,]*(?:г\.\s?р\.|д\.\s?р\.|года\s+рождения|г\.\s*рожд)")
@@ -156,6 +170,26 @@ def _has_non_pd_label(text: str, start: int) -> bool:
     return NON_PD_LABEL.search(left_window(text, start, WIN_LABEL)) is not None
 
 
+def _clean_gap(gap: str) -> bool:
+    """Между словом-контекстом и кандидатом нет другого числа (≥ 4 цифр) и метки телефона."""
+    return YEAR_RE.search(gap) is None and PHONE_LABEL.search(gap) is None
+
+
+def keyword_near(text: str, start: int, end: int, kw: re.Pattern[str], width: int) -> bool:
+    """Слово kw в окне ±width (в пределах строки) и «чистый» промежуток до кандидата.
+
+    Одно слово-контекст не засчитывается нескольким числам: ближайшее вхождение
+    слева/справа должно отделяться от кандидата только текстом без других чисел.
+    """
+    left = left_window(text, start, width)
+    hits = list(kw.finditer(left))
+    if hits and _clean_gap(left[hits[-1].end():]):
+        return True
+    right = right_window(text, end, width)
+    hit = kw.search(right)
+    return hit is not None and _clean_gap(right[:hit.start()])
+
+
 # ---------- Поиск по типам ----------
 def _find_snils(ctx: _Ctx) -> Iterator[Candidate]:
     text = ctx.text
@@ -193,23 +227,57 @@ def _find_card(ctx: _Ctx) -> Iterator[Candidate]:
             yield Candidate(EntityType.CARD, start, end, CONF_CHECKSUM)
 
 
+def _has_passport_context(text: str, start: int, end: int) -> bool:
+    """«паспорт» рядом, ИЛИ «серия/серии» прямо перед числом и «выдан» рядом.
+
+    Само слово «серия» контекстом не считается: «серия поставки», «серия препарата».
+    """
+    if keyword_near(text, start, end, KW_PASSPORT, WIN_PASSPORT):
+        return True
+    series_before = KW_SERIES_BEFORE.search(left_window(text, start, WIN_PASSPORT))
+    return series_before is not None and keyword_near(
+        text, start, end, KW_ISSUED, WIN_PASSPORT
+    )
+
+
 def _find_passport(ctx: _Ctx) -> Iterator[Candidate]:
     text = ctx.text
     for m in PASSPORT_RE.finditer(text):
         if not v.is_valid_passport_series(m.group("series")):
             continue
-        has_context = KW_PASSPORT.search(
-            left_window(text, m.start(), WIN_PASSPORT)
-        ) or KW_PASSPORT.search(right_window(text, m.end(), WIN_PASSPORT))
-        if has_context and not _has_non_pd_label(text, m.start()):
+        if _has_passport_context(text, m.start(), m.end()) and not _has_non_pd_label(
+            text, m.start()
+        ):
             yield Candidate(EntityType.PASSPORT, m.start(), m.end(), CONF_CONTEXT)
+
+
+def _phone_confidence(national: str, default: float) -> float:
+    return CONF_TOLL_FREE if v.is_toll_free(national) else default
 
 
 def _find_phone(ctx: _Ctx) -> Iterator[Candidate]:
     text = ctx.text
     for m in PHONE_RE.finditer(text):
-        if v.is_valid_ru_phone(m.group()) and not _has_non_pd_label(text, m.start()):
-            yield Candidate(EntityType.PHONE, m.start(), m.end(), CONF_FORMAT)
+        national = v.ru_phone_national(m.group())
+        if national is None or not v.is_valid_ru_phone(m.group()):
+            continue
+        if not _has_non_pd_label(text, m.start()):
+            conf = _phone_confidence(national, CONF_FORMAT)
+            yield Candidate(EntityType.PHONE, m.start(), m.end(), conf)
+
+
+def _find_phone_local(ctx: _Ctx) -> Iterator[Candidate]:
+    """10 цифр без +7/8 — только с меткой «тел/моб/факс/phone» в 30 символах слева."""
+    text = ctx.text
+    for m in PHONE_LOCAL_RE.finditer(text):
+        national = v.ru_phone_national(m.group())
+        if national is None or v.is_valid_ru_phone(m.group()):  # нужно ровно 10 цифр
+            continue
+        if not PHONE_LABEL.search(left_window(text, m.start(), WIN_PHONE_LABEL)):
+            continue
+        if not _has_non_pd_label(text, m.start()):
+            conf = _phone_confidence(national, CONF_PHONE_LOCAL)
+            yield Candidate(EntityType.PHONE, m.start(), m.end(), conf)
 
 
 def _find_email(ctx: _Ctx) -> Iterator[Candidate]:
@@ -277,7 +345,7 @@ def _find_accounts(ctx: _Ctx) -> tuple[list[Candidate], list[tuple[int, int]]]:
 
 _FINDERS: tuple[Callable[[_Ctx], Iterator[Candidate]], ...] = (
     _find_snils, _find_inn, _find_card, _find_passport,
-    _find_birth_date, _find_phone, _find_email,
+    _find_birth_date, _find_phone, _find_phone_local, _find_email,
 )
 
 
