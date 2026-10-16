@@ -35,3 +35,4 @@ eval/results/*
 Thumbs.db
 eval/corpus/
 Claude outputs/
+docs/planning/

@@ -36,7 +36,8 @@ class Entity(BaseModel):
     end: int
     page: int | None = None
     section: str | None = None
-    value_masked: str                # для показа: "Иванов И***", "***-***-*** 45"
+    # для ПДн — маскирование с сохранением длины (contracts.md, 4.1): "И█████ И███"
+    value_masked: str
     confidence: float = Field(ge=0, le=1)
     detector: Literal["regex", "ner", "dict", "llm", "model"]
 

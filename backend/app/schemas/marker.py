@@ -15,7 +15,9 @@ class MarkerType(str, Enum):
 
 
 class Evidence(BaseModel):
-    quote: str                       # дословная цитата (для ПДн — уже замаскированная)
+    # цитата исходного текста, ПДн замаскированы с сохранением длины (contracts.md, 4.1):
+    # quote == ReportText.text[start:end], len(quote) == end - start
+    quote: str
     start: int
     end: int
     page: int | None = None

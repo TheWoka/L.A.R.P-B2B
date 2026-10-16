@@ -70,7 +70,7 @@ class Entity(BaseModel):
     end: int
     page: int | None = None
     section: str | None = None
-    value_masked: str                # для показа: "Иванов И***", "***-***-*** 45"
+    value_masked: str                # для ПДн — маскирование с сохранением длины (раздел 4.1): "И█████ И███", "███-███-███ ██"
     confidence: float = Field(ge=0, le=1)
     detector: Literal["regex", "ner", "dict", "llm", "model"]
 
@@ -86,7 +86,8 @@ class MarkerType(str, Enum):
 
 
 class Evidence(BaseModel):
-    quote: str                       # дословная цитата (для ПДн — уже замаскированная)
+    quote: str                       # цитата исходного текста, ПДн замаскированы с сохранением длины:
+                                     # quote == ReportText.text[start:end], len(quote) == end - start
     start: int
     end: int
     page: int | None = None
@@ -251,7 +252,12 @@ class MaskResult(BaseModel):
 def mask(text: str, entities: list[Entity]) -> MaskResult: ...
 def unmask(text: str, mapping: dict[str, str]) -> str: ...
 def to_original_offset(masked_offset: int, spans: list[MaskSpan]) -> int: ...
-# пересчёт смещения из masked_text в координаты исходного текста — для цитат из ответа LLM
+# пересчёт смещения из masked_text в координаты исходного текста — для цитат из ответа LLM.
+# Вне плейсхолдеров — сдвиг на разницу длин замен левее; строго внутри плейсхолдера → orig_start;
+# ровно на masked_end → orig_end. Перед пересчётом границы цитаты LLM расширяются до целых
+# плейсхолдеров (T-013), поэтому значение ПДн попадает в цитату целиком.
+def mask_preserving_length(text: str, entities: list[Entity]) -> str: ...
+# маскирование с сохранением длины (раздел 4.1) — для ReportText.text, Evidence.quote, Entity.value_masked
 
 # services/llm/client.py
 def complete_json(system: str, user: str, schema: type[BaseModel]) -> BaseModel: ...
@@ -321,10 +327,22 @@ class HealthStatus(BaseModel):       # ответ GET /api/health
 **Единая система координат.** Все смещения в `Report` (`Entity.start/end`, `Evidence.start/end`)
 и в `ReportText.segments` считаются в координатах **исходного** полного текста (`ExtractedDocument.text`).
 
-`ReportText.text` — текст с маскированием, сохраняющим длину: каждый символ значения ПДн заменяется
-на `█`, кроме первой буквы каждого слова (`"Иванов Иван"` → `"И█████ И███"`). Поэтому
+`ReportText.text` — текст с маскированием, сохраняющим длину (`mask_preserving_length`). Поэтому
 `len(ReportText.text)` равна длине исходного текста и смещения совпадают с исходными — фронтенд
-подсвечивает находки по `start/end` без пересчёта.
+подсвечивает находки по `start/end` без пересчёта. Тем же правилом строятся `Evidence.quote`
+(`quote == ReportText.text[start:end]`) и `Entity.value_masked`.
+
+**Правило маскирования с сохранением длины.** Применяется к значению каждой сущности ПДн
+(категории `pd`, `pd_special`). «Слово» — непрерывная последовательность букв и цифр (`\w+`).
+Слово начинается с буквы — первая буква остаётся, остальные символы слова → `█`; слово начинается
+с цифры — все символы слова → `█`. Прочие символы (пробелы, `-`, `(`, `)`, `+`, `@`, `.`) остаются.
+
+| Исходное значение | После маскирования |
+|---|---|
+| `Иванов Иван` | `И█████ И███` |
+| `123-456-789 00` | `███-███-███ ██` |
+| `+7 (912) 345-67-89` | `+█ (███) ███-██-██` |
+| `ivan.petrov@mail.ru` | `i███.p█████@m███.r█` |
 
 Текст для LLM (`MaskResult.masked_text`, плейсхолдеры `[PERSON_1]`) имеет другую длину. Цитаты из
 ответа LLM переводятся в исходные координаты через `to_original_offset(masked_offset, spans)`.
@@ -353,5 +371,6 @@ REPORT_TTL_DAYS=7
 
 | Дата | Что изменилось | Кто решил |
 |---|---|---|
+| 2026-10-16 | Ревью T-001: `Evidence.quote` и `Entity.value_masked` — маскирование с сохранением длины, `quote == ReportText.text[start:end]`. Определено правило маскирования (слово = `\w+`; буквенное слово — первая буква видна; цифровое — скрыто целиком; разделители видны). В раздел 3 добавлена `mask_preserving_length(text, entities) -> str` (T-008). Уточнена `to_original_offset` внутри плейсхолдера; границы цитат LLM расширяются до целых плейсхолдеров (T-013). | Данила (тимлид) |
 | 2026-10-15 | T-001 (правка 2): единая система координат — все смещения в `Report` и `ReportText.segments` в координатах исходного текста; `ReportText.text` — маскирование с сохранением длины (`█`, кроме первой буквы слова). В `MaskResult` добавлено `spans: list[MaskSpan]`, добавлена функция `to_original_offset` (реализация — T-008). Health: `status = "degraded"`, если `db` или `redis` = false (HTTP 200). | Данила (тимлид) |
 | 2026-10-15 | T-001: `GET /api/health` возвращает `HealthStatus {status, db, redis}` вместо `{status}`. Добавлен раздел 4.1 с моделями `TaskCreated`, `QueryRequest`, `ReportText`, `HealthStatus` — раньше эти формы были описаны только в таблице раздела 4 без имён. Поля и смысл ответов не изменились, кроме двух новых полей health. | Данила (тимлид) |

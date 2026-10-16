@@ -48,6 +48,7 @@ export interface Entity {
   end: number;
   page: number | null;
   section: string | null;
+  /** Для ПДн — маскирование с сохранением длины (contracts.md, 4.1): "И█████ И███". */
   value_masked: string;
   confidence: number;
   detector: Detector;
@@ -63,6 +64,7 @@ export type MarkerType =
   | "kii_mention";
 
 export interface Evidence {
+  /** Цитата, ПДн скрыты с сохранением длины: quote === ReportText.text.slice(start, end). */
   quote: string;
   start: number;
   end: number;
