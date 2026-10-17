@@ -7,7 +7,7 @@ import pymupdf
 
 from app.schemas import ExtractedDocument, TextSegment
 from app.services.extraction.docx import extract_docx
-from app.services.extraction.pdf import extract_pdf
+from app.services.extraction.pdf import ScannedPdfError, extract_pdf
 from app.services.extraction.xlsx import extract_xlsx
 
 logger = logging.getLogger(__name__)
@@ -32,6 +32,8 @@ def extract(path: Path, filename: str, document_id: str) -> ExtractedDocument:
         if extension == ".pdf":
             with pymupdf.open(path, filetype="pdf") as pdf:
                 pages = len(pdf)
+    except ScannedPdfError:
+        raise
     except Exception as exc:
         raise ValueError(
             "Не удалось прочитать файл. Он повреждён, недоступен или защищён паролем."
@@ -43,7 +45,9 @@ def extract(path: Path, filename: str, document_id: str) -> ExtractedDocument:
             continue
         normalized.append(segment.model_copy(update={"id": len(normalized), "offset": offset}))
         offset += len(segment.text) + 1
-    logger.info("Извлечён файл %s: страниц=%s, сегментов=%s", filename, pages, len(normalized))
+    logger.info(
+        "Извлечён документ %s: страниц=%s, сегментов=%s", document_id, pages, len(normalized),
+    )
     return ExtractedDocument(
         document_id=document_id, filename=filename, pages=pages,
         text="\n".join(segment.text for segment in normalized), segments=normalized,
