@@ -9,12 +9,13 @@ import pymupdf
 import pytest
 from docx import Document
 from docx.enum.style import WD_STYLE_TYPE
+from docx.shared import Inches
 from openpyxl import Workbook
 
 from app.schemas import ExtractedDocument, TextSegment
 from app.services.extraction.docx import extract_docx
 from app.services.extraction.extract import extract
-from app.services.extraction.pdf import extract_pdf
+from app.services.extraction.pdf import extract_pdf, is_numbered_heading
 from app.services.extraction.xlsx import extract_xlsx
 
 
@@ -117,6 +118,100 @@ def test_docx_order_and_sections(docx_path: Path) -> None:
     assert_offsets(document)
 
 
+def test_docx_headers_and_footers(tmp_path: Path) -> None:
+    path = tmp_path / "margins.docx"
+    source = Document()
+    source.sections[0].header.paragraphs[0].text = "Коммерческая тайна. ООО «Ромашка»"
+    source.sections[0].footer.paragraphs[0].text = "Срок хранения 5 лет"
+    source.add_heading("1. Выдуманная закупка", level=1)
+    source.add_paragraph("Поставка лунных кубов.")
+    source.save(path)
+
+    document = extract(path, path.name, "synthetic-id")
+    assert document.text == (
+        "Коммерческая тайна. ООО «Ромашка»\n"
+        "1. Выдуманная закупка\nПоставка лунных кубов.\nСрок хранения 5 лет"
+    )
+    assert [segment.section for segment in document.segments] == [
+        "Верхний колонтитул", "1. Выдуманная закупка",
+        "1. Выдуманная закупка", "Нижний колонтитул",
+    ]
+    assert_offsets(document)
+    segments = extract_docx(path)
+    assert_offsets(document.model_copy(update={"segments": segments}))
+
+
+@pytest.mark.parametrize("first_page", [False, True])
+@pytest.mark.parametrize("even_pages", [False, True])
+def test_docx_optional_margins_and_tables(
+    tmp_path: Path, first_page: bool, even_pages: bool,
+) -> None:
+    path = tmp_path / "optional-margins.docx"
+    source = Document()
+    section = source.sections[0]
+    section.different_first_page_header_footer = first_page
+    source.settings.odd_and_even_pages_header_footer = even_pages
+    source.add_paragraph("Выдуманное содержимое")
+    expected_headers: list[str] = []
+    expected_footers: list[str] = []
+    for kind, expected in [("header", expected_headers), ("footer", expected_footers)]:
+        for prefix, enabled in [("", True), ("first_page_", first_page),
+                                ("even_page_", even_pages)]:
+            margin = getattr(section, prefix + kind)
+            paragraph = f"Выдуманный абзац {prefix}{kind}"
+            margin.paragraphs[0].text = paragraph
+            table = margin.add_table(rows=1, cols=2, width=Inches(4))
+            table.cell(0, 0).text = f"Выдуманная таблица {prefix}{kind}"
+            table.cell(0, 1).text = "Лунный куб"
+            margin.add_paragraph(" ")
+            margin.add_paragraph(f"Конец {prefix}{kind}")
+            if enabled:
+                expected.extend([paragraph, f"{table.cell(0, 0).text} | Лунный куб",
+                                 f"Конец {prefix}{kind}"])
+    source.save(path)
+
+    document = extract(path, path.name, "synthetic-id")
+    assert [segment.text for segment in document.segments] == [
+        *expected_headers, "Выдуманное содержимое", *expected_footers,
+    ]
+    assert [segment.section for segment in document.segments] == (
+        ["Верхний колонтитул"] * len(expected_headers)
+        + [None] + ["Нижний колонтитул"] * len(expected_footers)
+    )
+    assert_offsets(document)
+
+
+@pytest.mark.parametrize("linked", [False, True])
+def test_docx_repeated_margins(tmp_path: Path, linked: bool) -> None:
+    path = tmp_path / "repeated-margins.docx"
+    source = Document()
+    source.settings.odd_and_even_pages_header_footer = True
+    first = source.sections[0]
+    first.different_first_page_header_footer = True
+    names = ["header", "first_page_header", "even_page_header",
+             "footer", "first_page_footer", "even_page_footer"]
+    for name in names:
+        getattr(first, name).paragraphs[0].text = f"Выдуманный колонтитул {name}"
+    source.add_paragraph("Первый выдуманный раздел")
+    second = source.add_section()
+    second.different_first_page_header_footer = True
+    for name in names:
+        margin = getattr(second, name)
+        margin.is_linked_to_previous = linked
+        if not linked:
+            margin.paragraphs[0].text = f"Выдуманный колонтитул {name}"
+    source.add_paragraph("Второй выдуманный раздел")
+    source.save(path)
+
+    document = extract(path, path.name, "synthetic-id")
+    assert [segment.text for segment in document.segments] == [
+        *(f"Выдуманный колонтитул {name}" for name in names[:3]),
+        "Первый выдуманный раздел", "Второй выдуманный раздел",
+        *(f"Выдуманный колонтитул {name}" for name in names[3:]),
+    ]
+    assert_offsets(document)
+
+
 def test_xlsx_sections_and_values(xlsx_path: Path) -> None:
     document = extract(xlsx_path, "sample.xlsx", "synthetic-sheet")
     assert [segment.section for segment in document.segments] == [
@@ -141,7 +236,9 @@ def test_pdf_pages_and_sections(pdf_path: Path) -> None:
 
 
 @pytest.mark.parametrize("fixture, filename", [
-    ("pdf_path", "upload.PdF"), ("docx_path", "upload.DoCx"), ("xlsx_path", "upload.XlSx"),
+    ("pdf_path", "Выдуманный_Луннокубов.PdF"),
+    ("docx_path", "Выдуманный_Луннокубов.DoCx"),
+    ("xlsx_path", "Выдуманный_Луннокубов.XlSx"),
 ])
 def test_filename_dispatch_and_safe_logs(
     fixture: str, filename: str, request: pytest.FixtureRequest,
@@ -155,7 +252,9 @@ def test_filename_dispatch_and_safe_logs(
     assert document.text
     assert document.filename == filename
     assert document.document_id == "synthetic-id"
-    assert filename in caplog.text
+    assert filename not in caplog.text
+    assert Path(filename).stem not in caplog.text
+    assert "synthetic-id" in caplog.text
     assert f"сегментов={len(document.segments)}" in caplog.text
     assert f"страниц={document.pages}" in caplog.text
     assert all(segment.text not in caplog.text for segment in document.segments)
@@ -184,16 +283,11 @@ def test_corrupt_file(corrupt_path: Path) -> None:
     assert error.value.__cause__ is not None
 
 
-@pytest.fixture(params=["pdf", "docx", "xlsx"])
+@pytest.fixture(params=["docx", "xlsx"])
 def empty_path(tmp_path: Path, request: pytest.FixtureRequest) -> Path:
     extension: str = request.param
     path = tmp_path / f"empty.{extension}"
-    if extension == "pdf":
-        with pymupdf.open() as document:
-            document.new_page()
-            document.new_page()
-            document.save(path)
-    elif extension == "docx":
+    if extension == "docx":
         document = Document()
         document.add_paragraph(" \t ")
         document.add_table(rows=1, cols=2)
@@ -210,8 +304,52 @@ def test_empty_documents(empty_path: Path) -> None:
     extracted = extract(empty_path, empty_path.name, "synthetic-id")
     assert extracted.text == ""
     assert extracted.segments == []
-    assert extracted.pages == (2 if empty_path.suffix == ".pdf" else None)
+    assert extracted.pages is None
     assert_offsets(extracted)
+
+
+@pytest.mark.parametrize("page_count", [1, 2])
+def test_pdf_without_text_reports_scan(tmp_path: Path, page_count: int) -> None:
+    path = tmp_path / "scan.pdf"
+    with pymupdf.open() as source:
+        for _ in range(page_count):
+            page = source.new_page()
+            page.insert_text((72, 72), "   ")
+        source.save(path)
+
+    with pytest.raises(ValueError) as error:
+        extract(path, path.name, "synthetic-id")
+    assert str(error.value) == (
+        "Документ похож на скан: текст не распознаётся. "
+        "Загрузите документ с текстовым слоем."
+    )
+
+
+@pytest.mark.parametrize("empty_pages", [(1,), (2,), (1, 3)])
+def test_pdf_partially_empty_pages_warning(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture, empty_pages: tuple[int, ...],
+) -> None:
+    path = tmp_path / "partially-empty.pdf"
+    page_count = len(empty_pages) + 1
+    with pymupdf.open() as source:
+        for number in range(1, page_count + 1):
+            page = source.new_page()
+            if number not in empty_pages:
+                page.insert_text((72, 72), "Fictional moon cubes.")
+        source.save(path)
+
+    with caplog.at_level(logging.WARNING, logger="app.services.extraction.pdf"):
+        document = extract(path, path.name, "synthetic-id")
+    assert document.pages == page_count
+    assert document.text == "Fictional moon cubes."
+    assert [segment.page for segment in document.segments] == [
+        number for number in range(1, page_count + 1) if number not in empty_pages
+    ]
+    warnings = [record for record in caplog.records if record.levelno == logging.WARNING]
+    assert len(warnings) == 1
+    assert warnings[0].getMessage() == f"PDF: страницы без текста: {list(empty_pages)}"
+    assert document.text not in caplog.text
+    assert_offsets(document)
 
 
 @pytest.fixture
@@ -241,6 +379,10 @@ def test_docx_merged_cells(merged_path: Path) -> None:
 @pytest.fixture(params=[
     ("Без номера", "Heading 2", "Без номера"),
     ("Русский стиль", "Заголовок 2", "Русский стиль"),
+    ("2026 год — отчёт", "Heading 2", "2026 год — отчёт"),
+    ("3.1. Цена контракта составляет 100 000 руб.", "Заголовок 2",
+     "3.1. Цена контракта составляет 100 000 руб."),
+    ("а" * 81 + ":", "Heading 2", "а" * 81 + ":"),
     ("3.2. Условия", "Normal", "3.2. Условия"),
     ("3. " + "а" * 117, "Normal", None),
     ("Обычный абзац", "Normal", None),
@@ -260,6 +402,53 @@ def heading_case(tmp_path: Path, request: pytest.FixtureRequest) -> tuple[Path, 
 def test_docx_heading_detection(heading_case: tuple[Path, str | None]) -> None:
     path, expected = heading_case
     assert extract_docx(path)[-1].section == expected
+
+
+@pytest.mark.parametrize("line, expected", [
+    ("1. Общие положения", True),
+    ("3.2. Обязанности сторон", True),
+    ("2026 год — отчёт", False),
+    ("3.1. Цена контракта составляет 100 000 руб.", False),
+    ("10 000 рублей", False),
+    ("1.1.1. Термины", True),
+    ("99.99.99 Термины", True),
+    ("1.1.1.1. Термины", False),
+    ("100. Термины", False),
+    ("1.100. Термины", False),
+    ("1.1.100. Термины", False),
+    ("1. термины", False),
+    ("1.Общие положения", False),
+    ("1. Термины;", False),
+    ("1. Термины:", False),
+    ("1. Термины,", False),
+    ("1. " + "А" * 77, True),
+    ("1. " + "А" * 78, False),
+    ("1. Термины" + " слова" * 8, True),
+    ("1. Термины" + " слова" * 9, False),
+    ("", False),
+])
+@pytest.mark.parametrize("extension", ["pdf", "docx"])
+def test_numbered_heading_rules(
+    tmp_path: Path, line: str, expected: bool, extension: str,
+) -> None:
+    assert is_numbered_heading(line) is expected
+    path = tmp_path / f"numbered-heading.{extension}"
+    if extension == "docx":
+        source = Document()
+        source.add_paragraph(line)
+        source.add_paragraph("Выдуманный текст раздела")
+        source.save(path)
+    else:
+        with pymupdf.open() as source:
+            page = source.new_page(width=1400)
+            if line:
+                page.insert_htmlbox((40, 40, 1360, 100), line)
+            page.insert_htmlbox((40, 150, 1360, 200), "Выдуманный текст раздела")
+            source.save(path)
+
+    document = extract(path, path.name, "synthetic-id")
+    assert document.segments[-1].section == (line if expected else None)
+    assert_offsets(document)
 
 
 @pytest.mark.parametrize("fixture, parser", [
