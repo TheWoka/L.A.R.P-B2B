@@ -3,6 +3,8 @@
 
 import type {
   DocPurpose,
+  LlmCall,
+  Metrics,
   QueryRequest,
   Report,
   ReportText,
@@ -77,6 +79,19 @@ export function getReport(reportId: string): Promise<Report> {
 
 export function getReportText(reportId: string): Promise<ReportText> {
   return request<ReportText>(`/reports/${encodeURIComponent(reportId)}/text`);
+}
+
+export function getLlmLog(reportId: string): Promise<LlmCall[]> {
+  return request<LlmCall[]>(`/reports/${encodeURIComponent(reportId)}/llm-log`);
+}
+
+/** Ссылка для кнопки «Скачать обезличенную копию» (href), а не fetch: файл отдаёт браузер. */
+export function redactedUrl(reportId: string): string {
+  return `${BASE_URL}/reports/${encodeURIComponent(reportId)}/redacted`;
+}
+
+export function getMetrics(): Promise<Metrics> {
+  return request<Metrics>("/metrics");
 }
 
 export function listRules(): Promise<Rule[]> {
