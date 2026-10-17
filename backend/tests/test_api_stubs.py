@@ -24,7 +24,7 @@ def test_openapi_has_all_contract_endpoints(client: TestClient) -> None:
 
 
 def test_stub_returns_501_with_task_number(client: TestClient) -> None:
-    response = client.get("/api/tasks/some-id")
+    response = client.get("/api/reports/some-id")
     assert response.status_code == 501
     assert "T-009" in response.json()["detail"]
 
