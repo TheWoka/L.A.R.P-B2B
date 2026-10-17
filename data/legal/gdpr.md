@@ -354,8 +354,4 @@ In the absence of an adequacy decision, Union or Member State law may, for impor
 
 The controller or processor shall document the assessment as well as the suitable safeguards referred to in the second subparagraph of paragraph 1 of this Article in the records referred to in Article 30.
 
-Источник:https://gdpr-info.eu/, редакция от 23.05.2018 (cor. OJ L 127)
-
-1. В исходном тексте присутствовали цифры-индексы предложений, слитые с текстом (например, `1The processor…`, `2In the case…`, `3That legal basis…` и т. д.). На сайте gdpr-info.eu они отображаются как верхние индексы и служат для нумерации предложений внутри параграфа. Я убрал их как мусор сайта (правило 4), поскольку в официальном тексте GDPR предложения внутри параграфов не нумеруются. Сами слова закона не изменены.
-
-2. Явных обрезков или непонятных фрагментов в предоставленных статьях не обнаружено — все 12 статей (4, 5, 6, 9, 28, 32, 44–49) выглядят полными.
+Источник:https://gdpr-info.eu/, редакция от 04.05.2016
