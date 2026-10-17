@@ -23,7 +23,7 @@
       "end": 171,
       "page": 2,
       "section": "4. Цена контракта",
-      "value_masked": "Себестоимость ***",
+      "value_masked": "38 400 руб.",
       "confidence": 0.82,
       "detector": "dict"
     },
@@ -45,7 +45,7 @@
       "end": 319,
       "page": 3,
       "section": "9. Контактные лица",
-      "value_masked": "Карпова В***",
+      "value_masked": "К██████ В███████ О███████",
       "confidence": 0.93,
       "detector": "ner"
     },
@@ -56,7 +56,7 @@
       "end": 344,
       "page": 3,
       "section": "9. Контактные лица",
-      "value_masked": "+7 (***) ***-**-33",
+      "value_masked": "+█ (███) ███-██-██",
       "confidence": 0.99,
       "detector": "regex"
     },
@@ -67,7 +67,7 @@
       "end": 374,
       "page": 3,
       "section": "9. Контактные лица",
-      "value_masked": "v***@example.org",
+      "value_masked": "v.k██████@e██████.o██",
       "confidence": 0.99,
       "detector": "regex"
     },
@@ -78,7 +78,7 @@
       "end": 425,
       "page": 3,
       "section": "9. Контактные лица",
-      "value_masked": "Лыткин А***",
+      "value_masked": "Л█████ А██████ П███████",
       "confidence": 0.91,
       "detector": "ner"
     },
@@ -89,7 +89,7 @@
       "end": 446,
       "page": 3,
       "section": "9. Контактные лица",
-      "value_masked": "69** ***456",
+      "value_masked": "████ ██████",
       "confidence": 0.96,
       "detector": "regex"
     },
@@ -100,7 +100,7 @@
       "end": 468,
       "page": 3,
       "section": "9. Контактные лица",
-      "value_masked": "***-***-*** 00",
+      "value_masked": "███-███-███ ██",
       "confidence": 0.98,
       "detector": "regex"
     }
@@ -152,14 +152,14 @@
       ],
       "evidence": [
         {
-          "quote": "Ответственный исполнитель: К██████ В███████ О███████, тел. +█ (████ 1████████",
+          "quote": "Ответственный исполнитель: К██████ В███████ О███████, тел. +█ (███) ███-██-██",
           "start": 267,
           "end": 344,
           "page": 3,
           "section": "9. Контактные лица"
         },
         {
-          "quote": "Л█████ А██████ П███████, паспорт 6███ 1█████, СНИЛС 1██████████ 0█",
+          "quote": "Л█████ А██████ П███████, паспорт ████ ██████, СНИЛС ███-███-███ ██",
           "start": 402,
           "end": 468,
           "page": 3,

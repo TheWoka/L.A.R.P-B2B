@@ -132,3 +132,40 @@ def test_assign_location_without_segments() -> None:
     bare = ExtractedDocument(document_id="b", filename="b.txt", text="x" * 20, segments=[])
     e = ent(0, 5)
     assert assign_location([e], bare) == [e]
+
+
+# ---------- сквозной тест T-008: detect → mask (AGENTS.md, правило 5) ----------
+def test_detect_then_mask_hides_all_pd() -> None:
+    from app.services.masking.masker import mask, mask_preserving_length, unmask
+
+    snils = make_snils(31)
+    fio, address = "Иванов Иван Петрович", "г. Томск, ул. Ленина, д. 30, кв. 5"
+    e2e = build_doc([
+        (f"Исполнитель {fio}, СНИЛС {snils}, тел. {PHONE}.", 1, "1. Стороны"),
+        (f"Проживает по адресу: {address}. Цена контракта 120 000 руб.", 1, "1. Стороны"),
+    ])
+    entities = detect(e2e)
+    assert {e.type for e in entities} >= {T.PERSON, T.SNILS, T.PHONE, T.ADDRESS}
+
+    result = mask(e2e.text, entities)
+    for value in (fio, "Иванов", snils, PHONE, "345-67-89", address, "ул. Ленина"):
+        assert value not in result.masked_text, "в LLM уходит только замаскированный текст"
+    for placeholder in ("[PERSON_1]", "[SNILS_1]", "[PHONE_1]", "[ADDRESS_1]"):
+        assert placeholder in result.masked_text
+    assert "120 000 руб." in result.masked_text   # не ПДн — остаётся
+    assert unmask(result.masked_text, result.mapping) == e2e.text
+
+    shown = mask_preserving_length(e2e.text, entities)
+    assert len(shown) == len(e2e.text)
+    for value in (fio, snils, PHONE, address):
+        assert value not in shown
+
+
+def test_detect_then_mask_capitals() -> None:
+    from app.services.masking.masker import mask
+
+    caps = build_doc([("ФИО: ИВАНОВ ИВАН ИВАНОВИЧ, ИП СМИРНОВА АННА СЕРГЕЕВНА", 1, None)])
+    result = mask(caps.text, detect(caps))
+    assert result.masked_text == "ФИО: [PERSON_1], ИП [PERSON_2]"
+    for value in ("ИВАНОВ", "ИВАН", "СМИРНОВА"):
+        assert value not in result.masked_text

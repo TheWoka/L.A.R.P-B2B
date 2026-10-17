@@ -5,6 +5,7 @@ from bisect import bisect_right
 from collections import Counter
 
 from app.schemas import Entity, ExtractedDocument
+from app.services.detection.ner_detector import detect_ner
 from app.services.detection.regex_detector import detect_regex
 
 logger = logging.getLogger(__name__)
@@ -67,9 +68,7 @@ def detect(doc: ExtractedDocument) -> list[Entity]:
 
     Контракт: docs/contracts.md, раздел 3. Задачи T-007, T-008, исполнитель — Данила.
     """
-    regex_entities = detect_regex(doc)
-    # TODO T-008: + detect_ner(doc)
-    entities = assign_location(merge_entities(regex_entities), doc)
+    entities = assign_location(merge_entities(detect_regex(doc), detect_ner(doc)), doc)
     # В лог — только количество по типам, никаких значений (AGENTS.md, правило 4).
     counts = Counter(e.type.value for e in entities)
     logger.info(
