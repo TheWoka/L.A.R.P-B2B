@@ -1,6 +1,7 @@
-"""Тесты detect(), merge_entities(), assign_location() (T-007)."""
+"""Тесты detect(), merge_entities(), assign_location() (T-007, T-008, T-013a)."""
 
 import logging
+from pathlib import Path
 
 import pytest
 
@@ -78,7 +79,10 @@ def test_empty_document() -> None:
 
 def test_document_without_pd() -> None:
     clean = build_doc([("ИНН 7707083893, р/с 40702810400000000225, БИК 044525225", 1, None)])
-    assert detect(clean) == []
+    entities = detect(clean)
+    # реквизиты организации — не ПДн; с T-013a расчётный счёт — FINANCIAL (detector="dict")
+    assert [e for e in entities if e.category == EntityCategory.pd] == []
+    assert [(e.type, e.detector) for e in entities] == [(T.FINANCIAL, "dict")]
 
 
 def test_logs_have_no_values(doc: ExtractedDocument, caplog: pytest.LogCaptureFixture) -> None:
@@ -169,3 +173,49 @@ def test_detect_then_mask_capitals() -> None:
     assert result.masked_text == "ФИО: [PERSON_1], ИП [PERSON_2]"
     for value in ("ИВАНОВ", "ИВАН", "СМИРНОВА"):
         assert value not in result.masked_text
+
+
+# ---------- сквозной тест T-013a: ПДн + коммерческая тайна → mask → правила ----------
+def test_detect_trade_secret_mask_and_rule(repo_root: Path) -> None:
+    from app.schemas import DocPurpose, Marker, MarkerType, RuleContext
+    from app.services.masking.masker import mask
+    from app.services.rules.engine import evaluate
+    from app.services.rules.loader import load_rules
+
+    fio, secret = "Петров Пётр Сергеевич", "себестоимость единицы составляет 38 400 руб."
+    e2e = build_doc([
+        (f"Менеджер {fio}, тел. {PHONE}.", 1, "1. Контакты"),
+        (f"Расчёт цены: {secret}", 2, "2. Цена"),
+    ])
+    entities = detect(e2e)
+    types = {e.type for e in entities}
+    assert {T.PERSON, T.PHONE, T.TRADE_SECRET} <= types
+    [ts] = [e for e in entities if e.type == T.TRADE_SECRET]
+    assert (ts.detector, ts.category, ts.page) == ("dict", EntityCategory.trade_secret, 2)
+    assert e2e.text[ts.start:ts.end] == ts.value_masked == secret
+
+    result = mask(e2e.text, entities)
+    assert fio not in result.masked_text and PHONE not in result.masked_text
+    assert secret in result.masked_text            # маскируются только ПДн (решение 17.10)
+
+    ctx = RuleContext(
+        doc=e2e, masked_text=result.masked_text, entities=entities, purpose=DocPurpose.internal,
+        markers=[Marker(type=MarkerType.classification_mark, present=False)],
+    )
+    violations = evaluate(load_rules(repo_root / "data/rules/rules.yaml"), ctx)
+    [violation] = [v for v in violations if v.rule_id == "TRADE_SECRET_WITHOUT_MARK"]
+    assert [(ev.start, ev.end) for ev in violation.evidence] == [(ts.start, ts.end)]
+
+
+def test_trade_secret_trimmed_around_ip_person() -> None:
+    from app.services.masking.masker import mask
+
+    text = "Наценка ИП Смирнова А.А. составляет 12%"
+    entities = detect(build_doc([(text, 1, None)]))
+    by_type = {e.type: e for e in entities}
+    assert {T.PERSON, T.TRADE_SECRET} <= set(by_type)
+    person, ts = by_type[T.PERSON], by_type[T.TRADE_SECRET]
+    assert ts.end <= person.start or ts.start >= person.end, "спаны не пересекаются"
+    assert ts.value_masked.endswith("12%") and "Смирнов" not in ts.value_masked
+    result = mask(text, entities)                  # не падает на пересечении
+    assert "Смирнова" not in result.masked_text and "12%" in result.masked_text
