@@ -15,3 +15,4 @@ select = ["E", "W", "F", "I", "B"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+markers = ["slow: долгие тесты производительности"]
