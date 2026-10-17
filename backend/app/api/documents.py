@@ -1,39 +1,84 @@
-"""Создание задач проверки: загрузка файла и текстовый запрос.
+"""Приём документов и текстовых запросов без извлечения текста в HTTP."""
 
-Заглушки по контракту (contracts.md, раздел 4). Реализация — T-009.
-"""
-
+from pathlib import Path
 from typing import Annotated
+from uuid import uuid4
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
+from app.db.models import DocumentRow, TaskRow
+from app.db.session import get_db
 from app.schemas import DocPurpose, QueryRequest, TaskCreated
+from app.services.storage import delete_file, save_text, save_upload
+from app.worker.tasks import process_document
 
 router = APIRouter(tags=["documents"])
+UNSUPPORTED_FORMAT = "Формат файла не поддерживается. Загрузите .pdf, .docx или .xlsx"
+DbSession = Annotated[Session, Depends(get_db)]
 
-NOT_IMPLEMENTED = "Будет реализовано в T-009"
+
+def enqueue_document(
+    session: Session, document_id: str, filename: str | None, purpose: DocPurpose, path: Path,
+) -> TaskCreated:
+    """Фиксирует документ и задачу до отправки идентификатора воркеру."""
+    task_id = uuid4().hex
+    try:
+        session.add(DocumentRow(
+            id=document_id, filename=filename, purpose=purpose.value, stored_path=str(path),
+        ))
+        session.flush()
+        session.add(TaskRow(id=task_id, document_id=document_id, status="queued"))
+        session.commit()
+    except Exception:
+        session.rollback()
+        delete_file(path)
+        raise
+    try:
+        process_document.delay(task_id)
+    except Exception:
+        delete_file(path)
+        document = session.get(DocumentRow, document_id)
+        task = session.get(TaskRow, task_id)
+        document.stored_path = None
+        task.status = "failed"
+        task.error = "Не удалось начать проверку. Попробуйте ещё раз"
+        session.commit()
+        raise HTTPException(status_code=503, detail=task.error) from None
+    return TaskCreated(task_id=task_id, document_id=document_id)
 
 
 @router.post(
-    "/documents",
-    status_code=202,
-    response_model=TaskCreated,
+    "/documents", status_code=202, response_model=TaskCreated,
     summary="Загрузить документ на проверку",
 )
 def upload_document(
     file: Annotated[UploadFile, File(description=".pdf, .docx или .xlsx, до 50 МБ")],
     purpose: Annotated[DocPurpose, Form(description="Назначение документа")],
+    session: DbSession,
 ) -> TaskCreated:
-    """Сохраняет файл, ставит задачу в Celery и сразу (< 1 с) возвращает task_id."""
-    raise HTTPException(status_code=501, detail=NOT_IMPLEMENTED)
+    """Проверяет формат и размер, сохраняет файл и ставит проверку в очередь."""
+    extension = Path(file.filename or "").suffix.lower()
+    signatures = {".pdf": b"%PDF", ".docx": b"PK\x03\x04", ".xlsx": b"PK\x03\x04"}
+    signature = file.file.read(4)
+    file.file.seek(0)
+    if extension not in signatures or signature != signatures[extension]:
+        raise HTTPException(status_code=400, detail=UNSUPPORTED_FORMAT)
+    document_id = uuid4().hex
+    try:
+        path = save_upload(file, document_id, get_settings().max_upload_mb * 1024 * 1024)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+    return enqueue_document(session, document_id, file.filename, purpose, path)
 
 
 @router.post(
-    "/queries",
-    status_code=202,
-    response_model=TaskCreated,
+    "/queries", status_code=202, response_model=TaskCreated,
     summary="Проверить текст без файла",
 )
-def submit_query(body: QueryRequest) -> TaskCreated:
-    """Ставит в очередь проверку текста, введённого пользователем."""
-    raise HTTPException(status_code=501, detail=NOT_IMPLEMENTED)
+def submit_query(body: QueryRequest, session: DbSession) -> TaskCreated:
+    """Сохраняет текст запроса и ставит проверку в очередь."""
+    document_id = uuid4().hex
+    path = save_text(body.text, document_id)
+    return enqueue_document(session, document_id, None, body.purpose, path)
