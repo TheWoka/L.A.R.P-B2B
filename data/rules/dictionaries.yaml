@@ -1,0 +1,120 @@
+# Словари детектора коммерческой тайны и финансовых данных (T-013a).
+# Читает backend/app/services/detection/dict_detector.py, без LLM.
+#
+# Формат — список групп:
+#   id           уникальный идентификатор группы (латиница, snake_case)
+#   type         TRADE_SECRET | FINANCIAL
+#   patterns     регулярные выражения по основам слов; регистр не важен, «ё» = «е»;
+#                пробел в шаблоне совпадает с любым количеством пробельных символов
+#   needs_value  true — сущность только если рядом есть сумма или процент
+#                (в той же фразе: до 80 символов после слова или до 40 — перед ним)
+#   confidence   необязательно; по умолчанию 0.9 (needs_value: true) и 0.75 (false)
+#   description  необязательно; комментарий для людей
+#
+# Шаблоны пишите в одинарных кавычках: '\w*' внутри них не нужно экранировать.
+# Расчётные счета организаций ищутся кодом (проверка ключа по БИК), не словарём.
+
+# ---------- Коммерческая тайна: слово + значение ----------
+- id: cost_price
+  type: TRADE_SECRET
+  needs_value: true
+  description: Себестоимость
+  patterns:
+    - 'себестоимост\w*'
+
+- id: margin
+  type: TRADE_SECRET
+  needs_value: true
+  description: Маржа и маржинальность
+  patterns:
+    - 'марж\w*'
+    - 'маржинальност\w*'
+
+- id: markup
+  type: TRADE_SECRET
+  needs_value: true
+  description: Наценка, торговая надбавка
+  patterns:
+    - 'наценк\w*'
+    - 'торгов\w+ надбавк\w*'
+
+- id: profitability
+  type: TRADE_SECRET
+  needs_value: true
+  patterns:
+    - 'рентабельност\w*'
+
+- id: purchase_price
+  type: TRADE_SECRET
+  needs_value: true
+  description: Закупочная (входная) цена поставщика
+  patterns:
+    - 'закупочн\w+ цен\w*'
+    - 'входн\w+ цен\w*'
+    - 'цен\w* закупки'
+
+- id: discounts
+  type: TRADE_SECRET
+  needs_value: true
+  description: Индивидуальные скидки, бонусы, ретро-бонусы
+  patterns:
+    - '(?:индивидуальн|дилерск|специальн)\w* скидк\w*'
+    - 'ретро-?бонус\w*'
+    - 'бонус\w* поставщик\w*'
+    - 'услови\w+ скидок'
+
+# ---------- Коммерческая тайна: само слово ----------
+- id: know_how
+  type: TRADE_SECRET
+  needs_value: false
+  description: Ноу-хау, рецептуры, технологии производства
+  patterns:
+    - 'ноу-?хау'
+    - 'рецептур\w*'
+    - 'технологи\w+ производства'
+    - 'секрет\w* производства'
+
+- id: client_base
+  type: TRADE_SECRET
+  needs_value: false
+  description: Перечни клиентов и поставщиков, клиентская база
+  patterns:
+    - 'перечень (?:клиентов|поставщиков|контрагентов)'
+    - 'клиентск\w+ баз\w*'
+
+# ---------- Финансовые данные: слово + значение ----------
+- id: revenue_profit
+  type: FINANCIAL
+  needs_value: true
+  description: Выручка, прибыль, убыток, оборот, EBITDA
+  patterns:
+    - 'выручк\w*'
+    - '(?:чист\w+ )?прибыл\w*'
+    - 'убыт\w*'
+    - 'оборот\w*'
+    - 'EBITDA'
+
+- id: receivables_payables
+  type: FINANCIAL
+  needs_value: true
+  description: Дебиторская и кредиторская задолженность
+  patterns:
+    - 'дебиторск\w+ задолженност\w*'
+    - 'кредиторск\w+ задолженност\w*'
+
+- id: cash_balance
+  type: FINANCIAL
+  needs_value: true
+  description: Остатки денежных средств
+  patterns:
+    - 'остат\w+ (?:денежных средств|на счет\w*)'
+
+- id: payroll
+  type: FINANCIAL
+  needs_value: true
+  description: Фонд оплаты труда, зарплаты, оклады
+  patterns:
+    - 'фонд\w* оплаты труда'
+    - 'ФОТ'
+    - 'заработн\w+ плат\w*'
+    - 'оклад\w*'

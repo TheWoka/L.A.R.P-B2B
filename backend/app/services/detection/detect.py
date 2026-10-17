@@ -1,10 +1,14 @@
-"""Детекция ПДн, коммерческой тайны и финансовых данных. T-007, T-008, исполнитель — Данила."""
+"""Детекция ПДн, коммерческой тайны и финансовых данных.
+
+Задачи T-007, T-008, T-013a, исполнитель — Данила.
+"""
 
 import logging
 from bisect import bisect_right
 from collections import Counter
 
 from app.schemas import Entity, ExtractedDocument
+from app.services.detection.dict_detector import detect_dict
 from app.services.detection.ner_detector import detect_ner
 from app.services.detection.regex_detector import detect_regex
 
@@ -62,13 +66,20 @@ def assign_location(entities: list[Entity], doc: ExtractedDocument) -> list[Enti
 def detect(doc: ExtractedDocument) -> list[Entity]:
     """Находит сущности в документе: regex + NER + словари.
 
-    Объединяет результаты regex_detector (T-007) и ner_detector (T-008), убирает
-    пересечения (приоритет у более точного детектора), проставляет page/section
-    по сегментам. Значения в Entity — только value_masked. Результат отсортирован по start.
+    Объединяет результаты regex_detector (T-007), ner_detector (T-008) и dict_detector
+    (T-013a), убирает пересечения (приоритет у более точного детектора), проставляет
+    page/section по сегментам. Значения в Entity — только value_masked. Результат
+    отсортирован по start.
 
-    Контракт: docs/contracts.md, раздел 3. Задачи T-007, T-008, исполнитель — Данила.
+    Словарные спаны (TRADE_SECRET, FINANCIAL) до слияния обрезаются по найденным ПДн:
+    «Наценка ИП Смирнова А.А. составляет 12%» даёт и PERSON, и TRADE_SECRET без пересечения,
+    иначе merge_entities выкинул бы одну из сущностей.
+
+    Контракт: docs/contracts.md, раздел 3. Задачи T-007, T-008, T-013a, исполнитель — Данила.
     """
-    entities = assign_location(merge_entities(detect_regex(doc), detect_ner(doc)), doc)
+    regex, ner = detect_regex(doc), detect_ner(doc)
+    dict_ = detect_dict(doc, pd_entities=regex + ner)
+    entities = assign_location(merge_entities(regex, ner, dict_), doc)
     # В лог — только количество по типам, никаких значений (AGENTS.md, правило 4).
     counts = Counter(e.type.value for e in entities)
     logger.info(
