@@ -125,6 +125,20 @@ export interface ChecklistItem {
   evidence: Evidence | null;
 }
 
+// След проверки (контракт v2): по нему отчёт можно воспроизвести.
+export type LlmProvider = "mock" | "openai_compatible";
+
+export interface AuditInfo {
+  document_sha256: string; // sha256 исходного файла (для запроса — текста в UTF-8)
+  ruleset_version: string; // первые 12 hex sha256 канонического JSON включённых правил
+  dictionaries_version: string; // то же для data/rules/dictionaries.yaml
+  app_version: string;
+  detectors: string[]; // например ["regex", "ner:natasha-1.6.0", "dict"]
+  llm_provider: LlmProvider;
+  llm_model: string | null; // null в режиме mock
+  llm_calls: number; // реальных вызовов LLM (без кэша и mock)
+}
+
 export interface Report {
   report_id: string;
   document_id: string;
@@ -138,6 +152,42 @@ export interface Report {
   checklist: ChecklistItem[]; // ровно 3 элемента
   violations: Violation[];
   llm_used: boolean;
+  audit: AuditInfo;
+  redacted_available: boolean; // есть ли обезличенная копия (redactedUrl)
+}
+
+// ---------- «Что видела нейросеть»: журнал вызовов LLM ----------
+export type LlmPurpose = "rule_condition" | "trade_secret";
+export type LlmVerdict = "yes" | "no" | "unknown";
+
+export interface LlmCall {
+  purpose: LlmPurpose;
+  rule_id: string | null; // для purpose="rule_condition", иначе null
+  question: string;
+  /** РОВНО тот текст, что ушёл в LLM: только замаскированный ([PERSON_1] …). */
+  masked_fragment: string;
+  verdict: LlmVerdict;
+  quote: string | null; // цитата из ответа LLM (в координатах masked_fragment)
+  cached: boolean; // ответ взят из кэша Redis
+}
+
+// ---------- Метрики качества ----------
+export interface TypeMetrics {
+  type: string; // значение EntityType
+  precision: number; // 0..1
+  recall: number; // 0..1
+  f1: number; // 0..1
+  support: number; // число эталонных сущностей
+}
+
+export interface Metrics {
+  corpus: string;
+  documents: number;
+  created_at: string; // ISO 8601
+  by_type: TypeMetrics[];
+  pd_recall: number; // по всем ПДн — критерий ≥ 0.90
+  trade_secret_recall: number; // критерий ≥ 0.85
+  matching: string; // правило совпадения, например "overlap ≥ 50% и тот же type"
 }
 
 // ---------- Задачи ----------

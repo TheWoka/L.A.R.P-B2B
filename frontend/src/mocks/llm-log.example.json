@@ -1,0 +1,29 @@
+[
+  {
+    "purpose": "rule_condition",
+    "rule_id": "PD_TRANSFER_WITHOUT_PURPOSE",
+    "question": "Передаются ли персональные данные третьему лицу без указания цели передачи?",
+    "masked_fragment": "9.2. Поставщик вправе передавать сведения о представителе Заказчика [PERSON_1], тел. [PHONE_1], своим субподрядчикам.",
+    "verdict": "yes",
+    "quote": "вправе передавать сведения о представителе Заказчика [PERSON_1], тел. [PHONE_1], своим субподрядчикам",
+    "cached": false
+  },
+  {
+    "purpose": "rule_condition",
+    "rule_id": "PD_RETENTION_NOT_SET",
+    "question": "Указан ли срок хранения персональных данных контактных лиц?",
+    "masked_fragment": "Представитель Поставщика: [PERSON_2], паспорт [PASSPORT_1], СНИЛС [SNILS_1].",
+    "verdict": "no",
+    "quote": null,
+    "cached": true
+  },
+  {
+    "purpose": "trade_secret",
+    "rule_id": null,
+    "question": "Является ли фрагмент сведениями, составляющими коммерческую тайну Поставщика?",
+    "masked_fragment": "Методика расчёта скидки согласована с [PERSON_1] и приведена в Приложении 3.",
+    "verdict": "unknown",
+    "quote": null,
+    "cached": false
+  }
+]

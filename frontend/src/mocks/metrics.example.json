@@ -1,0 +1,20 @@
+{
+  "corpus": "пример для разработки интерфейса",
+  "documents": 120,
+  "created_at": "2026-10-17T12:00:00Z",
+  "by_type": [
+    {"type": "PERSON", "precision": 0.94, "recall": 0.92, "f1": 0.93, "support": 412},
+    {"type": "PASSPORT", "precision": 0.99, "recall": 0.98, "f1": 0.985, "support": 96},
+    {"type": "SNILS", "precision": 1.0, "recall": 0.99, "f1": 0.995, "support": 88},
+    {"type": "INN", "precision": 0.97, "recall": 0.96, "f1": 0.965, "support": 74},
+    {"type": "PHONE", "precision": 0.98, "recall": 0.97, "f1": 0.975, "support": 203},
+    {"type": "EMAIL", "precision": 0.99, "recall": 0.99, "f1": 0.99, "support": 158},
+    {"type": "ADDRESS", "precision": 0.86, "recall": 0.81, "f1": 0.834, "support": 131},
+    {"type": "BIRTH_DATE", "precision": 0.93, "recall": 0.9, "f1": 0.915, "support": 52},
+    {"type": "TRADE_SECRET", "precision": 0.81, "recall": 0.87, "f1": 0.839, "support": 145},
+    {"type": "FINANCIAL", "precision": 0.78, "recall": 0.9, "f1": 0.836, "support": 117}
+  ],
+  "pd_recall": 0.94,
+  "trade_secret_recall": 0.87,
+  "matching": "overlap ≥ 50% и тот же type"
+}

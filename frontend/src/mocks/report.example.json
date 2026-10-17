@@ -34,7 +34,7 @@
       "end": 240,
       "page": 2,
       "section": "4. Цена контракта",
-      "value_masked": "4070**************45",
+      "value_masked": "40702810500000012345",
       "confidence": 0.97,
       "detector": "regex"
     },
@@ -218,5 +218,20 @@
       "source": "rule"
     }
   ],
-  "llm_used": false
+  "llm_used": false,
+  "audit": {
+    "document_sha256": "629f057d75c518804c4d5836d3176b008b3d36639f358c116761a68d2b088001",
+    "ruleset_version": "3f9a1c7e2b40",
+    "dictionaries_version": "8d2e6b1f0a93",
+    "app_version": "0.1.0",
+    "detectors": [
+      "regex",
+      "ner:natasha-1.6.0",
+      "dict"
+    ],
+    "llm_provider": "mock",
+    "llm_model": null,
+    "llm_calls": 0
+  },
+  "redacted_available": false
 }
