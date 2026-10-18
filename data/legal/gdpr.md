@@ -354,4 +354,4 @@ In the absence of an adequacy decision, Union or Member State law may, for impor
 
 The controller or processor shall document the assessment as well as the suitable safeguards referred to in the second subparagraph of paragraph 1 of this Article in the records referred to in Article 30.
 
-Источник:https://gdpr-info.eu/, редакция от 04.05.2016
+Источник: https://eur-lex.europa.eu/eli/reg/2016/679/oj, редакция от 04.05.2016
