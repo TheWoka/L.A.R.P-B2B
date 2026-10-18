@@ -21,7 +21,7 @@ from app.schemas import (
     Severity,
     TextSegment,
 )
-from app.services.rules.engine import evaluate
+from app.services.rules.engine import evaluate, validate_condition
 from app.services.rules.loader import load_rules
 
 PERSON = {"type": "entity_present", "categories": ["pd"], "types": ["PERSON"]}
@@ -111,17 +111,15 @@ def _rule(
         ({"not": CLASSIFICATION}, True),
         ({"not": PERSON}, False),
         ({"not": {"not": PERSON}}, True),
-        ({"all": []}, True),
-        ({"any": []}, False),
         ({"type": "entity_present", "categories": []}, False),
         ({**PERSON, "types": []}, False),
         ({"type": "purpose_is", "purposes": []}, False),
-        ({"type": "entity_present", "categories": [], "min_count": 0}, True),
     ],
 )
 def test_condition_truth_table(
     rule_context: RuleContext, condition: dict[str, object], expected: bool
 ) -> None:
+    assert validate_condition(condition) is None
     violations = evaluate([_rule(condition)], rule_context)
     assert bool(violations) is expected
 
@@ -281,14 +279,16 @@ def test_llm_stub_returns_no_violation_and_logs_no_document(
 @pytest.mark.parametrize(
     "condition",
     [
-        {}, {"type": "unknown"}, {"type": None}, {"type": []},
+        {}, {"type": "unknown"}, {"type": "entity_presnt"}, {"type": None}, {"type": []},
+        {"all": []}, {"any": []},
         {"all": PERSON}, {"any": None}, {"not": []}, {"not": None},
         {"all": [None]}, {"any": ["invalid"]}, {"all": [], "any": []},
         {**PERSON, "extra": True}, {**PERSON, "all": []},
         {"type": "entity_present"}, {**PERSON, "categories": "pd"},
         {**PERSON, "categories": [123]}, {**PERSON, "categories": ["unknown"]},
         {**PERSON, "types": None}, {**PERSON, "types": ["unknown"]},
-        {**PERSON, "min_count": -1}, {**PERSON, "min_count": True},
+        {**PERSON, "min_count": 0}, {**PERSON, "min_count": -1},
+        {**PERSON, "min_count": True},
         {**PERSON, "min_count": "1"}, {**PERSON, "min_count": 1.5},
         {"type": "marker_present"}, {"type": "marker_absent", "marker": []},
         {"type": "marker_present", "marker": "unknown"},
@@ -300,18 +300,77 @@ def test_llm_stub_returns_no_violation_and_logs_no_document(
         {"any": [PERSON, {"type": "unknown"}]},
     ],
 )
-def test_invalid_condition_reports_rule_id(
-    rule_context: RuleContext, condition: dict[str, object]
+def test_invalid_condition_is_rejected_before_and_during_evaluation(
+    rule_context: RuleContext, tmp_path: Path, condition: dict[str, object]
 ) -> None:
+    with pytest.raises(ValueError):
+        validate_condition(condition)
     with pytest.raises(ValueError, match="BROKEN_RULE"):
         evaluate([_rule(condition, "BROKEN_RULE")], rule_context)
+    data = _rule(condition, "BROKEN_RULE").model_dump(mode="json")
+    with pytest.raises(ValueError, match="Правило BROKEN_RULE:"):
+        load_rules(_write_rules(tmp_path, [data]))
 
 
-def test_cyclic_condition_is_rejected(rule_context: RuleContext) -> None:
+@pytest.mark.parametrize("operator", ["not", "all", "any"])
+def test_cyclic_condition_is_rejected(
+    rule_context: RuleContext, tmp_path: Path, operator: str
+) -> None:
     condition: dict[str, object] = {}
-    condition["not"] = condition
+    condition[operator] = condition if operator == "not" else [condition]
+    with pytest.raises(ValueError, match="циклическую"):
+        validate_condition(condition)
     with pytest.raises(ValueError, match="CYCLIC_RULE"):
         evaluate([_rule(condition, "CYCLIC_RULE")], rule_context)
+    data = _rule(PERSON, "CYCLIC_RULE").model_dump(mode="json")
+    data["condition"] = condition
+    with pytest.raises(ValueError, match="Правило CYCLIC_RULE:"):
+        load_rules(_write_rules(tmp_path, [data]))
+
+
+@pytest.mark.parametrize("condition", [None, [], [PERSON], "invalid", True, 1])
+def test_validate_condition_rejects_non_mapping_root(condition: object) -> None:
+    with pytest.raises(ValueError, match="непустым словарём"):
+        validate_condition(condition)
+
+
+def test_validate_condition_checks_all_kinds_without_evaluation(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    condition = {"all": [
+        PERSON, APPROVAL, {"not": CLASSIFICATION},
+        {"type": "marker_absent", "marker": "retention_period"},
+        {"any": [PERSON, {"type": "purpose_is", "purposes": ["publication"]}]},
+        {"type": "llm", "question": "Синтетический вопрос"},
+    ]}
+    with caplog.at_level(logging.DEBUG, logger="app.services.rules.engine"):
+        assert validate_condition(condition) is None
+    assert caplog.records == []
+
+
+def test_validate_condition_rejects_indirect_cycle() -> None:
+    condition: dict[str, object] = {}
+    condition["all"] = [{"any": [{"not": condition}]}]
+    with pytest.raises(ValueError, match="циклическую"):
+        validate_condition(condition)
+
+
+def test_validate_condition_rejects_excessive_depth() -> None:
+    condition: dict[str, object] = PERSON
+    for _ in range(2000):
+        condition = {"not": condition}
+    with pytest.raises(ValueError, match="глубину"):
+        validate_condition(condition)
+
+
+@pytest.mark.parametrize(
+    "overrides", [{"enabled": False}, {"applies_to": ["contract"]}],
+)
+def test_load_validates_inactive_rules(tmp_path: Path, overrides: dict[str, object]) -> None:
+    data = _rule({"type": "entity_presnt"}, "INACTIVE_RULE").model_dump(mode="json")
+    data.update(overrides)
+    with pytest.raises(ValueError, match="Правило INACTIVE_RULE: неизвестный тип"):
+        load_rules(_write_rules(tmp_path, [data]))
 
 
 def test_empty_rule_list(rule_context: RuleContext) -> None:
