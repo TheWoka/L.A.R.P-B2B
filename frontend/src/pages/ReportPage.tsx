@@ -1,40 +1,56 @@
-import { Alert, Card, Descriptions, Space, Tag, Typography } from "antd";
-import type { DescriptionsProps } from "antd";
+import { Alert, Card, Col, Descriptions, Row, Space, Statistic, Tag, Typography } from "antd";
 import { useParams } from "react-router-dom";
 
 import type { DocPurpose, Overall, Report } from "../api/types";
+import Checklist from "../components/Checklist";
+import EntitiesTable from "../components/EntitiesTable";
+import ViolationsTable from "../components/ViolationsTable";
+import { PURPOSE_LABELS } from "../components/labels";
 import mockReport from "../mocks/report.example.json";
 
-// Пока бэкенд не готов (T-009), страница показывает мок-отчёт из mocks/report.example.json.
+// В T-006 страница использует демонстрационный отчёт; подключение GET /reports будет позже.
 const report = mockReport as Report;
 
-const PURPOSE_LABELS: Record<DocPurpose, string> = {
-  internal: "Внутренний документ",
-  publication: "Для публикации",
-  contract: "Договор с контрагентом",
-  international: "Международный контракт",
-};
-
-const OVERALL: Record<Overall, { color: string; label: string }> = {
-  red: { color: "#ff4d4f", label: "Есть серьёзные нарушения" },
-  yellow: { color: "#faad14", label: "Есть замечания" },
-  green: { color: "#52c41a", label: "Нарушений не найдено" },
+const OVERALL: Record<Overall, { color: string; label: string; description: string }> = {
+  red: {
+    color: "#cf1322",
+    label: "Есть серьёзные нарушения",
+    description: "Перед использованием документа необходимо устранить серьёзные нарушения.",
+  },
+  yellow: {
+    color: "#d48806",
+    label: "Есть замечания",
+    description: "Проверьте замечания и рекомендации перед использованием документа.",
+  },
+  green: {
+    color: "#389e0d",
+    label: "Нарушений не найдено",
+    description: "По результатам проверки нарушений не обнаружено.",
+  },
 };
 
 function TrafficLight({ value }: { value: Overall }) {
   const lamps: Overall[] = ["red", "yellow", "green"];
+  const colors: Record<Overall, string> = {
+    red: "#cf1322",
+    yellow: "#d48806",
+    green: "#389e0d",
+  };
+
   return (
     <Space size="middle" aria-label={`Итог проверки: ${OVERALL[value].label}`}>
       {lamps.map((lamp) => (
         <span
           key={lamp}
+          title={lamp === value ? OVERALL[lamp].label : undefined}
           style={{
             display: "inline-block",
             width: 28,
             height: 28,
             borderRadius: "50%",
-            background: OVERALL[lamp].color,
-            opacity: lamp === value ? 1 : 0.15,
+            background: colors[lamp],
+            opacity: lamp === value ? 1 : 0.16,
+            boxShadow: lamp === value ? `0 0 0 4px ${colors[lamp]}22` : "none",
           }}
         />
       ))}
@@ -42,22 +58,18 @@ function TrafficLight({ value }: { value: Overall }) {
   );
 }
 
-// TODO T-006 (Алиса): загрузка getReport(reportId) и getReportText(reportId),
-// таблица нарушений с цитатами и ссылками на статьи, подсветка находок в тексте, чек-лист.
 export default function ReportPage() {
   const { reportId } = useParams<{ reportId: string }>();
-  const redCount = report.violations.filter((v) => v.severity === "red").length;
-  const yellowCount = report.violations.length - redCount;
-  const entityCount = Object.values(report.stats).reduce((sum, n) => sum + n, 0);
-  const details: DescriptionsProps["items"] = [
+  const redCount = report.violations.filter((violation) => violation.severity === "red").length;
+  const yellowCount = report.violations.filter((violation) => violation.severity === "yellow").length;
+  const entityCount = Object.values(report.stats).reduce((sum, count) => sum + count, 0);
+  const overall = OVERALL[report.overall];
+
+  const details = [
     { key: "file", label: "Документ", children: report.filename ?? "Текстовый запрос" },
-    { key: "purpose", label: "Назначение", children: PURPOSE_LABELS[report.purpose] },
-    { key: "entities", label: "Найдено чувствительных данных", children: entityCount },
-    {
-      key: "violations",
-      label: "Нарушения",
-      children: `серьёзных — ${redCount}, замечаний — ${yellowCount}`,
-    },
+    { key: "purpose", label: "Назначение", children: PURPOSE_LABELS[report.purpose as DocPurpose] },
+    { key: "created", label: "Дата проверки", children: new Date(report.created_at).toLocaleString("ru-RU") },
+    { key: "duration", label: "Время обработки", children: `${(report.processing_ms / 1000).toLocaleString("ru-RU")} с` },
   ];
 
   return (
@@ -65,17 +77,56 @@ export default function ReportPage() {
       <Alert
         type="info"
         showIcon
-        title={`Показан пример отчёта (запрошен отчёт «${reportId ?? ""}»)`}
+        title={`Демонстрационный отчёт${reportId ? ` · ${reportId}` : ""}`}
+        description="На этом этапе показаны примерные результаты. Данные взяты из демонстрационного отчёта."
       />
+
       <Card>
-        <Typography.Title level={2}>Результат проверки</Typography.Title>
+        <Typography.Title level={2} style={{ marginTop: 0 }}>
+          Результат проверки
+        </Typography.Title>
         <Space size="large" align="center" wrap>
           <TrafficLight value={report.overall} />
-          <Tag color={OVERALL[report.overall].color} style={{ fontSize: 16, padding: "4px 12px" }}>
-            {OVERALL[report.overall].label}
+          <Tag color={overall.color} style={{ fontSize: 16, padding: "4px 12px" }}>
+            {overall.label}
           </Tag>
         </Space>
-        <Descriptions column={1} style={{ marginTop: 24 }} items={details} />
+        <Typography.Paragraph type="secondary" style={{ marginTop: 12 }}>
+          {overall.description}
+        </Typography.Paragraph>
+        <Descriptions column={{ xs: 1, sm: 2, md: 2 }} items={details} />
+        <Row gutter={[12, 12]} style={{ marginTop: 20 }}>
+          <Col xs={12} md={8}>
+            <Card size="small">
+              <Statistic title="Найдено данных" value={entityCount} />
+            </Card>
+          </Col>
+          <Col xs={12} md={8}>
+            <Card size="small">
+              <Statistic title="Серьёзные нарушения" value={redCount} valueStyle={{ color: "#cf1322" }} />
+            </Card>
+          </Col>
+          <Col xs={12} md={8}>
+            <Card size="small">
+              <Statistic title="Замечания" value={yellowCount} valueStyle={{ color: "#d48806" }} />
+            </Card>
+          </Col>
+        </Row>
+      </Card>
+
+      <Card title="Чек-лист документа">
+        <Checklist items={report.checklist} />
+      </Card>
+
+      <Card title={`Нарушения (${report.violations.length})`}>
+        <ViolationsTable violations={report.violations} />
+      </Card>
+
+      <Card title={`Найденные данные (${report.entities.length})`}>
+        <Typography.Paragraph type="secondary">
+          Чувствительные данные отображаются в замаскированном виде.
+        </Typography.Paragraph>
+        <EntitiesTable entities={report.entities} stats={report.stats} />
       </Card>
     </Space>
   );
