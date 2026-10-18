@@ -6,6 +6,7 @@ import yaml
 from pydantic import ValidationError
 
 from app.schemas import Rule
+from app.services.rules.engine import validate_condition
 
 
 def load_rules(path: Path) -> list[Rule]:
@@ -25,6 +26,10 @@ def load_rules(path: Path) -> list[Rule]:
             rule = Rule.model_validate(item)
         except ValidationError as error:
             raise ValueError(f"Правило {label}: {_validation_details(error)}") from None
+        try:
+            validate_condition(rule.condition)
+        except ValueError as error:
+            raise ValueError(f"Правило {rule.id}: {error}") from None
         if rule.id in seen_ids:
             raise ValueError(f"Повторяющийся id правила: {rule.id}")
         seen_ids.add(rule.id)
