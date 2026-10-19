@@ -404,7 +404,10 @@ def _write_rules(tmp_path: Path, data: object) -> Path:
 
 def test_load_actual_rules(repo_root: Path) -> None:
     rules = load_rules(repo_root / "data/rules/rules.yaml")
-    assert [rule.id for rule in rules] == ["PD_IN_PUBLICATION", "TRADE_SECRET_WITHOUT_MARK"]
+    rule_ids = {rule.id for rule in rules}
+    assert len(rules) == 16
+    assert len(rule_ids) == len(rules)
+    assert {"PD_IN_PUBLICATION", "TRADE_SECRET_WITHOUT_MARK"} <= rule_ids
     assert all(isinstance(rule, Rule) for rule in rules)
 
 
@@ -416,7 +419,9 @@ def test_actual_yaml_rules_evaluate_document(
     rules = load_rules(repo_root / "data/rules/rules.yaml")
     expected = ["TRADE_SECRET_WITHOUT_MARK"]
     if purpose == DocPurpose.publication:
+        # По docs/rules.md: есть ПДн и коммерческая тайна в документе для публикации.
         expected.insert(0, "PD_IN_PUBLICATION")
+        expected.append("TRADE_SECRET_IN_PUBLICATION")
     assert [item.rule_id for item in evaluate(rules, ctx)] == expected
 
 
