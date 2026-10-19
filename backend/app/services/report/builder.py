@@ -1,10 +1,11 @@
 """Сборка итогового отчёта. Задача T-016, исполнитель — Данил."""
 
-from app.schemas import Report, RuleContext, Violation
+from app.schemas import AuditInfo, Report, RuleContext, Violation
 
 
 def build_report(
-    ctx: RuleContext, violations: list[Violation], processing_ms: int, llm_used: bool
+    ctx: RuleContext, violations: list[Violation], processing_ms: int, llm_used: bool,
+    audit: AuditInfo,
 ) -> Report:
     """Собирает Report: статистика по типам сущностей, чек-лист ровно из 3 пунктов
     (approvals, classification, retention) и светофор по правилу из contracts.md:

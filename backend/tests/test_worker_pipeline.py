@@ -1,7 +1,8 @@
-"""Первая стадия с реальным извлечением и удалением исходников."""
+"""Конвейер с реальным извлечением, сохранением отчёта и удалением исходников."""
 
 import logging
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
+from hashlib import sha256
 from pathlib import Path
 from unittest.mock import MagicMock, Mock
 
@@ -11,10 +12,18 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
-from app.db.models import Base, DocumentRow, TaskRow
-from app.schemas import ExtractedDocument, TextSegment
+from app.db.models import Base, DocumentRow, ReportRow, TaskRow
+from app.schemas import DocPurpose, ExtractedDocument, Report, ReportText, Stage, TextSegment
+from app.services import pipeline
 from app.services.extraction.extract import extract
+from app.services.pipeline import AuditResult
 from app.worker import tasks
+from tests.test_pipeline import NAME, TEXT, make_report
+
+
+@pytest.fixture(autouse=True)
+def report_builder(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(pipeline, "build_report", make_report)
 
 
 @pytest.fixture
@@ -44,6 +53,7 @@ def test_docx_pipeline(
     document = Document()
     document.add_paragraph("Синтетический договор")
     document.save(path)
+    source_bytes = path.read_bytes()
     task = create_task(session, path, "synthetic.docx")
 
     def checked_extract(source: Path, filename: str, document_id: str) -> ExtractedDocument:
@@ -56,7 +66,14 @@ def test_docx_pipeline(
     extractor = Mock(side_effect=checked_extract)
     monkeypatch.setattr(tasks, "extract", extractor)
     tasks.run_pipeline(task.id, session)
-    assert (task.status, task.progress, task.error, task.report_id) == ("done", 100, None, None)
+    assert (task.status, task.stage, task.progress, task.error) == ("done", "reporting", 100, None)
+    row = session.get(ReportRow, task.report_id)
+    report = Report.model_validate(row.data)
+    report_text = ReportText.model_validate(row.text)
+    assert report.report_id == task.report_id
+    assert report.document_id == task.document_id
+    assert report.audit.document_sha256 == sha256(source_bytes).hexdigest()
+    assert report_text.text == "Синтетический договор"
     assert not path.exists()
     assert session.get(DocumentRow, task.document_id).stored_path is None
     extractor.assert_called_once_with(path, "synthetic.docx", task.document_id)
@@ -78,6 +95,7 @@ def test_corrupt_pdf_pipeline(session: Session, tmp_path: Path) -> None:
 @pytest.mark.parametrize("failure", [
     ValueError("Не удалось прочитать файл. Он повреждён, недоступен или защищён паролем."),
     RuntimeError("СЕКРЕТНОЕ СОДЕРЖИМОЕ"),
+    NotImplementedError("T-016 (Данил)"),
 ])
 def test_failed_pipeline(
     session: Session, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
@@ -91,12 +109,14 @@ def test_failed_pipeline(
         tasks.run_pipeline(task.id, session)
     assert task.status == "failed"
     expected = str(failure) if isinstance(failure, ValueError) else tasks.PROCESSING_ERROR
+    if isinstance(failure, NotImplementedError):
+        expected = tasks.MODULE_UNAVAILABLE
     assert task.error == expected
     assert not path.exists()
     assert session.get(DocumentRow, task.document_id).stored_path is None
     assert "confidential-name" not in caplog.text
     assert "СЕКРЕТНОЕ СОДЕРЖИМОЕ" not in caplog.text
-    if isinstance(failure, RuntimeError):
+    if type(failure) is RuntimeError:
         assert "RuntimeError" in caplog.text
         assert task.id in caplog.text
 
@@ -119,6 +139,71 @@ def test_text_pipeline(
     assert not path.exists()
     assert session.get(DocumentRow, task.document_id).stored_path is None
     extractor.assert_not_called()
+    row = session.get(ReportRow, task.report_id)
+    assert Report.model_validate(row.data).filename is None
+    assert ReportText.model_validate(row.text).text == text
+    assert Report.model_validate(row.data).audit.document_sha256 == sha256(
+        text.encode("utf-8"),
+    ).hexdigest()
+
+
+def test_worker_stages_and_private_data(
+    session: Session, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    path = tmp_path / "synthetic.txt"
+    path.write_text(TEXT, encoding="utf-8")
+    task = create_task(session, path, None)
+    states: list[tuple[str, int]] = []
+    original_run = tasks.run_audit
+
+    def checked_run(
+        doc: ExtractedDocument, purpose: DocPurpose, source_bytes: bytes,
+        on_stage: Callable[[Stage, int], None],
+    ) -> AuditResult:
+        def checked_stage(stage: Stage, progress: int) -> None:
+            on_stage(stage, progress)
+            with Session(session.bind) as observer:
+                row = observer.get(TaskRow, task.id)
+                assert row.status == "processing"
+                states.append((row.stage, row.progress))
+        return original_run(doc, purpose, source_bytes, checked_stage)
+
+    monkeypatch.setattr(tasks, "run_audit", checked_run)
+    with caplog.at_level(logging.INFO):
+        tasks.run_pipeline(task.id, session)
+    assert states == [("detecting", 30), ("masking", 55), ("checking", 70), ("reporting", 90)]
+    assert task.status == "done"
+    assert NAME not in caplog.text
+    assert "by_type=" in caplog.text
+    row = session.get(ReportRow, task.report_id)
+    assert NAME not in str(row.data) and NAME not in str(row.text)
+    assert not path.exists()
+
+
+@pytest.mark.parametrize("failure", [NotImplementedError("T-016"), ValueError("Ошибка правил"),
+                                    RuntimeError(NAME)])
+def test_audit_failure_removes_source(
+    session: Session, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture, failure: Exception,
+) -> None:
+    path = tmp_path / "synthetic.txt"
+    path.write_text(TEXT, encoding="utf-8")
+    task = create_task(session, path, None)
+    monkeypatch.setattr(tasks, "run_audit", Mock(side_effect=failure))
+    with caplog.at_level(logging.INFO):
+        tasks.run_pipeline(task.id, session)
+    assert task.status == "failed" and task.report_id is None
+    expected = tasks.PROCESSING_ERROR
+    if isinstance(failure, NotImplementedError):
+        expected = tasks.MODULE_UNAVAILABLE
+    elif isinstance(failure, ValueError):
+        expected = str(failure)
+    assert task.error == expected
+    assert not path.exists()
+    assert session.get(DocumentRow, task.document_id).stored_path is None
+    assert session.query(ReportRow).count() == 0
+    assert NAME not in caplog.text
 
 
 @pytest.mark.parametrize("stored_path_missing", [False, True])

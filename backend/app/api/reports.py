@@ -1,15 +1,19 @@
-"""Отчёты проверки. Заглушки по контракту.
+"""Чтение сохранённых отчётов и текста проверки.
 
-Реализация: отчёт, текст, экспорт — T-009; журнал LLM — T-013; обезличенная копия — T-026.
+Заглушки: экспорт — T-015; журнал LLM — T-013; обезличенная копия — T-026.
 """
 
-from typing import Literal
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Response
+from sqlalchemy.orm import Session
 
+from app.db.models import ReportRow
+from app.db.session import get_db
 from app.schemas import LlmCall, Report, ReportText
 
 router = APIRouter(tags=["reports"])
+DbSession = Annotated[Session, Depends(get_db)]
 
 NOT_IMPLEMENTED = "Будет реализовано в T-009"
 NOT_IMPLEMENTED_LLM_LOG = "Будет реализовано в T-013"
@@ -17,8 +21,11 @@ NOT_IMPLEMENTED_REDACTED = "Будет реализовано в T-026"
 
 
 @router.get("/reports/{report_id}", response_model=Report, summary="Отчёт проверки")
-def get_report(report_id: str) -> Report:
-    raise HTTPException(status_code=501, detail=NOT_IMPLEMENTED)
+def get_report(report_id: str, session: DbSession) -> Report:
+    row = session.get(ReportRow, report_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Отчёт не найден")
+    return Report.model_validate(row.data)
 
 
 @router.get(
@@ -26,13 +33,16 @@ def get_report(report_id: str) -> Report:
     response_model=ReportText,
     summary="Текст документа с замаскированными ПДн",
 )
-def get_report_text(report_id: str) -> ReportText:
+def get_report_text(report_id: str, session: DbSession) -> ReportText:
     """Текст для подсветки находок.
 
     ПДн скрыты маскированием с сохранением длины (`█`, первая буква слова видна),
     см. contracts.md, раздел 4.1. Смещения из Report применяются к тексту напрямую.
     """
-    raise HTTPException(status_code=501, detail=NOT_IMPLEMENTED)
+    row = session.get(ReportRow, report_id)
+    if row is None or row.text is None:
+        raise HTTPException(status_code=404, detail="Текст отчёта не найден")
+    return ReportText.model_validate(row.text)
 
 
 @router.get(
