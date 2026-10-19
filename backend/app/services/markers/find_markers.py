@@ -3,6 +3,7 @@
 import logging
 import re
 from bisect import bisect_left, bisect_right
+from itertools import islice
 
 from app.schemas import Evidence, ExtractedDocument, Marker, MarkerType, TextSegment
 
@@ -32,7 +33,9 @@ PHRASES: dict[MarkerType, tuple[str, ...]] = {
         "187-ФЗ", "КИИ",
     ),
 }
-APPROVAL_LINE_START = frozenset({"согласовано", "утверждаю"})
+APPROVAL_LINE_START = frozenset({"согласовано", "утверждаю", "визы"})
+RETENTION_GOODS_PREFIXES = ("товар", "продукц", "издели", "груз", "материал", "образц")
+WORD_PATTERN = re.compile(r"\w+")
 MARGIN_SECTIONS = frozenset({"Верхний колонтитул", "Нижний колонтитул"})
 CLASSIFICATION_MAX_LENGTH = 80
 LAW_REFERENCE_DISTANCE = 80  # Максимальное расстояние между краями статьи и 152-ФЗ.
@@ -104,21 +107,39 @@ def _accept_match(
     law_spans: list[tuple[int, int]],
 ) -> bool:
     """Отличает реквизиты и грифы от упоминаний, проверяет контекст статьи."""
+    phrase = " ".join(match.group().lower().replace("ё", "е").split())
     if kind == MarkerType.approval_sheet:
-        if match.group().lower().replace("ё", "е") in APPROVAL_LINE_START:
-            line_start = text.rfind("\n", 0, match.start()) + 1
-            return not text[line_start:match.start()].strip()
+        if phrase in APPROVAL_LINE_START:
+            return _is_approval_label(text, match)
     if kind == MarkerType.classification_mark:
         return _is_classification(text, match, segment)
+    if kind == MarkerType.retention_period and phrase == "срок хранения":
+        following_words = WORD_PATTERN.finditer(text, match.end())
+        return not any(
+            word.group().lower().startswith(RETENTION_GOODS_PREFIXES)
+            for word in islice(following_words, 3)
+        )
     if match.lastgroup == "article":
         return _has_nearby_law(match.start(), match.end(), law_spans)
     return True
 
 
+def _is_approval_label(text: str, match: re.Match[str]) -> bool:
+    """Реквизит начинается со строки и имеет пустое либо допустимое продолжение."""
+    line_start = text.rfind("\n", 0, match.start()) + 1
+    if text[line_start:match.start()].strip():
+        return False
+    line_end = text.find("\n", match.end())
+    suffix = text[match.end():line_end if line_end >= 0 else len(text)].lstrip()
+    return not suffix or suffix[0] in ":,/-—" or suffix[0].isupper()
+
+
 def _is_classification(text: str, match: re.Match[str], segment: TextSegment | None) -> bool:
-    """Гриф — отдельная короткая плашка, колонтитул или фраза заглавными."""
+    """Гриф — короткая плашка, колонтитул или фраза из нескольких слов заглавными."""
     quote = match.group()
-    if quote.isupper() or (segment is not None and segment.section in MARGIN_SECTIONS):
+    if (quote.isupper() and len(quote.split()) >= 2) or (
+        segment is not None and segment.section in MARGIN_SECTIONS
+    ):
         return True
     line_start = text.rfind("\n", 0, match.start()) + 1
     line_end = text.find("\n", match.end())

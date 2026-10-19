@@ -111,9 +111,6 @@ def _rule(
         ({"not": CLASSIFICATION}, True),
         ({"not": PERSON}, False),
         ({"not": {"not": PERSON}}, True),
-        ({"type": "entity_present", "categories": []}, False),
-        ({**PERSON, "types": []}, False),
-        ({"type": "purpose_is", "purposes": []}, False),
     ],
 )
 def test_condition_truth_table(
@@ -310,6 +307,28 @@ def test_invalid_condition_is_rejected_before_and_during_evaluation(
     data = _rule(condition, "BROKEN_RULE").model_dump(mode="json")
     with pytest.raises(ValueError, match="Правило BROKEN_RULE:"):
         load_rules(_write_rules(tmp_path, [data]))
+
+
+@pytest.mark.parametrize(("condition", "field"), [
+    ({"type": "entity_present", "categories": []}, "categories"),
+    ({**PERSON, "types": []}, "types"),
+    ({"type": "purpose_is", "purposes": []}, "purposes"),
+])
+@pytest.mark.parametrize("operator", [None, "all", "any", "not"])
+def test_empty_enum_lists_are_rejected_with_field_and_rule_id(
+    rule_context: RuleContext, tmp_path: Path, condition: dict[str, object],
+    field: str, operator: str | None,
+) -> None:
+    if operator is not None:
+        condition = {operator: condition if operator == "not" else [condition]}
+    message = f"{field} должен содержать хотя бы одно значение"
+    with pytest.raises(ValueError, match=message):
+        validate_condition(condition)
+    rule = _rule(condition, "EMPTY_FILTER_RULE")
+    with pytest.raises(ValueError, match=f"Правило EMPTY_FILTER_RULE: {message}"):
+        evaluate([rule], rule_context)
+    with pytest.raises(ValueError, match=f"Правило EMPTY_FILTER_RULE: {message}"):
+        load_rules(_write_rules(tmp_path, [rule.model_dump(mode="json")]))
 
 
 @pytest.mark.parametrize("operator", ["not", "all", "any"])
