@@ -86,6 +86,18 @@ def test_each_marker_negative(kind: MarkerType, text: str) -> None:
     assert marker.evidence is None
 
 
+@pytest.mark.parametrize(("kind", "text"), [
+    (MarkerType.classification_mark, "Столешница из ЛДСП и плиты ДСП толщиной 16 мм."),
+    (MarkerType.approval_sheet, "Поставщик оформляет визы сотрудникам за свой счёт."),
+    (MarkerType.approval_sheet, "Согласовано сторонами, что поставка учебная."),
+    (MarkerType.retention_period, "Гарантийный срок хранения товара — 12 месяцев."),
+])
+def test_review_false_positives_are_rejected(kind: MarkerType, text: str) -> None:
+    marker = _marker(_document((text, 7, "Синтетический раздел")), kind)
+    assert not marker.present
+    assert marker.evidence is None
+
+
 @pytest.mark.parametrize("text", ["", " ", "\n\n", "Обычный синтетический договор."])
 def test_no_markers_still_returns_all_six_in_enum_order(text: str) -> None:
     doc = ExtractedDocument(document_id="empty", filename="empty.txt", text=text, segments=[])
@@ -112,11 +124,36 @@ def test_all_markers_are_returned_once_in_enum_order() -> None:
         assert (evidence.page, evidence.section) == (7, "Синтетический раздел")
 
 
-@pytest.mark.parametrize("word", ["Согласовано", "Утверждаю", "Утвёрждаю"])
+@pytest.mark.parametrize("word", ["Согласовано", "Утверждаю", "Утвёрждаю", "Визы"])
 def test_approval_at_line_start_quotes_no_synthetic_person(word: str) -> None:
     text = f"Выдуманные реквизиты\r\n\t  {word}: Тестов Тест Тестович\nПрочий текст"
     doc = _document((text, 7, "Синтетический раздел"))
     _assert_evidence(doc, MarkerType.approval_sheet, word)
+
+
+@pytest.mark.parametrize("word", ["Согласовано", "Утверждаю", "Визы"])
+@pytest.mark.parametrize("suffix", [
+    "", " \t", ": Тестов Тест", ", Тестов Тест", "/ Тестов Тест",
+    "- Тестов Тест", "— Тестов Тест", "\tТестов Тест", " \t\nстрочное продолжение",
+])
+def test_approval_label_accepts_only_allowed_continuation(word: str, suffix: str) -> None:
+    doc = _document((f"Выдуманный заголовок\n\t{word}{suffix}",
+                     7, "Синтетический раздел"))
+    _assert_evidence(doc, MarkerType.approval_sheet, word)
+
+
+@pytest.mark.parametrize("word", ["Согласовано", "Утверждаю", "Визы"])
+@pytest.mark.parametrize("suffix", [" сторонами учебного договора.", "\tучебный текст.", "."])
+def test_approval_label_rejects_lowercase_continuation_and_period(word: str, suffix: str) -> None:
+    marker = _marker(_document((f"\t{word}{suffix}", 7, None)), MarkerType.approval_sheet)
+    assert not marker.present
+    assert marker.evidence is None
+
+
+def test_uppercase_approval_on_separate_line() -> None:
+    doc = _document(("Учебное введение\nСОГЛАСОВАНО\nстрочное продолжение",
+                     7, "Синтетический раздел"))
+    _assert_evidence(doc, MarkerType.approval_sheet, "СОГЛАСОВАНО")
 
 
 @pytest.mark.parametrize("text", [
@@ -138,6 +175,7 @@ def test_first_valid_approval_wins_regardless_of_dictionary_order() -> None:
 
 @pytest.mark.parametrize("phrase", [
     "коммерческая тайна", "конфиденциально", "для служебного пользования", "дсп",
+    "ДСП", "КОНФИДЕНЦИАЛЬНО",
 ])
 def test_classification_is_an_isolated_short_line(phrase: str) -> None:
     doc = _document((f"Учебный заголовок\n«{phrase}»\nВыдуманное продолжение",
@@ -146,20 +184,22 @@ def test_classification_is_an_isolated_short_line(phrase: str) -> None:
 
 
 @pytest.mark.parametrize("section", ["Верхний колонтитул", "Нижний колонтитул"])
-def test_classification_in_long_margin_segment(section: str) -> None:
-    text = "Учебный шаблон " * 10 + "конфиденциально — Тестов Тест"
+@pytest.mark.parametrize("phrase", ["конфиденциально", "КОНФИДЕНЦИАЛЬНО", "ДСП"])
+def test_classification_in_long_margin_segment(section: str, phrase: str) -> None:
+    text = "Учебный шаблон " * 10 + f"{phrase} — Тестов Тест"
     doc = _document(("Введение", 1, None), (text, 7, section))
     marker = _marker(doc, MarkerType.classification_mark)
     assert marker.present and marker.evidence is not None
-    assert marker.evidence.quote == "конфиденциально"
-    assert doc.text[marker.evidence.start:marker.evidence.end] == "конфиденциально"
+    assert marker.evidence.quote == phrase
+    assert doc.text[marker.evidence.start:marker.evidence.end] == phrase
     assert (marker.evidence.page, marker.evidence.section) == (7, section)
 
 
-def test_classification_in_uppercase_inside_long_line() -> None:
-    doc = _document((("Учебная строка " * 10) + "КОММЕРЧЕСКАЯ ТАЙНА: Тестов Тест",
+@pytest.mark.parametrize("phrase", ["КОММЕРЧЕСКАЯ ТАЙНА", "ДЛЯ СЛУЖЕБНОГО ПОЛЬЗОВАНИЯ"])
+def test_classification_in_uppercase_inside_long_line(phrase: str) -> None:
+    doc = _document((("Учебная строка " * 10) + f"{phrase}: Тестов Тест",
                      7, "Синтетический раздел"))
-    _assert_evidence(doc, MarkerType.classification_mark, "КОММЕРЧЕСКАЯ ТАЙНА")
+    _assert_evidence(doc, MarkerType.classification_mark, phrase)
 
 
 @pytest.mark.parametrize("text", [
@@ -167,6 +207,8 @@ def test_classification_in_uppercase_inside_long_line() -> None:
     "Говорим про понятие «коммерческая тайна» в учебном договоре.",
     "Выдуманный текст для служебного пользования содержит описание.",
     "Стороны обязуются не разглашать сведения, составляющие коммерческую тайну",
+    "Поставить плиту ДСП для учебного стенда.",
+    "Слово КОНФИДЕНЦИАЛЬНО приведено в учебной инструкции.",
 ])
 def test_classification_rejects_phrase_inside_short_prose(text: str) -> None:
     assert not _marker(_document((text, 7, None)), MarkerType.classification_mark).present
@@ -180,12 +222,54 @@ def test_first_valid_classification_skips_prose() -> None:
 
 
 @pytest.mark.parametrize("length", [80, 81])
-def test_isolated_classification_length_limit(length: int) -> None:
-    phrase = "конфиденциально"
+@pytest.mark.parametrize("phrase", ["конфиденциально", "КОНФИДЕНЦИАЛЬНО", "ДСП"])
+def test_isolated_classification_length_limit(length: int, phrase: str) -> None:
     label = "." * (length - len(phrase)) + phrase
     doc = _document((label, 7, None))
     marker = _marker(doc, MarkerType.classification_mark)
     assert marker.present is (length == 80)
+
+
+@pytest.mark.parametrize("goods", [
+    "товаров", "ПРОДУКЦИИ", "изделий", "грузов", "материалов", "образцов",
+])
+@pytest.mark.parametrize("preceding_words", [0, 1, 2, 3])
+def test_retention_excludes_goods_only_within_next_three_words(
+    goods: str, preceding_words: int,
+) -> None:
+    phrase = "СРОК\tХРАНЕНИЯ"
+    text = f"Учебное условие: {phrase} {'учебных ' * preceding_words}{goods} — 12 месяцев."
+    doc = _document((text, 7, "Синтетический раздел"))
+    marker = _marker(doc, MarkerType.retention_period)
+    if preceding_words == 3:
+        _assert_evidence(doc, MarkerType.retention_period, phrase)
+    else:
+        assert not marker.present
+        assert marker.evidence is None
+
+
+@pytest.mark.parametrize(("text", "quote"), [
+    ("Срок хранения документа — 5 лет", "Срок хранения документа"),
+    ("срок хранения персональных данных — 5 лет", "срок хранения"),
+])
+def test_retention_of_documents_and_personal_data_remains_present(text: str, quote: str) -> None:
+    _assert_evidence(_document((text, 7, "Синтетический раздел")),
+                     MarkerType.retention_period, quote)
+
+
+@pytest.mark.parametrize("phrase", [
+    "хранится в течение", "подлежит уничтожению", "уничтожается по истечении",
+])
+def test_other_retention_phrases_keep_existing_behavior(phrase: str) -> None:
+    doc = _document((f"Учебный образец {phrase} срока хранения товара.",
+                     7, "Синтетический раздел"))
+    _assert_evidence(doc, MarkerType.retention_period, phrase)
+
+
+def test_first_valid_retention_skips_goods_storage() -> None:
+    doc = _document(("Срок хранения товара — 12 месяцев.", 1, "Введение"),
+                    ("Срок хранения документа — 5 лет.", 7, "Синтетический раздел"))
+    _assert_evidence(doc, MarkerType.retention_period, "Срок хранения документа")
 
 
 @pytest.mark.parametrize("reference", ["ч. 3 ст. 6", "ч.3 ст.6", "части 3 статьи 6"])

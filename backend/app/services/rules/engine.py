@@ -177,6 +177,8 @@ def _enum_values(
     values = condition[field]
     if not isinstance(values, list) or any(not isinstance(value, str) for value in values):
         raise ValueError(f"{field} должен содержать список строк")
+    if not values:
+        raise ValueError(f"{field} должен содержать хотя бы одно значение")
     allowed = {member.value for member in enum_type}
     if any(value not in allowed for value in values):
         raise ValueError(f"{field} содержит неизвестное значение")
