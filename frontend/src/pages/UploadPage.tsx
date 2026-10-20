@@ -110,6 +110,9 @@ export default function UploadPage() {
 
       <div>
         <Typography.Text strong>Назначение документа</Typography.Text>
+        <Typography.Paragraph type="secondary" style={{ marginTop: 4, marginBottom: 0 }}>
+          Выберите, как планируете использовать документ: от этого зависят правила проверки.
+        </Typography.Paragraph>
         <Radio.Group
           value={filePurpose}
           onChange={(event) => setFilePurpose(event.target.value as DocPurpose)}
@@ -145,6 +148,9 @@ export default function UploadPage() {
       />
       <div>
         <Typography.Text strong>Назначение документа</Typography.Text>
+        <Typography.Paragraph type="secondary" style={{ marginTop: 4, marginBottom: 0 }}>
+          Выберите, как планируете использовать текст: от этого зависят правила проверки.
+        </Typography.Paragraph>
         <Select<DocPurpose>
           aria-label="Назначение текста"
           value={queryPurpose}
