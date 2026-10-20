@@ -80,7 +80,7 @@ export default function ReportPage() {
         <Row gutter={[12, 12]} style={{ marginTop: 20 }}>
           <Col xs={12} md={8}>
             <Card size="small">
-              <Statistic title="Найдено фрагментов с данными" value={entityCount} />
+              <Statistic title="Найдено фрагментов с чувствительными данными" value={entityCount} />
             </Card>
           </Col>
           <Col xs={12} md={8}>
@@ -116,6 +116,8 @@ export default function ReportPage() {
         </Typography.Paragraph>
         <EntitiesTable entities={report.entities} stats={report.stats} />
       </Card>
+
+      <Button size="large" onClick={() => navigate("/")}>Проверить другой документ</Button>
 
       <Modal title={selectedLaw ? `${selectedLaw.law}, ${selectedLaw.article}` : "Норма закона"} open={selectedLaw !== null} onCancel={() => setSelectedLaw(null)} footer={<Button onClick={() => setSelectedLaw(null)}>Закрыть</Button>}>
         {selectedLaw?.title && <Typography.Paragraph strong>{selectedLaw.title}</Typography.Paragraph>}
