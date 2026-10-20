@@ -107,12 +107,6 @@ def test_export_still_returns_501(client: TestClient) -> None:
     assert response.status_code == 501
 
 
-def test_rules_stub_points_to_t010(client: TestClient) -> None:
-    response = client.get("/api/rules")
-    assert response.status_code == 501
-    assert "T-010" in response.json()["detail"]
-
-
 @pytest.mark.parametrize(
     ("path", "task"),
     [
