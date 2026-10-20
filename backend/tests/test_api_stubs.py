@@ -1,7 +1,38 @@
 """Все эндпоинты из contracts.md, раздел 4, есть в API (видны в Swagger на /docs)."""
 
+from collections.abc import Iterator
+
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
+from sqlalchemy.pool import StaticPool
+
+from app.core.version import APP_VERSION
+from app.db.models import Base, DocumentRow, ReportRow
+from app.db.session import get_db
+from app.main import app
+from app.schemas import DocPurpose, Report, ReportText
+from app.services import pipeline
+from tests.test_pipeline import NAME, PHONE, make_doc, make_report
+
+
+@pytest.fixture
+def report_db() -> Iterator[Session]:
+    engine = create_engine(
+        "sqlite://", poolclass=StaticPool, connect_args={"check_same_thread": False},
+    )
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        def override_db() -> Iterator[Session]:
+            yield session
+
+        app.dependency_overrides[get_db] = override_db
+        try:
+            yield session
+        finally:
+            app.dependency_overrides.pop(get_db, None)
+    engine.dispose()
 
 CONTRACT_ENDPOINTS = {
     ("post", "/api/documents"),
@@ -28,16 +59,52 @@ def test_openapi_has_all_contract_endpoints(client: TestClient) -> None:
     assert CONTRACT_ENDPOINTS <= actual
 
 
-def test_stub_returns_501_with_task_number(client: TestClient) -> None:
-    response = client.get("/api/reports/some-id")
-    assert response.status_code == 501
-    assert "T-009" in response.json()["detail"]
+@pytest.mark.parametrize("suffix", ["", "/text"])
+def test_missing_report_returns_404(
+    client: TestClient, report_db: Session, suffix: str,
+) -> None:
+    response = client.get(f"/api/reports/some-id{suffix}")
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Текст отчёта не найден" if suffix else "Отчёт не найден"}
 
 
-def test_rules_stub_points_to_t010(client: TestClient) -> None:
-    response = client.get("/api/rules")
+def test_saved_report_and_text(
+    client: TestClient, report_db: Session, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(pipeline, "build_report", make_report)
+    result = pipeline.run_audit(make_doc(), DocPurpose.publication, b"synthetic")
+    report_db.add(DocumentRow(id=result.report.document_id, filename="synthetic.docx",
+                              purpose="publication"))
+    report_db.flush()
+    report_db.add(ReportRow(
+        id=result.report.report_id, document_id=result.report.document_id,
+        data=result.report.model_dump(mode="json"), text=result.report_text.model_dump(mode="json"),
+    ))
+    report_db.commit()
+    response = client.get(f"/api/reports/{result.report.report_id}")
+    assert response.status_code == 200
+    assert Report.model_validate(response.json()) == result.report
+    response = client.get(f"/api/reports/{result.report.report_id}/text")
+    assert response.status_code == 200
+    assert ReportText.model_validate(response.json()) == result.report_text
+    assert NAME not in response.text and PHONE not in response.text
+
+
+def test_report_without_text_returns_404(client: TestClient, report_db: Session) -> None:
+    report_db.add(DocumentRow(id="synthetic", purpose="internal"))
+    report_db.flush()
+    report_db.add(ReportRow(id="old-report", document_id="synthetic", data={}))
+    report_db.commit()
+    assert client.get("/api/reports/old-report/text").status_code == 404
+
+
+def test_api_version(client: TestClient) -> None:
+    assert client.get("/openapi.json").json()["info"]["version"] == APP_VERSION
+
+
+def test_export_still_returns_501(client: TestClient) -> None:
+    response = client.get("/api/reports/some-id/export")
     assert response.status_code == 501
-    assert "T-010" in response.json()["detail"]
 
 
 @pytest.mark.parametrize(

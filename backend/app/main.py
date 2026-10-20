@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import documents, health, metrics, reports, rules, tasks
 from app.core.logging import setup_logging
+from app.core.version import APP_VERSION
 from app.db.session import init_db
 
 logger = logging.getLogger(__name__)
@@ -28,7 +29,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(
     title="ИИ-аудитор безопасности документов",
     description="Хакатон B2B-РТС «AI Procurement Copilot», задача 7. Контракты: docs/contracts.md",
-    version="0.1.0",
+    version=APP_VERSION,
     lifespan=lifespan,
 )
 

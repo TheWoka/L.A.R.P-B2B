@@ -54,6 +54,7 @@ class ReportRow(Base):
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     document_id: Mapped[str] = mapped_column(ForeignKey("documents.id", ondelete="CASCADE"))
     data: Mapped[dict] = mapped_column(JSONB().with_variant(JSON(), "sqlite"))
+    text: Mapped[dict | None] = mapped_column(JSONB().with_variant(JSON(), "sqlite"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -64,4 +65,5 @@ class RuleRow(Base):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     data: Mapped[dict] = mapped_column(JSONB().with_variant(JSON(), "sqlite"))
