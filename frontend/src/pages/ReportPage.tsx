@@ -6,6 +6,7 @@ import { ApiError, getReport, getReportText } from "../api/client";
 import type { DocPurpose, Evidence, LawRef, Report, ReportText } from "../api/types";
 import Checklist from "../components/Checklist";
 import DocumentText from "../components/DocumentText";
+import { getArticleText } from "../components/legalArticles";
 import EntitiesTable from "../components/EntitiesTable";
 import ViolationsTable from "../components/ViolationsTable";
 import { PURPOSE_LABELS } from "../components/labels";
@@ -114,8 +115,11 @@ export default function ReportPage() {
       </Card>
 
       <Modal title={selectedLaw ? `${selectedLaw.law}, ${selectedLaw.article}` : "Норма закона"} open={selectedLaw !== null} onCancel={() => setSelectedLaw(null)} footer={<Button onClick={() => setSelectedLaw(null)}>Закрыть</Button>}>
-        {selectedLaw?.title && <Typography.Paragraph>{selectedLaw.title}</Typography.Paragraph>}
-        {selectedLaw?.url ? <Typography.Link href={selectedLaw.url} target="_blank" rel="noreferrer">Открыть текст статьи</Typography.Link> : <Typography.Text type="secondary">Ссылка на текст статьи не указана.</Typography.Text>}
+        {selectedLaw?.title && <Typography.Paragraph strong>{selectedLaw.title}</Typography.Paragraph>}
+        {selectedLaw && getArticleText(selectedLaw) ? (
+          <Typography.Paragraph style={{ whiteSpace: "pre-wrap", maxHeight: "50vh", overflowY: "auto" }}>{getArticleText(selectedLaw)}</Typography.Paragraph>
+        ) : <Typography.Paragraph type="secondary">Текст этой нормы не включён в каталог проекта.</Typography.Paragraph>}
+        {selectedLaw?.url && <Typography.Link href={selectedLaw.url} target="_blank" rel="noreferrer">Открыть источник</Typography.Link>}
       </Modal>
     </Space>
   );
