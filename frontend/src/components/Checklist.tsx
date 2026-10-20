@@ -37,8 +37,8 @@ export default function Checklist({ items }: ChecklistProps) {
               </Typography.Paragraph>
               {item.evidence ? (
                 <Typography.Text type="secondary">
-                  {item.evidence.page !== null ? `Страница ${item.evidence.page}` : ""}
-                  {item.evidence.page !== null && item.evidence.section ? " · " : ""}
+                  {item.evidence.page != null ? `Страница ${item.evidence.page}` : ""}
+                  {item.evidence.page != null && item.evidence.section ? " · " : ""}
                   {item.evidence.section ?? ""}
                 </Typography.Text>
               ) : null}
