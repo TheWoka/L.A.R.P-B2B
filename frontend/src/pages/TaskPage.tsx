@@ -74,7 +74,9 @@ export default function TaskPage() {
     <Card>
       <Typography.Title level={2}>{task?.status === "failed" ? "Не удалось проверить документ" : "Документ проверяется"}</Typography.Title>
       <Typography.Paragraph type="secondary">Номер проверки: {taskId}</Typography.Paragraph>
-      <Typography.Paragraph>Этапы обновляются автоматически. Можно оставить эту страницу открытой до появления отчёта.</Typography.Paragraph>
+      {task?.status !== "failed" && (
+        <Typography.Paragraph>Этапы обновляются автоматически. Можно оставить эту страницу открытой до появления отчёта.</Typography.Paragraph>
+      )}
       <Steps current={Math.max(0, current)} items={STAGES.map(({ title }) => ({ title }))} responsive />
       <Progress percent={task?.progress ?? 0} status={task?.status === "failed" ? "exception" : "active"} style={{ marginTop: 24 }} />
       {task?.status === "failed" && (
