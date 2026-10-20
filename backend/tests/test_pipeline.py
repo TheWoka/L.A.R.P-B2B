@@ -129,11 +129,6 @@ def test_masking_segments_across_entity_boundary(monkeypatch: pytest.MonkeyPatch
     assert NAME not in result.report_text.model_dump_json()
 
 
-def test_builder_stub_is_preserved() -> None:
-    with pytest.raises(NotImplementedError, match="T-016"):
-        pipeline.run_audit(make_doc(""), DocPurpose.internal, b"")
-
-
 def test_audit_hashes(repo_root: Path) -> None:
     rules = load_rules(repo_root / "data/rules/rules.yaml")
     audit = pipeline.build_audit(TEXT.encode("utf-8"), rules, CallBudget(30))
