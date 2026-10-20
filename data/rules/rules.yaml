@@ -11,7 +11,16 @@
     - {law: 152-ФЗ, article: ст. 10.1}
   applies_to: [publication]
   condition: {type: entity_present, categories: [pd, pd_special], min_count: 1}
-  recommendation: Удалите или обезличьте персональные данные перед публикацией либо получите согласие на распространение.
+  recommendation: Удалите или обезличьте ПДн перед публикацией либо получите согласие субъекта на распространение.
+
+- id: BANK_DATA_IN_PUBLICATION
+  title: Платёжные реквизиты физлиц в документе для публикации
+  description: Документ для публикации содержит номера банковских карт или счетов физлиц.
+  severity: red
+  law_refs: [{law: 152-ФЗ, article: ст. 7}]
+  applies_to: [publication]
+  condition: {type: entity_present, categories: [pd], types: [CARD, BANK_ACCOUNT]}
+  recommendation: Удалите номера карт и счетов физлиц перед выгрузкой в ЕИС — воспользуйтесь обезличенной копией документа.
 
 - id: TRADE_SECRET_WITHOUT_MARK
   title: Коммерческая тайна без грифа
@@ -22,4 +31,157 @@
     all:
       - {type: entity_present, categories: [trade_secret]}
       - {type: marker_absent, marker: classification_mark}
-  recommendation: Нанесите гриф «Коммерческая тайна» с указанием обладателя информации.
+  recommendation: Нанесите гриф «Коммерческая тайна» с указанием обладателя информации (наименование и адрес).
+
+- id: TRADE_SECRET_IN_PUBLICATION
+  title: Коммерческая тайна в документе для публикации
+  description: Документ для публикации содержит сведения, составляющие коммерческую тайну.
+  severity: red
+  law_refs: [{law: 98-ФЗ, article: ст. 10}]
+  applies_to: [publication]
+  condition: {type: entity_present, categories: [trade_secret]}
+  recommendation: Исключите сведения о себестоимости, наценке, условиях скидок из документа, который будет опубликован.
+
+- id: TRADE_SECRET_CALCULABLE
+  title: По опубликованным данным можно вычислить коммерческую тайну
+  description: Числа в документе для публикации позволяют восстановить себестоимость товара или маржу поставщика.
+  severity: yellow
+  law_refs: [{law: 98-ФЗ, article: ст. 10}]
+  applies_to: [publication]
+  condition:
+    type: llm
+    question: Можно ли по приведённым в тексте числам вычислить себестоимость единицы товара или маржу поставщика?
+  recommendation: Агрегируйте показатели или уберите исходные числа, по которым восстанавливается себестоимость.
+
+- id: PD_ENTRUSTMENT_MISSING
+  title: Нет условий поручения обработки ПДн контрагенту
+  description: Договор содержит паспортные данные, СНИЛС, ИНН, адрес или дату рождения без условий поручения обработки ПДн.
+  severity: red
+  law_refs: [{law: 152-ФЗ, article: ст. 6 ч. 3}]
+  applies_to: [contract]
+  condition:
+    all:
+      - {type: entity_present, categories: [pd], types: [PASSPORT, SNILS, INN, ADDRESS, BIRTH_DATE]}
+      - {type: marker_absent, marker: processing_assignment}
+  recommendation: "Включите в проект контракта условия поручения обработки ПДн по ч. 3 ст. 6 152-ФЗ: цели, перечень действий, обязанность соблюдать конфиденциальность и требования ст. 19."
+
+- id: CONSENT_MISSING_FOR_CONTRACT
+  title: Паспортные данные без согласия на обработку
+  description: Договор содержит паспортные данные, СНИЛС или ИНН без согласия на обработку ПДн.
+  severity: yellow
+  law_refs: [{law: 152-ФЗ, article: ст. 9}]
+  applies_to: [contract]
+  condition:
+    all:
+      - {type: entity_present, categories: [pd], types: [PASSPORT, SNILS, INN]}
+      - {type: marker_absent, marker: consent_clause}
+  recommendation: "Проверьте основание обработки: если данные относятся к третьим лицам (работники, субподрядчики), приложите форму согласия по ст. 9."
+
+- id: SPECIAL_PD_NO_CONSENT
+  title: Особые категории ПДн без согласия
+  description: Документ содержит особые категории ПДн без согласия на обработку.
+  severity: red
+  law_refs:
+    - {law: 152-ФЗ, article: ст. 10}
+    - {law: GDPR, article: Art. 9}
+  condition:
+    all:
+      - {type: entity_present, categories: [pd_special]}
+      - {type: marker_absent, marker: consent_clause}
+  recommendation: Исключите сведения о здоровье, убеждениях и т. п. из документа закупки либо приложите письменное согласие по ст. 10.
+
+- id: SECURITY_MEASURES_VAGUE
+  title: Меры защиты ПДн описаны формально
+  description: Договор с условиями поручения обработки ПДн описывает меры защиты только общими фразами.
+  severity: yellow
+  law_refs:
+    - {law: 152-ФЗ, article: ст. 19}
+    - {law: GDPR, article: Art. 32}
+  applies_to: [contract]
+  condition:
+    all:
+      - {type: marker_present, marker: processing_assignment}
+      - type: llm
+        question: Описаны ли меры защиты персональных данных только общими фразами, без конкретных технических и организационных мер?
+  recommendation: "Конкретизируйте меры защиты: шифрование, разграничение доступа, учёт носителей, порядок уничтожения."
+
+- id: KII_IN_PUBLICATION
+  title: Сведения об объектах КИИ в документе для публикации
+  description: Документ для публикации содержит упоминание объектов КИИ.
+  severity: red
+  law_refs: [{law: 187-ФЗ, article: ст. 2}]
+  applies_to: [publication]
+  condition: {type: marker_present, marker: kii_mention}
+  recommendation: "Уберите из документа для ЕИС сведения о значимых объектах КИИ: схемы, адреса, средства защиты."
+
+- id: KII_INCIDENTS_NOT_REGULATED
+  title: Контрагент с доступом к КИИ без обязанности сообщать об инцидентах
+  description: Договор с упоминанием КИИ не обязывает контрагента уведомлять заказчика о компьютерных инцидентах.
+  severity: yellow
+  law_refs: [{law: 187-ФЗ, article: ст. 9}]
+  applies_to: [contract]
+  condition:
+    all:
+      - {type: marker_present, marker: kii_mention}
+      - type: llm
+        question: Отсутствует ли в тексте обязанность контрагента уведомлять заказчика о компьютерных инцидентах?
+  recommendation: Добавьте в контракт обязанность и сроки уведомления заказчика о компьютерных инцидентах.
+
+- id: GDPR_CROSS_BORDER
+  title: Трансграничная передача ПДн по международному контракту
+  description: Международный контракт содержит персональные данные.
+  severity: yellow
+  law_refs:
+    - {law: GDPR, article: Art. 44}
+    - {law: GDPR, article: Art. 46}
+  applies_to: [international]
+  condition: {type: entity_present, categories: [pd, pd_special]}
+  recommendation: "Проверьте основание передачи: решение о достаточности или стандартные договорные условия (SCC)."
+
+- id: GDPR_NO_DPA
+  title: Нет условий обработки ПДн по поручению (DPA)
+  description: Международный контракт содержит ПДн без условий их обработки по поручению.
+  severity: red
+  law_refs: [{law: GDPR, article: Art. 28}]
+  applies_to: [international]
+  condition:
+    all:
+      - {type: entity_present, categories: [pd, pd_special]}
+      - {type: marker_absent, marker: processing_assignment}
+  recommendation: Заключите соглашение об обработке данных (Data Processing Agreement) по Art. 28 GDPR.
+
+- id: CHECKLIST_NO_APPROVAL
+  title: Нет листа согласования
+  description: Внутренний документ или договор с контрагентом не содержит листа согласования.
+  severity: yellow
+  law_refs: [{law: Политика ИБ компании, article: документооборот}]
+  applies_to: [internal, contract]
+  condition: {type: marker_absent, marker: approval_sheet}
+  recommendation: Пройдите внутреннее согласование и приложите лист согласования с визами.
+
+- id: CHECKLIST_NO_MARK
+  title: Нет грифа на документе с ПДн
+  description: Внутренний документ содержит паспортные данные, СНИЛС, ИНН или дату рождения без грифа конфиденциальности.
+  severity: yellow
+  law_refs:
+    - {law: 152-ФЗ, article: ст. 7}
+    - {law: 152-ФЗ, article: ст. 18.1}
+  applies_to: [internal]
+  condition:
+    all:
+      - {type: entity_present, categories: [pd], types: [PASSPORT, SNILS, INN, BIRTH_DATE]}
+      - {type: marker_absent, marker: classification_mark}
+  recommendation: Нанесите гриф «Конфиденциально» по внутренней политике обработки ПДн.
+
+- id: CHECKLIST_NO_RETENTION
+  title: Не указан срок хранения ПДн
+  description: Документ содержит паспортные данные, СНИЛС, ИНН или дату рождения без срока хранения ПДн.
+  severity: yellow
+  law_refs:
+    - {law: 152-ФЗ, article: ст. 5 ч. 7}
+    - {law: GDPR, article: Art. 5}
+  condition:
+    all:
+      - {type: entity_present, categories: [pd], types: [PASSPORT, SNILS, INN, BIRTH_DATE]}
+      - {type: marker_absent, marker: retention_period}
+  recommendation: Укажите срок хранения ПДн или условие их уничтожения (например, «до истечения срока исковой давности по контракту»).

@@ -111,9 +111,6 @@ def _rule(
         ({"not": CLASSIFICATION}, True),
         ({"not": PERSON}, False),
         ({"not": {"not": PERSON}}, True),
-        ({"type": "entity_present", "categories": []}, False),
-        ({**PERSON, "types": []}, False),
-        ({"type": "purpose_is", "purposes": []}, False),
     ],
 )
 def test_condition_truth_table(
@@ -312,6 +309,28 @@ def test_invalid_condition_is_rejected_before_and_during_evaluation(
         load_rules(_write_rules(tmp_path, [data]))
 
 
+@pytest.mark.parametrize(("condition", "field"), [
+    ({"type": "entity_present", "categories": []}, "categories"),
+    ({**PERSON, "types": []}, "types"),
+    ({"type": "purpose_is", "purposes": []}, "purposes"),
+])
+@pytest.mark.parametrize("operator", [None, "all", "any", "not"])
+def test_empty_enum_lists_are_rejected_with_field_and_rule_id(
+    rule_context: RuleContext, tmp_path: Path, condition: dict[str, object],
+    field: str, operator: str | None,
+) -> None:
+    if operator is not None:
+        condition = {operator: condition if operator == "not" else [condition]}
+    message = f"{field} должен содержать хотя бы одно значение"
+    with pytest.raises(ValueError, match=message):
+        validate_condition(condition)
+    rule = _rule(condition, "EMPTY_FILTER_RULE")
+    with pytest.raises(ValueError, match=f"Правило EMPTY_FILTER_RULE: {message}"):
+        evaluate([rule], rule_context)
+    with pytest.raises(ValueError, match=f"Правило EMPTY_FILTER_RULE: {message}"):
+        load_rules(_write_rules(tmp_path, [rule.model_dump(mode="json")]))
+
+
 @pytest.mark.parametrize("operator", ["not", "all", "any"])
 def test_cyclic_condition_is_rejected(
     rule_context: RuleContext, tmp_path: Path, operator: str
@@ -385,7 +404,10 @@ def _write_rules(tmp_path: Path, data: object) -> Path:
 
 def test_load_actual_rules(repo_root: Path) -> None:
     rules = load_rules(repo_root / "data/rules/rules.yaml")
-    assert [rule.id for rule in rules] == ["PD_IN_PUBLICATION", "TRADE_SECRET_WITHOUT_MARK"]
+    rule_ids = {rule.id for rule in rules}
+    assert len(rules) == 16
+    assert len(rule_ids) == len(rules)
+    assert {"PD_IN_PUBLICATION", "TRADE_SECRET_WITHOUT_MARK"} <= rule_ids
     assert all(isinstance(rule, Rule) for rule in rules)
 
 
@@ -397,7 +419,9 @@ def test_actual_yaml_rules_evaluate_document(
     rules = load_rules(repo_root / "data/rules/rules.yaml")
     expected = ["TRADE_SECRET_WITHOUT_MARK"]
     if purpose == DocPurpose.publication:
+        # По docs/rules.md: есть ПДн и коммерческая тайна в документе для публикации.
         expected.insert(0, "PD_IN_PUBLICATION")
+        expected.append("TRADE_SECRET_IN_PUBLICATION")
     assert [item.rule_id for item in evaluate(rules, ctx)] == expected
 
 
