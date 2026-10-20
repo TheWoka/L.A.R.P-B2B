@@ -31,7 +31,7 @@ export default function App() {
           style={{ flex: 1, minWidth: 0 }}
         />
       </Header>
-      <Content style={{ padding: "24px 48px" }}>
+      <Content style={{ padding: "24px clamp(16px, 4vw, 48px)" }}>
         <Routes>
           <Route path="/" element={<UploadPage />} />
           <Route path="/tasks/:taskId" element={<TaskPage />} />

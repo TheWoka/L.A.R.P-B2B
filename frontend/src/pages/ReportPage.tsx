@@ -80,7 +80,7 @@ export default function ReportPage() {
         <Row gutter={[12, 12]} style={{ marginTop: 20 }}>
           <Col xs={12} md={8}>
             <Card size="small">
-              <Statistic title="Найдено данных" value={entityCount} />
+              <Statistic title="Найдено фрагментов с данными" value={entityCount} />
             </Card>
           </Col>
           <Col xs={12} md={8}>
@@ -101,6 +101,9 @@ export default function ReportPage() {
       </Card>
 
       <Card title={`Нарушения (${report.violations.length})`}>
+        {documentText && report.violations.some((violation) => violation.evidence.length > 0) && (
+          <Typography.Paragraph type="secondary">Раскройте нарушение и нажмите на цитату, чтобы увидеть её в тексте документа.</Typography.Paragraph>
+        )}
         <ViolationsTable violations={report.violations} onSelectEvidence={documentText ? setSelectedEvidence : undefined} onShowLaw={setSelectedLaw} />
       </Card>
 
