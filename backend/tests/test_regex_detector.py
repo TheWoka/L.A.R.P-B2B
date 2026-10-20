@@ -15,9 +15,8 @@ from app.services.detection.regex_detector import (
     CONF_CHECKSUM,
     CONF_FORMAT,
     CONF_PHONE_LOCAL,
-    CONF_ROLE_EMAIL,
-    CONF_TOLL_FREE,
     detect_regex,
+    is_role_mailbox,
 )
 from tests.test_validators import (
     break_digit,
@@ -91,11 +90,13 @@ POSITIVES: list[tuple[EntityType, str, str]] = [
     (T.BANK_ACCOUNT, "Счёт получателя {}, БИК " + _BIK + ".", make_account("40817810", _BIK, 1)),
     (T.BANK_ACCOUNT, "Перечислить на счёт {} (вклад).", make_account("42307810", _BIK, 2)),
     (T.BANK_ACCOUNT, "Лицевой счёт {} открыт в банке.", make_account("40820810", _BIK, 3)),
+    # Счёт ИП 40802 — ПДн: ИП — физлицо (T-019a)
+    (T.BANK_ACCOUNT, "Расчётный счёт ИП {}, БИК " + _BIK + ".", make_account("40802810", _BIK, 4)),
     # Телефон
     (T.PHONE, "Контактный телефон {} (будни).", "+7 (912) 345-67-89"),
     (T.PHONE, "Звонить по номеру {}.", "8 912 345 67 89"),
     (T.PHONE, "Тел.: {}", "+79123456789"),
-    (T.PHONE, "Приёмная: {}, доб. 12.", "8(3822)12-34-56"),
+    (T.PHONE, "Рабочий: {}, доб. 12.", "8(3822)12-34-56"),
     (T.PHONE, "WhatsApp {} — менеджер", "8-923-111-22-33"),
     (T.PHONE, "Тел.: {}, с 9 до 18", "(912) 345-67-89"),
     (T.PHONE, "моб. {} (Иван)", "912 345-67-89"),
@@ -155,10 +156,6 @@ def test_confidences() -> None:
     text = f"Счёт {acc}\nБИК {_BIK}"
     entities = run(text)
     assert [e.confidence for e in entities] == [CONF_CHECKSUM]
-    assert assert_found("Пишите: zakupki@org.ru", T.EMAIL, "zakupki@org.ru").confidence == (
-        CONF_ROLE_EMAIL
-    )
-    assert assert_found("info2@org.ru", T.EMAIL, "info2@org.ru").confidence == CONF_ROLE_EMAIL
 
 
 def test_account_wrong_key_with_bik_rejected() -> None:
@@ -267,16 +264,67 @@ def test_local_phone_inside_full_phone_is_merged() -> None:
     ]
 
 
+# ---------- Контакты организаций: сущность не создаётся (T-019a) ----------
+# Раньше шли с уверенностью 0.5, но confidence нигде не фильтруется: такой «ПДн» давал
+# ложное PD_IN_PUBLICATION на любом ТЗ с телефоном поддержки.
+ORG_CONTACTS: list[str] = [
+    "Горячая линия 8 800 123-45-67",
+    "Звонок бесплатный: +7 (804) 123-45-67",
+    "тел. (800) 123-45-67",
+    "Контактный телефон службы поддержки поставщика: 8-800-000-00-00.",
+    "Общий e-mail: info@example.ru; телефон приёмной: 8 (3822) 70-11-22",
+    "Приёмная: +7 (3822) 44-90-10",
+    "Отдел продаж: sales@example.ru, тел. 8 (3822) 90-00-00",
+    "Отдел закупок, тел. +7 913 000-11-22",
+    "Служба поддержки: (3822) 55-14-07",
+    "ГОРЯЧАЯ ЛИНИЯ: 8 (3822) 31-31-31",
+    "Пишите: zakupki@org.ru",
+    "info2@org.ru",
+    "tender@ssk-example.ru, buh@ssk-example.ru, hr@ssk-example.ru",
+    "Отдел снабжения: zakupki.tomsk@org.ru",
+    "support@org.ru, тел. +7 913 274-60-18",
+]
+
+
+@pytest.mark.parametrize("text", ORG_CONTACTS)
+def test_org_contacts_not_entities(text: str) -> None:
+    assert run(text) == []
+
+
 @pytest.mark.parametrize(
-    "text, value",
+    ("text", "value"),
     [
-        ("Горячая линия {}", "8 800 123-45-67"),
-        ("Звонок бесплатный: {}", "+7 (804) 123-45-67"),
-        ("тел. {}", "(800) 123-45-67"),
+        # ФИО между меткой и номером — телефон сотрудника, это ПДн
+        ("Отдел ВЭД: Кулагин М.Ю., тел. +7 913 880-21-44", "+7 913 880-21-44"),
+        ("Отдел кадров — И.П. Сидорова, моб. +7 913 880-21-45", "+7 913 880-21-45"),
+        # метка организации дальше 30 символов слева — не наш контекст
+        ("Приёмная работает до 18:00, а по срочным вопросам +7 913 880-21-46",
+         "+7 913 880-21-46"),
+        # личный ящик рядом с телефоном
+        ("t.zueva@example.ru, тел. +7 923 601-48-35", "+7 923 601-48-35"),
+        ("Служебный телефон инженера: +7 923 601-48-36", "+7 923 601-48-36"),
     ],
 )
-def test_toll_free_low_confidence(text: str, value: str) -> None:
-    assert assert_found(text.format(value), T.PHONE, value).confidence == CONF_TOLL_FREE
+def test_personal_phone_near_org_words_kept(text: str, value: str) -> None:
+    assert_found(text, T.PHONE, value)
+
+
+@pytest.mark.parametrize(
+    ("local", "expected"),
+    [
+        ("info", True), ("INFO2", True), ("sales", True), ("zakupki.tomsk", True),
+        ("priem_1", True), ("hr", True), ("t.zueva", False), ("ivan.petrov", False),
+        ("salesman.ivan", False), ("", False),
+    ],
+)
+def test_is_role_mailbox(local: str, expected: bool) -> None:
+    assert is_role_mailbox(local) is expected
+
+
+def test_personal_email_kept_next_to_role_mailbox() -> None:
+    text = "Кому: zakupki@example.ru; копия: nadezhda.volkova@example.ru"
+    [ent] = run(text)
+    assert text[ent.start:ent.end] == "nadezhda.volkova@example.ru"
 
 
 # ---------- Пересечения ----------

@@ -14,6 +14,10 @@ ADDRESS: AddrExtractor (медленный) запускается только 
 ИП — физлицо: ФИО после «ИП» / «индивидуальный предприниматель» возвращается как PERSON,
 даже если Natasha разметила всю конструкцию как ORG.
 
+Правила поверх Natasha (T-019a): полное ФИО с отчеством в любом падеже («Выдана
+Пономарёву Артёму Вадимовичу» — Natasha дательный падеж пропускает) и имя держателя
+карты латиницей («держатель IVAN PETROV», «Cardholder: Ivan Petrov»).
+
 ФИО ЗАГЛАВНЫМИ: Natasha работает на копии текста той же длины, где «ИВАНОВ» → «Иванов»
 (аббревиатуры ООО, ИНН, НДС … не меняются). Смещения в копии и в doc.text совпадают;
 value_masked и проверки PERSON строятся по исходному doc.text.
@@ -62,6 +66,27 @@ _NAME_SHAPE_RE = re.compile(
     rf"|{_TITLE_WORD}\s+{_INITIALS}|{_INITIALS}\s*{_TITLE_WORD}"
 )
 IP_PERSON_CONFIDENCE = 0.9
+
+# Полное ФИО «Фамилия Имя Отчество» в любом падеже: третье слово — отчество
+# («-ович/-евич/-ич», «-овна/-евна/-ична/-инична» + падежное окончание).
+_PATRONYMIC = r"[А-ЯЁ][а-яё]+(?:(?:ович|евич|ич)(?:а|у|ем|е)?|(?:овн|евн|ичн|иничн)(?:а|ы|е|у|ой))"
+_FULL_NAME_RE = re.compile(
+    rf"(?<![А-Яа-яЁё-]){_TITLE_WORD}\s+[А-ЯЁ][а-яё]+\s+{_PATRONYMIC}(?![А-Яа-яЁё])"
+)
+FULL_NAME_CONFIDENCE = 0.85
+# Держатель карты латиницей: два слова с заглавной после метки.
+_LATIN_WORD = r"[A-Z](?:[a-z]+|[A-Z]+)(?:-[A-Z](?:[a-z]+|[A-Z]+))?"
+_CARDHOLDER_RE = re.compile(
+    r"(?:(?i:держател\w*)(?:\s+(?i:карты))?|(?i:card\s?holder)|(?i:имя\s+на\s+карте))"
+    rf"\s*[:—–-]?\s*({_LATIN_WORD}\s+{_LATIN_WORD})(?![A-Za-z])"
+)
+CARDHOLDER_CONFIDENCE = 0.9
+# «держатель карты Visa Gold» — платёжная система и класс карты, а не имя.
+_CARD_WORDS = frozenset({
+    "VISA", "MASTERCARD", "MAESTRO", "MIR", "UNIONPAY", "JCB", "AMEX", "ELECTRON",
+    "CLASSIC", "GOLD", "PLATINUM", "STANDARD", "WORLD", "BLACK", "INFINITE", "SIGNATURE",
+    "PREMIUM", "BUSINESS", "CORPORATE", "DEBIT", "CREDIT", "CARD", "BANK",
+})
 
 # ФИО ЗАГЛАВНЫМИ: Natasha обучена на обычном регистре и «ИВАНОВ ИВАН» не видит.
 _CAPS_WORD_RE = re.compile(r"(?<![^\W\d_])[А-ЯЁ]{2,}(?![^\W\d_])")
@@ -264,6 +289,34 @@ def _ip_person_entities(
     return entities
 
 
+def _rule_person_entities(text: str, ner_text: str) -> list[Entity]:
+    """ФИО по правилам: полное ФИО с отчеством (по копии с исправленным регистром)
+    и держатель карты латиницей (по исходному тексту)."""
+    entities = [
+        _entity(text, _Span(m.start(), m.end()), EntityType.PERSON, FULL_NAME_CONFIDENCE)
+        for m in _FULL_NAME_RE.finditer(ner_text)
+    ]
+    entities += [
+        _entity(text, _Span(m.start(1), m.end(1)), EntityType.PERSON, CARDHOLDER_CONFIDENCE)
+        for m in _CARDHOLDER_RE.finditer(text)
+        if not _CARD_WORDS & set(m.group(1).upper().split())
+    ]
+    return entities
+
+
+def _add_missing(persons: list[Entity], extra: list[Entity]) -> list[Entity]:
+    """Добавляет сущности правил: новые — как есть, а если правило целиком накрывает
+    неполный спан Natasha («Гусевой Мариной» + « Олеговной») — заменяет его.
+    Частичные пересечения не трогаем: доверяем Natasha."""
+    kept = list(persons)
+    for e in extra:
+        overlap = [p for p in kept if p.start < e.end and e.start < p.end]
+        same = any((p.start, p.end) == (e.start, e.end) for p in overlap)
+        if not same and all(e.start <= p.start and p.end <= e.end for p in overlap):
+            kept = [p for p in kept if p not in overlap] + [e]
+    return sorted(kept, key=lambda e: (e.start, e.end))
+
+
 def _unique_persons(persons: list[Entity], ip_persons: list[Entity]) -> list[Entity]:
     """Одинаковые спаны схлопываются; у ИП остаётся его confidence 0.9."""
     by_span = {(e.start, e.end): e for e in persons}
@@ -406,6 +459,7 @@ def detect_ner(doc: ExtractedDocument) -> list[Entity]:
     persons = _unique_persons(
         _person_entities(text, plain_per), _ip_person_entities(text, ner_text, prefixed)
     )
+    persons = _add_missing(persons, _rule_person_entities(text, ner_text))
     person_spans = [_Span(e.start, e.end) for e in persons]
     addresses = _address_entities(text, ner_text, models, person_spans, org_spans)
     entities = sorted(persons + addresses, key=lambda e: (e.start, e.end))

@@ -219,3 +219,70 @@ def test_trade_secret_trimmed_around_ip_person() -> None:
     assert ts.value_masked.endswith("12%") and "Смирнов" not in ts.value_masked
     result = mask(text, entities)                  # не падает на пересечении
     assert "Смирнова" not in result.masked_text and "12%" in result.masked_text
+
+
+# ---------- сквозные тесты T-019a ----------
+def _rule_ids(repo_root: Path, doc: ExtractedDocument, purpose: str, consent: bool) -> set[str]:
+    from app.schemas import DocPurpose, Marker, MarkerType, RuleContext
+    from app.services.masking.masker import mask
+    from app.services.rules.engine import evaluate
+    from app.services.rules.loader import load_rules
+
+    entities = detect(doc)
+    ctx = RuleContext(
+        doc=doc, masked_text=mask(doc.text, entities).masked_text, entities=entities,
+        purpose=DocPurpose(purpose),
+        markers=[Marker(type=MarkerType.consent_clause, present=consent)],
+    )
+    return {v.rule_id for v in evaluate(load_rules(repo_root / "data/rules/rules.yaml"), ctx)}
+
+
+def test_org_contacts_do_not_trigger_pd_in_publication(repo_root: Path) -> None:
+    tz = build_doc([
+        ("ТЕХНИЧЕСКОЕ ЗАДАНИЕ на поставку ИБП. Гарантия 36 месяцев.", 1, "1. Общие"),
+        ("Телефон службы поддержки: 8-800-000-00-00, e-mail: support@example.ru.", 1, "2. Связь"),
+        ("Приёмная заказчика: 8 (3822) 70-11-22, zakupki@example.ru", 1, "2. Связь"),
+    ])
+    pd_categories = (EntityCategory.pd, EntityCategory.pd_special)
+    assert [e for e in detect(tz) if e.category in pd_categories] == []
+    assert "PD_IN_PUBLICATION" not in _rule_ids(repo_root, tz, "publication", consent=False)
+
+
+def test_special_category_masked_and_rule(repo_root: Path) -> None:
+    from app.services.masking.masker import mask
+
+    text = "Работник Сафронов Леонид Игоревич: инвалидность III группы, работы только в помещении."
+    doc = build_doc([(text, 1, "Персонал")])
+    entities = detect(doc)
+    [special] = [e for e in entities if e.type == T.SPECIAL_CATEGORY]
+    assert special.category == EntityCategory.pd_special and special.page == 1
+    assert "инвалидность" not in special.value_masked
+    masked = mask(doc.text, entities).masked_text
+    assert "инвалидность" not in masked and "[SPECIAL_CATEGORY_1]" in masked
+    assert "SPECIAL_PD_NO_CONSENT" in _rule_ids(repo_root, doc, "internal", consent=False)
+    assert "SPECIAL_PD_NO_CONSENT" not in _rule_ids(repo_root, doc, "internal", consent=True)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Поставка лекарственных препаратов для лечения онкологических заболеваний",
+        "Расходные материалы для отделения беременных и родильниц",
+        "Средства реабилитации для инвалидов",
+        "Медицинская помощь при заболеваниях системы кровообращения",
+        "Закупка инсулина для пациентов с диабетом",
+    ],
+)
+def test_medical_procurement_is_not_special_category(text: str) -> None:
+    entities = detect(build_doc([(text, 1, "Предмет закупки")]))
+    assert [e for e in entities if e.type == T.SPECIAL_CATEGORY] == []
+
+
+def test_disability_next_to_person_is_special_category() -> None:
+    text = "Иванов Иван Иванович, инвалид II группы, работает в отделе снабжения."
+    entities = detect(build_doc([(text, 1, None)]))
+    by_type = {e.type: e for e in entities}
+    assert {T.PERSON, T.SPECIAL_CATEGORY} <= set(by_type)
+    special = by_type[T.SPECIAL_CATEGORY]
+    assert text[special.start:special.end].startswith("инвалид II группы")
+    assert special.category == EntityCategory.pd_special
