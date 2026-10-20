@@ -1,65 +1,51 @@
-import { Alert, Card, Col, Descriptions, Row, Space, Statistic, Tag, Typography } from "antd";
-import { useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Alert, Button, Card, Col, Descriptions, Modal, Result, Row, Skeleton, Space, Statistic, Tag, Typography } from "antd";
+import { useNavigate, useParams } from "react-router-dom";
 
-import type { DocPurpose, Overall, Report } from "../api/types";
+import { ApiError, getReport, getReportText } from "../api/client";
+import type { DocPurpose, Evidence, LawRef, Report, ReportText } from "../api/types";
 import Checklist from "../components/Checklist";
+import DocumentText from "../components/DocumentText";
+import { getArticleText } from "../components/legalArticles";
 import EntitiesTable from "../components/EntitiesTable";
 import ViolationsTable from "../components/ViolationsTable";
 import { PURPOSE_LABELS } from "../components/labels";
+import TrafficLight, { OVERALL } from "../components/TrafficLight";
 import mockReport from "../mocks/report.example.json";
-
-// В T-006 страница использует демонстрационный отчёт; подключение GET /reports будет позже.
-const report = mockReport as Report;
-
-const OVERALL: Record<Overall, { color: string; label: string; description: string }> = {
-  red: {
-    color: "#cf1322",
-    label: "Есть серьёзные нарушения",
-    description: "Перед использованием документа необходимо устранить серьёзные нарушения.",
-  },
-  yellow: {
-    color: "#d48806",
-    label: "Есть замечания",
-    description: "Проверьте замечания и рекомендации перед использованием документа.",
-  },
-  green: {
-    color: "#389e0d",
-    label: "Нарушений не найдено",
-    description: "По результатам проверки нарушений не обнаружено.",
-  },
-};
-
-function TrafficLight({ value }: { value: Overall }) {
-  const lamps: Overall[] = ["red", "yellow", "green"];
-  const colors: Record<Overall, string> = {
-    red: "#cf1322",
-    yellow: "#d48806",
-    green: "#389e0d",
-  };
-
-  return (
-    <Space size="middle" aria-label={`Итог проверки: ${OVERALL[value].label}`}>
-      {lamps.map((lamp) => (
-        <span
-          key={lamp}
-          title={lamp === value ? OVERALL[lamp].label : undefined}
-          style={{
-            display: "inline-block",
-            width: 28,
-            height: 28,
-            borderRadius: "50%",
-            background: colors[lamp],
-            opacity: lamp === value ? 1 : 0.16,
-            boxShadow: lamp === value ? `0 0 0 4px ${colors[lamp]}22` : "none",
-          }}
-        />
-      ))}
-    </Space>
-  );
-}
 
 export default function ReportPage() {
   const { reportId } = useParams<{ reportId: string }>();
+  const navigate = useNavigate();
+  const [liveReport, setLiveReport] = useState<Report | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const [documentText, setDocumentText] = useState<ReportText | null>(null);
+  const [textError, setTextError] = useState(false);
+  const [selectedEvidence, setSelectedEvidence] = useState<Evidence | null>(null);
+  const [selectedLaw, setSelectedLaw] = useState<LawRef | null>(null);
+
+  useEffect(() => {
+    if (!reportId || reportId === "example") return;
+    let active = true;
+    void getReport(reportId).then(
+      (result) => { if (active) setLiveReport(result); },
+      (reason: unknown) => { if (active) setError(reason); },
+    );
+    void getReportText(reportId).then(
+      (result) => { if (active) setDocumentText(result); },
+      () => { if (active) setTextError(true); },
+    );
+    return () => { active = false; };
+  }, [reportId]);
+
+  if (reportId !== "example" && error instanceof ApiError && error.status === 404) {
+    return <Result status="404" title="Отчёт не найден" extra={<Button onClick={() => navigate("/")}>На главную</Button>} />;
+  }
+  if (reportId !== "example" && error) {
+    return <Alert type="error" showIcon title="Не удалось загрузить отчёт" description={error instanceof Error ? error.message : "Попробуйте обновить страницу."} />;
+  }
+  if (reportId !== "example" && !liveReport) return <Skeleton active paragraph={{ rows: 10 }} />;
+
+  const report = reportId === "example" ? mockReport as Report : liveReport!;
   const redCount = report.violations.filter((violation) => violation.severity === "red").length;
   const yellowCount = report.violations.filter((violation) => violation.severity === "yellow").length;
   const entityCount = Object.values(report.stats).reduce((sum, count) => sum + count, 0);
@@ -74,12 +60,7 @@ export default function ReportPage() {
 
   return (
     <Space orientation="vertical" size="large" style={{ width: "100%" }}>
-      <Alert
-        type="info"
-        showIcon
-        title={`Демонстрационный отчёт${reportId ? ` · ${reportId}` : ""}`}
-        description="На этом этапе показаны примерные результаты. Данные взяты из демонстрационного отчёта."
-      />
+      {reportId === "example" && <Alert type="info" showIcon title="Демонстрационный отчёт" description="Данные в этом отчёте вымышленные." />}
 
       <Card>
         <Typography.Title level={2} style={{ marginTop: 0 }}>
@@ -94,11 +75,12 @@ export default function ReportPage() {
         <Typography.Paragraph type="secondary" style={{ marginTop: 12 }}>
           {overall.description}
         </Typography.Paragraph>
+        {!report.llm_used && <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>Смысловые проверки нейросетью не выполнялись (режим без LLM).</Typography.Paragraph>}
         <Descriptions column={{ xs: 1, sm: 2, md: 2 }} items={details} />
         <Row gutter={[12, 12]} style={{ marginTop: 20 }}>
           <Col xs={12} md={8}>
             <Card size="small">
-              <Statistic title="Найдено данных" value={entityCount} />
+              <Statistic title="Найдено фрагментов с чувствительными данными" value={entityCount} />
             </Card>
           </Col>
           <Col xs={12} md={8}>
@@ -119,8 +101,14 @@ export default function ReportPage() {
       </Card>
 
       <Card title={`Нарушения (${report.violations.length})`}>
-        <ViolationsTable violations={report.violations} />
+        {documentText && report.violations.some((violation) => violation.evidence.length > 0) && (
+          <Typography.Paragraph type="secondary">Раскройте нарушение и нажмите на цитату, чтобы увидеть её в тексте документа.</Typography.Paragraph>
+        )}
+        <ViolationsTable violations={report.violations} onSelectEvidence={documentText ? setSelectedEvidence : undefined} onShowLaw={setSelectedLaw} />
       </Card>
+
+      {documentText && <DocumentText document={documentText} entities={report.entities} selected={selectedEvidence} />}
+      {textError && <Alert type="warning" showIcon title="Текст документа пока недоступен" />}
 
       <Card title={`Найденные данные (${report.entities.length})`}>
         <Typography.Paragraph type="secondary">
@@ -128,6 +116,16 @@ export default function ReportPage() {
         </Typography.Paragraph>
         <EntitiesTable entities={report.entities} stats={report.stats} />
       </Card>
+
+      <Button size="large" onClick={() => navigate("/")}>Проверить другой документ</Button>
+
+      <Modal title={selectedLaw ? `${selectedLaw.law}, ${selectedLaw.article}` : "Норма закона"} open={selectedLaw !== null} onCancel={() => setSelectedLaw(null)} footer={<Button onClick={() => setSelectedLaw(null)}>Закрыть</Button>}>
+        {selectedLaw?.title && <Typography.Paragraph strong>{selectedLaw.title}</Typography.Paragraph>}
+        {selectedLaw && getArticleText(selectedLaw) ? (
+          <Typography.Paragraph style={{ whiteSpace: "pre-wrap", maxHeight: "50vh", overflowY: "auto" }}>{getArticleText(selectedLaw)}</Typography.Paragraph>
+        ) : <Typography.Paragraph type="secondary">Текст этой нормы не включён в каталог проекта.</Typography.Paragraph>}
+        {selectedLaw?.url && <Typography.Link href={selectedLaw.url} target="_blank" rel="noreferrer">Открыть источник</Typography.Link>}
+      </Modal>
     </Space>
   );
 }

@@ -1,0 +1,11 @@
+# Контекст сборки frontend — корень репозитория (docker-compose.yml).
+# backend собирается из своей папки и этот файл не читает.
+**/node_modules
+**/dist
+**/.env
+.git
+backend
+eval
+docs
+data/uploads
+data/demo

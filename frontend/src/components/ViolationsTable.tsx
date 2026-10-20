@@ -1,4 +1,4 @@
-import { List, Table, Tag, Typography } from "antd";
+import { Button, List, Table, Tag, Typography } from "antd";
 import type { TableColumnsType } from "antd";
 
 import type { Evidence, LawRef, Violation } from "../api/types";
@@ -6,6 +6,8 @@ import { SEVERITY_LABELS } from "./labels";
 
 interface ViolationsTableProps {
   violations: Violation[];
+  onSelectEvidence?: (evidence: Evidence) => void;
+  onShowLaw?: (law: LawRef) => void;
 }
 
 function evidenceLocation(evidence: Evidence): string {
@@ -15,8 +17,9 @@ function evidenceLocation(evidence: Evidence): string {
   return parts.join(" · ") || "Место не указано";
 }
 
-function LawReference({ law }: { law: LawRef }) {
+function LawReference({ law, onShow }: { law: LawRef; onShow?: (law: LawRef) => void }) {
   const label = `${law.law}, ${law.article}`;
+  if (onShow) return <Button type="link" style={{ padding: 0 }} onClick={() => onShow(law)}>{label}</Button>;
   if (law.url) {
     return (
       <Typography.Link href={law.url} target="_blank" rel="noreferrer">
@@ -27,7 +30,7 @@ function LawReference({ law }: { law: LawRef }) {
   return <Typography.Text>{label}</Typography.Text>;
 }
 
-export default function ViolationsTable({ violations }: ViolationsTableProps) {
+export default function ViolationsTable({ violations, onSelectEvidence, onShowLaw }: ViolationsTableProps) {
   const sortedViolations = [...violations].sort((a, b) => {
     if (a.severity === b.severity) return 0;
     return a.severity === "red" ? -1 : 1;
@@ -63,7 +66,7 @@ export default function ViolationsTable({ violations }: ViolationsTableProps) {
           dataSource={lawRefs}
           renderItem={(law, index) => (
             <List.Item key={`${law.law}-${law.article}-${index}`} style={{ paddingBlock: 2 }}>
-              <LawReference law={law} />
+              <LawReference law={law} onShow={onShowLaw} />
             </List.Item>
           )}
         />
@@ -94,7 +97,11 @@ export default function ViolationsTable({ violations }: ViolationsTableProps) {
               renderItem={(evidence, index) => (
                 <List.Item key={`${evidence.start}-${evidence.end}-${index}`}>
                   <div style={{ width: "100%" }}>
-                    <Typography.Text>{evidence.quote}</Typography.Text>
+                    {onSelectEvidence ? (
+                      <Button type="link" style={{ padding: 0, height: "auto", textAlign: "left", whiteSpace: "normal" }} onClick={() => onSelectEvidence(evidence)}>
+                        {evidence.quote || "Показать фрагмент в тексте"}
+                      </Button>
+                    ) : <Typography.Text>{evidence.quote}</Typography.Text>}
                     <br />
                     <Typography.Text type="secondary">
                       {evidenceLocation(evidence)}
