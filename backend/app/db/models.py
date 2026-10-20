@@ -64,4 +64,5 @@ class RuleRow(Base):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     data: Mapped[dict] = mapped_column(JSONB().with_variant(JSON(), "sqlite"))
