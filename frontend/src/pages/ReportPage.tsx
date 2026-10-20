@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { Alert, Button, Card, Col, Descriptions, Result, Row, Skeleton, Space, Statistic, Tag, Typography } from "antd";
+import { Alert, Button, Card, Col, Descriptions, Modal, Result, Row, Skeleton, Space, Statistic, Tag, Typography } from "antd";
 import { useNavigate, useParams } from "react-router-dom";
 
-import { ApiError, getReport } from "../api/client";
-import type { DocPurpose, Report } from "../api/types";
+import { ApiError, getReport, getReportText } from "../api/client";
+import type { DocPurpose, Evidence, LawRef, Report, ReportText } from "../api/types";
 import Checklist from "../components/Checklist";
+import DocumentText from "../components/DocumentText";
 import EntitiesTable from "../components/EntitiesTable";
 import ViolationsTable from "../components/ViolationsTable";
 import { PURPOSE_LABELS } from "../components/labels";
@@ -16,6 +17,10 @@ export default function ReportPage() {
   const navigate = useNavigate();
   const [liveReport, setLiveReport] = useState<Report | null>(null);
   const [error, setError] = useState<unknown>(null);
+  const [documentText, setDocumentText] = useState<ReportText | null>(null);
+  const [textError, setTextError] = useState(false);
+  const [selectedEvidence, setSelectedEvidence] = useState<Evidence | null>(null);
+  const [selectedLaw, setSelectedLaw] = useState<LawRef | null>(null);
 
   useEffect(() => {
     if (!reportId || reportId === "example") return;
@@ -23,6 +28,10 @@ export default function ReportPage() {
     void getReport(reportId).then(
       (result) => { if (active) setLiveReport(result); },
       (reason: unknown) => { if (active) setError(reason); },
+    );
+    void getReportText(reportId).then(
+      (result) => { if (active) setDocumentText(result); },
+      () => { if (active) setTextError(true); },
     );
     return () => { active = false; };
   }, [reportId]);
@@ -91,8 +100,11 @@ export default function ReportPage() {
       </Card>
 
       <Card title={`Нарушения (${report.violations.length})`}>
-        <ViolationsTable violations={report.violations} />
+        <ViolationsTable violations={report.violations} onSelectEvidence={documentText ? setSelectedEvidence : undefined} onShowLaw={setSelectedLaw} />
       </Card>
+
+      {documentText && <DocumentText document={documentText} entities={report.entities} selected={selectedEvidence} />}
+      {textError && <Alert type="warning" showIcon title="Текст документа пока недоступен" />}
 
       <Card title={`Найденные данные (${report.entities.length})`}>
         <Typography.Paragraph type="secondary">
@@ -100,6 +112,11 @@ export default function ReportPage() {
         </Typography.Paragraph>
         <EntitiesTable entities={report.entities} stats={report.stats} />
       </Card>
+
+      <Modal title={selectedLaw ? `${selectedLaw.law}, ${selectedLaw.article}` : "Норма закона"} open={selectedLaw !== null} onCancel={() => setSelectedLaw(null)} footer={<Button onClick={() => setSelectedLaw(null)}>Закрыть</Button>}>
+        {selectedLaw?.title && <Typography.Paragraph>{selectedLaw.title}</Typography.Paragraph>}
+        {selectedLaw?.url ? <Typography.Link href={selectedLaw.url} target="_blank" rel="noreferrer">Открыть текст статьи</Typography.Link> : <Typography.Text type="secondary">Ссылка на текст статьи не указана.</Typography.Text>}
+      </Modal>
     </Space>
   );
 }
