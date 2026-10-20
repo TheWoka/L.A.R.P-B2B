@@ -30,6 +30,43 @@ def found(text: str, etype: EntityType) -> list[str]:
     return [text[e.start:e.end] for e in detect_ner(make_doc(text)) if e.type == etype]
 
 
+# ---------- PERSON: правила поверх Natasha (T-019a) ----------
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("СПРАВКА\nВыдана Пономарёву Артёму Вадимовичу, 17.02.1979 г.р., в том, что",
+         "Пономарёву Артёму Вадимовичу"),
+        ("Договор заключён с Гусевой Мариной Олеговной сроком на год.",
+         "Гусевой Мариной Олеговной"),
+        ("ВЫДАНА ЗАХАРОВОЙ ЕЛЕНЕ СЕРГЕЕВНЕ для предъявления", "ЗАХАРОВОЙ ЕЛЕНЕ СЕРГЕЕВНЕ"),
+        ("на карту 2200 4466 9725 3812, держатель IVAN SHESTAKOV. Заявитель", "IVAN SHESTAKOV"),
+        ("Cardholder: Ivan Petrov-Vodkin", "Ivan Petrov-Vodkin"),
+        ("ДЕРЖАТЕЛЬ КАРТЫ: MARIA IVANOVA", "MARIA IVANOVA"),
+    ],
+)
+def test_rule_person_found(text: str, expected: str) -> None:
+    assert expected in found(text, T.PERSON)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "держатель карты Visa Gold обязан хранить ПИН-код",
+        "Держатель облигаций ООО «Альфа» вправе требовать погашения",
+        "Поставка по адресу: г. Томск, ул. Карла Маркса, д. 21",
+    ],
+)
+def test_rule_person_not_found(text: str) -> None:
+    assert found(text, T.PERSON) == []
+
+
+def test_rule_does_not_replace_equal_ip_span() -> None:
+    text = "Исполнитель: ИП Смирнова Анна Сергеевна, ИНН"
+    [ent] = [e for e in detect_ner(make_doc(text)) if e.type == T.PERSON]
+    assert text[ent.start:ent.end] == "Смирнова Анна Сергеевна"
+    assert ent.confidence == 0.9   # уверенность ИП сохраняется
+
+
 # ---------- PERSON: найдено ----------
 @pytest.mark.parametrize(
     ("text", "expected", "confidence"),

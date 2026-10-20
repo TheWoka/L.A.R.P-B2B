@@ -7,6 +7,12 @@
 код телефона, реальная дата) или обязательное слово-контекст рядом. Реквизиты
 организаций (ИНН из 10 цифр, счета 40702…, ИКЗ, ОГРН и т.п.) — не ПДн и не возвращаются.
 
+Контакты организации — тоже не ПДн и сущностью не становятся вовсе (T-019a): бесплатные
+линии 8-800 / 8-804, ролевые ящики (info@, sales@, zakupki@ …), телефон с меткой «приёмная»,
+«отдел», «служба», «горячая линия» слева или сразу после ролевого ящика. Раньше они шли
+с уверенностью 0.5, но confidence нигде не фильтруется — и любое ТЗ с телефоном поддержки
+получало ложное PD_IN_PUBLICATION.
+
 Текст не нормализуется: смещения совпадают с исходным doc.text. Исходные значения
 нигде не сохраняются и не логируются — в Entity только value_masked и координаты.
 """
@@ -25,10 +31,8 @@ CONF_CHECKSUM = 0.98        # прошла контрольная сумма
 CONF_CONTEXT = 0.95         # формат + обязательный контекст
 CONF_FORMAT = 0.9           # только формат (телефон с кодом страны)
 CONF_PHONE_LOCAL = 0.85     # телефон без кода страны, рядом метка "тел."
-CONF_TOLL_FREE = 0.5        # 8-800 / 8-804 — бесплатные линии организаций
 CONF_ACCOUNT_NO_BIK = 0.8   # счёт физлица, рядом нет БИК для проверки ключа
 CONF_EMAIL = 0.95
-CONF_ROLE_EMAIL = 0.5       # ролевой ящик организации: info@, zakupki@ …
 
 # При пересечении остаётся сущность с меньшим рангом; при равенстве — более длинная.
 PRIORITY: dict[EntityType, int] = {
@@ -42,11 +46,20 @@ PRIORITY: dict[EntityType, int] = {
     EntityType.EMAIL: 7,
 }
 
-# Балансовые счета физлиц (ПДн). Счета организаций (40702, 40602, 30101 …) — не ПДн.
-PERSONAL_ACCOUNT_PREFIXES = ("40817", "40820", "423", "426")
-ROLE_MAILBOXES = frozenset(
-    {"info", "zakupki", "tender", "office", "support", "noreply", "no-reply"}
-)
+# Балансовые счета физлиц (ПДн), включая 40802 — счёт ИП (ИП — физлицо, 152-ФЗ).
+# Счета организаций (40702, 40602, 30101 …) — не ПДн.
+PERSONAL_ACCOUNT_PREFIXES = ("40817", "40820", "40802", "423", "426")
+# Ролевые ящики организации: не ПДн, сущность не создаётся. Сравнивается локальная часть
+# без цифр в конце и её первое слово до «.», «_», «-»: «zakupki.tomsk@», «info2@».
+ROLE_MAILBOXES = frozenset({
+    "info", "mail", "post", "contact", "contacts", "hello", "feedback", "question",
+    "zakupki", "zakupka", "zakup", "tender", "tenders", "torgi", "goszakaz",
+    "office", "priem", "priemnaya", "reception", "secretary", "sekretar", "kanc", "doc", "docs",
+    "sales", "sale", "zakaz", "order", "orders", "shop", "market", "marketing", "pr", "press",
+    "support", "help", "helpdesk", "service", "servis", "hotline",
+    "buh", "buhgalteria", "accounting", "finance", "fin", "hr", "kadry", "job", "jobs",
+    "admin", "noreply", "no-reply", "postmaster", "webmaster", "security",
+})
 
 # ---------- Окна контекста (символов) ----------
 WIN_SNILS = 40
@@ -57,6 +70,7 @@ WIN_BIRTH_RIGHT = 15        # "01.02.1990 г.р." — сокращение ст�
 WIN_BIK = 120
 WIN_LABEL = 30
 WIN_PHONE_LABEL = 30
+WIN_ORG_CONTEXT = 30        # «приёмная / отдел / служба …» не дальше 30 символов слева
 SERIES_MAX_GAP = 3          # "серия 4506 …": между словом и числом не больше 3 символов
 
 # ---------- Регулярные выражения (компилируются один раз) ----------
@@ -94,6 +108,22 @@ PHONE_LOCAL_RE = re.compile(
     rf"(?!\d)(?!{S}\d{{3}})"
 )
 EMAIL_RE = re.compile(r"(?<![\w.+-])[\w.+-]+@[\w-]+(?:\.[\w-]+)*\.[^\W\d_]{2,}(?![\w-])")
+# Контекст телефона организации слева (нормализованное окно): «телефон приёмной: …»,
+# «Отдел продаж: …», «горячая линия …». «Служебный» сюда не попадает: «служеб» ≠ «служб».
+ORG_PHONE_CONTEXT = re.compile(
+    r"(?<!\w)(?:приемн\w*|отдел\w*|служб\w*|горяч\w*\s+лини\w*|диспетчер\w*|канцеляри\w*"
+    r"|колл-?центр\w*|контакт-?центр\w*|секретариат\w*|reception|hotline|call-?cent\w*)"
+)
+# ФИО между меткой и телефоном: «Отдел ВЭД: Кулагин М.Ю., тел. …» — телефон сотрудника.
+NAME_IN_GAP_RE = re.compile(
+    r"[А-ЯЁ][а-яё]+(?:-[А-ЯЁ][а-яё]+)?\s+[А-ЯЁ]\.|[А-ЯЁ]\.\s?(?:[А-ЯЁ]\.\s?)?[А-ЯЁ][а-яё]+"
+    r"|[А-ЯЁ][а-яё]+\s+[А-ЯЁ][а-яё]+\s+[А-ЯЁ][а-яё]+"
+)
+# Ролевой ящик прямо перед телефоном: «sales@example.ru, тел. 8 (3822) …».
+EMAIL_BEFORE_PHONE_RE = re.compile(
+    r"(?P<local>[\w.+-]+)@[\w.-]+\s*[,;]?\s*(?:(?:тел|моб|факс|phone)\w*\.?)?\s*:?\s*$",
+    re.IGNORECASE,
+)
 
 MONTHS = {
     "января": 1, "февраля": 2, "марта": 3, "апреля": 4, "мая": 5, "июня": 6,
@@ -251,8 +281,34 @@ def _find_passport(ctx: _Ctx) -> Iterator[Candidate]:
             yield Candidate(EntityType.PASSPORT, m.start(), m.end(), CONF_CONTEXT)
 
 
-def _phone_confidence(national: str, default: float) -> float:
-    return CONF_TOLL_FREE if v.is_toll_free(national) else default
+def is_role_mailbox(local: str) -> bool:
+    """Локальная часть адреса — ролевой ящик организации: «info2», «zakupki.tomsk»."""
+    local = local.lower().rstrip("0123456789")
+    first = re.split(r"[._-]", local, maxsplit=1)[0].rstrip("0123456789")
+    return local in ROLE_MAILBOXES or first in ROLE_MAILBOXES
+
+
+def _raw_left(text: str, start: int, width: int) -> str:
+    """Как left_window, но без нормализации — для проверок по регистру (ФИО)."""
+    lo = max(0, start - width)
+    nl = text.rfind("\n", lo, start)
+    return text[(nl + 1 if nl != -1 else lo):start]
+
+
+def is_org_phone(text: str, start: int, national: str) -> bool:
+    """Телефон организации, а не физлица: такой сущности не создаём.
+
+    8-800 / 8-804; метка «приёмная / отдел / служба / горячая линия …» в 30 символах слева
+    без ФИО между меткой и номером; ролевой ящик сразу перед номером.
+    """
+    if v.is_toll_free(national):
+        return True
+    raw = _raw_left(text, start, WIN_ORG_CONTEXT)
+    hits = list(ORG_PHONE_CONTEXT.finditer(_norm(raw)))  # _norm не меняет длину
+    if hits and NAME_IN_GAP_RE.search(raw[hits[-1].end():]) is None:
+        return True
+    email = EMAIL_BEFORE_PHONE_RE.search(_raw_left(text, start, WIN_ORG_CONTEXT + 40))
+    return email is not None and is_role_mailbox(email.group("local"))
 
 
 def _find_phone(ctx: _Ctx) -> Iterator[Candidate]:
@@ -261,9 +317,9 @@ def _find_phone(ctx: _Ctx) -> Iterator[Candidate]:
         national = v.ru_phone_national(m.group())
         if national is None or not v.is_valid_ru_phone(m.group()):
             continue
-        if not _has_non_pd_label(text, m.start()):
-            conf = _phone_confidence(national, CONF_FORMAT)
-            yield Candidate(EntityType.PHONE, m.start(), m.end(), conf)
+        if _has_non_pd_label(text, m.start()) or is_org_phone(text, m.start(), national):
+            continue
+        yield Candidate(EntityType.PHONE, m.start(), m.end(), CONF_FORMAT)
 
 
 def _find_phone_local(ctx: _Ctx) -> Iterator[Candidate]:
@@ -275,16 +331,16 @@ def _find_phone_local(ctx: _Ctx) -> Iterator[Candidate]:
             continue
         if not PHONE_LABEL.search(left_window(text, m.start(), WIN_PHONE_LABEL)):
             continue
-        if not _has_non_pd_label(text, m.start()):
-            conf = _phone_confidence(national, CONF_PHONE_LOCAL)
-            yield Candidate(EntityType.PHONE, m.start(), m.end(), conf)
+        if _has_non_pd_label(text, m.start()) or is_org_phone(text, m.start(), national):
+            continue
+        yield Candidate(EntityType.PHONE, m.start(), m.end(), CONF_PHONE_LOCAL)
 
 
 def _find_email(ctx: _Ctx) -> Iterator[Candidate]:
+    """Email физлица; ролевые ящики организации (info@, sales@ …) пропускаются."""
     for m in EMAIL_RE.finditer(ctx.text):
-        local = m.group().split("@", 1)[0].lower().rstrip("0123456789")
-        conf = CONF_ROLE_EMAIL if local in ROLE_MAILBOXES else CONF_EMAIL
-        yield Candidate(EntityType.EMAIL, m.start(), m.end(), conf)
+        if not is_role_mailbox(m.group().split("@", 1)[0]):
+            yield Candidate(EntityType.EMAIL, m.start(), m.end(), CONF_EMAIL)
 
 
 def _date_parts(m: re.Match[str]) -> tuple[int, int, int]:

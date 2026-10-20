@@ -1,21 +1,35 @@
-"""Словарный детектор коммерческой тайны и финансовых данных. Задача T-013a, исполнитель — Данила.
+"""Словарный детектор КТ, финансовых данных и особых категорий ПДн. Задачи T-013a, T-019a.
 
 Внутренний интерфейс модуля detection — не контракт.
 
 Принцип: коммерческая тайна и финансы — это связка «ключевое слово + значение»
 («себестоимость … 38 400 руб.», «12% — наценка»). Само слово «маржа» без числа
-сущностью не считается — это кандидат на уточнение LLM в T-013. Слова без значения
-(«ноу-хау», «рецептура») — сущность сразу, но с меньшей уверенностью.
+сущностью не считается — это кандидат на уточнение LLM в T-013.
+
+Группы needs_value: false (T-019a) — отрезок от ключевого слова до конца фразы:
+- КТ («ноу-хау», «рецептура», «перечень клиентов») — только если во фразе есть само
+  содержание: число, скобки с составом или «: …». «Перечень клиентов предоставляется по
+  запросу» — не сущность (eval/README.md, ловушки);
+- особые категории ПДн (SPECIAL_CATEGORY, ст. 10 152-ФЗ: здоровье, судимость, убеждения …) —
+  сразу: само слово «инвалидность» уже сведения о человеке. Метка с двоеточием
+  («Национальность: …») в отрезок не входит. Требования закупки («отсутствие судимости»)
+  исключаются.
+
+Группа с полем context срабатывает, только если в той же строке есть слово контекста:
+«материалы 640 000 руб.» — КТ лишь рядом с «себестоимость» / «калькуляция».
 
 Цены и суммы из документации закупки (НМЦК, цена контракта, обеспечение, аванс)
 публикуются в ЕИС (44-ФЗ) и коммерческой тайной не являются — исключаются.
 
+Ставки налогов («НДС 20%», «налог на прибыль 20%», «НДФЛ 13%») — не показатели компании.
+
 Словари — data/rules/dictionaries.yaml (Алина расширяет без кода). Расчётные счета
-организаций (407/406/405/40802, корсчёт 30101) ищутся кодом с проверкой ключа по БИК.
-Счета физлиц — ПДн, их находит regex_detector (T-007).
+организаций (407/406/405, корсчёт 30101) ищутся кодом с проверкой ключа по БИК.
+Счета физлиц и ИП (40817, 40802 …) — ПДн, их находит regex_detector (T-007, T-019a).
 
 value_masked для trade_secret / financial — исходный фрагмент: маскируются только ПДн
-(решение 17.10). Фрагменты текста в логи не пишутся (AGENTS.md, правило 4).
+(решение 17.10); у SPECIAL_CATEGORY (pd_special) — маскирование с сохранением длины.
+Фрагменты текста в логи не пишутся (AGENTS.md, правило 4).
 """
 
 import logging
@@ -33,6 +47,7 @@ import yaml
 from app.schemas import Entity, EntityCategory, EntityType, ExtractedDocument
 from app.services.detection import validators as v
 from app.services.detection.regex_detector import ACCOUNT_RE, BIK_RE
+from app.services.masking.masker import MASKED_CATEGORIES, mask_value
 
 logger = logging.getLogger(__name__)
 
@@ -49,14 +64,25 @@ WIN_EXCLUDE = 60            # окно исключений слева от сл
 WIN_VAT = 12                # «НДС 20%» — значение налога, а не показатель
 WIN_BIK = 120
 MAX_ENTITY_LEN = 160
+MAX_PHRASE_LEN = 120        # отрезок «слово → конец фразы» у групп needs_value: false
+WIN_TAX = 40                # «налог на прибыль 20%» — ставка налога слева от значения
+WIN_SPECIAL_EXCLUDE = 120   # «отсутствие судимости» — требование, а не сведения
+WIN_SUBJECT = 150           # человек (PERSON или маркер) не дальше 150 символов от сведений
 
 ACCOUNT_GROUP_ID = "org_account"
-ORG_ACCOUNT_PREFIXES = ("405", "406", "407", "40802", "30101")
-ALLOWED_TYPES = {EntityType.TRADE_SECRET, EntityType.FINANCIAL}
+# 40802 — счёт ИП, это ПДн (regex_detector), а не реквизит организации.
+ORG_ACCOUNT_PREFIXES = ("405", "406", "407", "30101")
 CATEGORY = {
     EntityType.TRADE_SECRET: EntityCategory.trade_secret,
     EntityType.FINANCIAL: EntityCategory.financial,
+    EntityType.SPECIAL_CATEGORY: EntityCategory.pd_special,
 }
+ALLOWED_TYPES = frozenset(CATEGORY)
+TYPES_HINT = "TRADE_SECRET, FINANCIAL или SPECIAL_CATEGORY"
+GROUP_FIELDS = frozenset(
+    {"id", "type", "patterns", "needs_value", "confidence", "description", "context",
+     "needs_subject"}
+)
 
 # ---------- Значение: сумма, процент, число с единицей ----------
 _NUM = r"\d{1,3}(?:[  ]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?"
@@ -87,6 +113,24 @@ NOT_SECRET_RE = re.compile(
     re.IGNORECASE,
 )
 VAT_RE = re.compile(r"ндс", re.IGNORECASE)
+# Ставка налога прямо перед значением: «налог на прибыль 20%», «НДФЛ 13%», «УСН 6%».
+TAX_RATE_LEFT_RE = re.compile(
+    r"(?<!\w)(?:ндс|ндфл|усн|есхн|налог(?:и|а|ов)?(?:\s+на\s+(?:прибыль|имущество|доходы"
+    r"(?:\s+физических\s+лиц)?|добавленную\s+стоимость))?)"
+    r"(?:\s+(?:по\s+ставке|ставка|в\s+размере|составляет))?\s*[:—–-]?\s*$",
+    re.IGNORECASE,
+)
+# «налог на прибыль»: «прибыль» здесь — объект налога, а не показатель компании.
+TAX_KEYWORD_LEFT_RE = re.compile(r"(?<!\w)налог\w*\s+на\s+$", re.IGNORECASE)
+# Содержание сведений КТ во фразе после слова: число, скобки с составом, «: текст».
+CONTENT_RE = re.compile(r"\d|\(|:\s*\w")
+# Метка «Национальность: …», «Сведения о судимости: …» — в отрезок не входит.
+LABEL_COLON_RE = re.compile(r"[ \t]*:[ \t]*")
+# Требование закупки, а не сведения о человеке: «отсутствие судимости у руководителя».
+SPECIAL_EXCLUDE_LEFT_RE = re.compile(
+    r"отсутстви\w*|требовани\w*|участник\w*\s+закупк\w*|не\s+должн\w*|не\s+име\w+",
+    re.IGNORECASE,
+)
 # Названия законов и статей: «№ 98-ФЗ «О коммерческой тайне»», «ст. 1465 ГК РФ «…»».
 LAW_TITLE_RE = re.compile(
     r"(?:закон\w*|кодекс\w*|\bгк\b|\d+-фз|\bст\.|стать\w+|положени\w+)[^«\n]{0,40}«[^»\n]{0,200}»"
@@ -94,6 +138,17 @@ LAW_TITLE_RE = re.compile(
     re.IGNORECASE,
 )
 _EDGE_JUNK = " \t ,:;—–-"
+_PHRASE_TAIL_JUNK = _EDGE_JUNK + ".!?\n"
+# Маркер конкретного человека рядом с особой категорией (needs_subject: true). Формы —
+# единственного числа: «для пациентов с диабетом» — о группе людей, не о субъекте ПДн.
+SUBJECT_MARKER_RE = re.compile(
+    r"(?<!\w)(?:работник(?:а|у|ом|е)?|работниц(?:а|ы|е|у|ей)|сотрудни(?:к|ка|ку|ком|ке|ца|цы|це|цу|цей)"
+    r"|кандидат(?:а|у|ом|е)?|пациент(?:а|у|ом|е|ка|ки|ке|ку|кой)?|гражданин(?:а|у|ом|е)?"
+    r"|гражданк(?:а|и|е|у|ой)|заявител(?:ь|я|ю|ем|е)|у\s+(?:него|нее))(?!\w)"
+    r"|(?<!\w)(?:сведени\w*\s+о\s+[^:\n]{1,40}|диагноз|национальност\w*|вероисповедани\w*"
+    r"|судимост\w*)\s*:",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -105,6 +160,8 @@ class DictGroup:
     regex: re.Pattern[str]
     needs_value: bool
     confidence: float
+    context: re.Pattern[str] | None = None   # слово, которое должно быть в той же строке
+    needs_subject: bool = False              # SPECIAL_CATEGORY: рядом должен быть человек
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,6 +173,7 @@ class _Candidate:
     anchor_end: int         # значение, а для needs_value: false — ключевое слово
     confidence: float
     group_id: str
+    labeled: bool = False   # значение после метки-ключевого слова: «Национальность: …»
 
 
 # ---------- Загрузка словарей ----------
@@ -138,7 +196,7 @@ def _compile_group(item: object, position: int, seen: set[str]) -> DictGroup:
     label = raw_id if isinstance(raw_id, str) and raw_id else f"№{position}"
     if not isinstance(item, dict):
         raise ValueError(f"Группа {label}: ожидается словарь")
-    extra = set(item) - {"id", "type", "patterns", "needs_value", "confidence", "description"}
+    extra = set(item) - GROUP_FIELDS
     if extra:
         raise ValueError(f"Группа {label}: неизвестные поля {sorted(extra)}")
     if not isinstance(raw_id, str) or not raw_id or raw_id in seen:
@@ -146,9 +204,9 @@ def _compile_group(item: object, position: int, seen: set[str]) -> DictGroup:
     try:
         etype = EntityType(item.get("type"))
     except ValueError:
-        raise ValueError(f"Группа {label}: type должен быть TRADE_SECRET или FINANCIAL") from None
+        raise ValueError(f"Группа {label}: type должен быть {TYPES_HINT}") from None
     if etype not in ALLOWED_TYPES:
-        raise ValueError(f"Группа {label}: type должен быть TRADE_SECRET или FINANCIAL")
+        raise ValueError(f"Группа {label}: type должен быть {TYPES_HINT}")
     needs_value = item.get("needs_value")
     if not isinstance(needs_value, bool):
         raise ValueError(f"Группа {label}: needs_value должен быть true или false")
@@ -159,7 +217,16 @@ def _compile_group(item: object, position: int, seen: set[str]) -> DictGroup:
     if not 0 <= confidence <= 1:
         raise ValueError(f"Группа {label}: confidence вне диапазона [0, 1]")
     regex = _compile_patterns(item.get("patterns"), label)
-    return DictGroup(raw_id, etype, regex, needs_value, float(confidence))
+    context = item.get("context")
+    context_re = None if context is None else _compile_patterns(context, f"{label} (context)")
+    needs_subject = item.get("needs_subject", False)
+    if not isinstance(needs_subject, bool):
+        raise ValueError(f"Группа {label}: needs_subject должен быть true или false")
+    if needs_subject and etype is not EntityType.SPECIAL_CATEGORY:
+        raise ValueError(f"Группа {label}: needs_subject только для SPECIAL_CATEGORY")
+    return DictGroup(
+        raw_id, etype, regex, needs_value, float(confidence), context_re, needs_subject
+    )
 
 
 def _compile_patterns(patterns: object, label: str) -> re.Pattern[str]:
@@ -244,7 +311,17 @@ class _Text:
         return EXCLUDE_LEFT_RE.search(window) is not None
 
     def is_vat(self, value_start: int) -> bool:
-        return VAT_RE.search(self.norm[max(0, value_start - WIN_VAT):value_start]) is not None
+        """Значение — ставка налога: «НДС 20%», «налог на прибыль 20%», «НДФЛ 13%»."""
+        if VAT_RE.search(self.norm[max(0, value_start - WIN_VAT):value_start]):
+            return True
+        left = self.norm[max(0, value_start - WIN_TAX):value_start]
+        return TAX_RATE_LEFT_RE.search(left) is not None
+
+    def line(self, pos: int) -> tuple[int, int]:
+        """Границы строки (абзаца) [lo, hi), в которую попадает pos."""
+        lo = self.norm.rfind("\n", 0, pos) + 1
+        hi = self.norm.find("\n", pos)
+        return lo, len(self.norm) if hi == -1 else hi
 
 
 # ---------- Поиск значений ----------
@@ -272,8 +349,65 @@ def _value_before(t: _Text, kw_start: int, lo: int, used: set[int]) -> tuple[int
 def _keyword_hits(t: _Text, groups: Sequence[DictGroup]) -> Iterator[tuple[DictGroup, int, int]]:
     for group in groups:
         for m in group.regex.finditer(t.norm):
-            if not t.in_law_title(m.start(), m.end()):
-                yield group, m.start(), m.end()
+            if t.in_law_title(m.start(), m.end()):
+                continue
+            if TAX_KEYWORD_LEFT_RE.search(t.norm, max(0, m.start() - WIN_VAT), m.start()):
+                continue
+            if group.context is not None and not group.context.search(t.norm, *t.line(m.start())):
+                continue
+            yield group, m.start(), m.end()
+
+
+def _phrase_candidate(t: _Text, group: DictGroup, ks: int, ke: int, hi: int) -> _Candidate | None:
+    """Группа needs_value: false — отрезок от слова до конца фразы (≤ 120 символов).
+
+    КТ — только с содержанием во фразе (число, скобки, «: …»), слово входит в отрезок
+    («показатель + значение», eval/README.md). Особые категории — сразу, кроме требований
+    закупки («отсутствие судимости»); метка с двоеточием сразу после слова
+    («Национальность: русский») в отрезок не входит — размечается само значение.
+    """
+    end = hi
+    while end > ke and t.norm[end - 1] in _PHRASE_TAIL_JUNK:
+        end -= 1
+    tail = t.norm[ke:end]
+    special = group.type is EntityType.SPECIAL_CATEGORY
+    if special:
+        lo = t.phrase(ks)[0]
+        left = t.norm[max(lo, ks - WIN_SPECIAL_EXCLUDE):ks]
+        if SPECIAL_EXCLUDE_LEFT_RE.search(left):
+            return None
+    elif CONTENT_RE.search(tail) is None:
+        return None
+    start, anchor_end = ks, ke
+    label = LABEL_COLON_RE.match(t.norm, ke, end) if special else None
+    labeled = bool(label and label.end() < end)
+    if label and labeled:
+        start = label.end()
+        word = re.match(r"\S+", t.norm[start:end])
+        anchor_end = start + (word.end() if word else 1)
+    if end - start > MAX_PHRASE_LEN:
+        cut = t.norm.rfind(" ", start, start + MAX_PHRASE_LEN)
+        end = max(cut, anchor_end) if cut > start else start + MAX_PHRASE_LEN
+    return _Candidate(
+        group.type, start, end, start, anchor_end, group.confidence, group.id, labeled
+    )
+
+
+def _has_subject(t: _Text, cand: _Candidate, persons: Sequence[tuple[int, int]]) -> bool:
+    """Рядом с особой категорией есть конкретный человек (needs_subject: true).
+
+    Окно — та же строка плюс ±150 символов. Человек: PERSON (regex/NER), маркер
+    («работник», «кандидат», «у неё», «Сведения о …:», «Диагноз:») или метка-ключевое
+    слово с двоеточием («Национальность: русский» — поле анкеты о человеке).
+    """
+    if cand.labeled:
+        return True
+    line_lo, line_hi = t.line(cand.start)
+    lo = min(line_lo, max(0, cand.start - WIN_SUBJECT))
+    hi = max(line_hi, min(len(t.norm), cand.end + WIN_SUBJECT))
+    if any(ps < hi and pe > lo for ps, pe in persons):
+        return True
+    return SUBJECT_MARKER_RE.search(t.norm, lo, hi) is not None
 
 
 def _pair(group: DictGroup, ks: int, ke: int, value: tuple[int, int]) -> _Candidate:
@@ -291,18 +425,29 @@ def _keyword_candidates(t: _Text, groups: Sequence[DictGroup]) -> list[_Candidat
     found: list[_Candidate] = []
     used: set[int] = set()
     pending: list[tuple[DictGroup, int, int, int]] = []
-    for group, ks, ke in sorted(_keyword_hits(t, groups), key=lambda h: h[1]):
+    # При одном start первой значение берёт группа с большей уверенностью: «ФОТ 480 000 руб.»
+    # рядом с «себестоимостью» — статья калькуляции (КТ), а не фонд оплаты труда (FINANCIAL).
+    # Слово, уже получившее значение, второй группе не достаётся: иначе она заберёт
+    # следующее значение и «сдвинет» пары по всей строке калькуляции.
+    hits = sorted(_keyword_hits(t, groups), key=lambda h: (h[1], -h[0].confidence))
+    paired_end = -1
+    for group, ks, ke in hits:
+        if ks < paired_end:
+            continue
         lo, hi = t.phrase(ks)
         if t.excluded(ks, lo) or NOT_SECRET_RE.search(t.norm, lo, hi):
             continue
         if not group.needs_value:
-            found.append(_Candidate(group.type, ks, ke, ks, ke, group.confidence, group.id))
+            phrase = _phrase_candidate(t, group, ks, ke, hi)
+            if phrase is not None:
+                found.append(phrase)
             continue
         value = _value_after(t, ke, hi, used)
         if value is None or t.excluded(value[0], lo):
             pending.append((group, ks, ke, lo))
             continue
         used.add(value[0])
+        paired_end = ke
         found.append(_pair(group, ks, ke, value))
     for group, ks, ke, lo in pending:
         value = _value_before(t, ks, lo, used)
@@ -401,12 +546,15 @@ def _resolve_overlaps(cands: list[_Candidate]) -> list[_Candidate]:
 
 
 def _to_entity(text: str, cand: _Candidate) -> Entity:
+    category = CATEGORY[cand.type]
+    value = text[cand.start:cand.end]
     return Entity(
         type=cand.type,
-        category=CATEGORY[cand.type],
+        category=category,
         start=cand.start,
         end=cand.end,
-        value_masked=text[cand.start:cand.end],   # не ПДн — без маскирования (решение 17.10)
+        # особые категории — ПДн, маскируются; КТ и финансы — как есть (решение 17.10)
+        value_masked=mask_value(value) if category in MASKED_CATEGORIES else value,
         confidence=cand.confidence,
         detector="dict",
     )
@@ -424,7 +572,12 @@ def find_candidates(
     groups = load_dictionaries() if groups is None else groups
     t = _Text.build(text)
     pd = _PdIndex.build(pd_entities)
-    raw = _keyword_candidates(t, groups) + _account_candidates(text)
+    persons = [(e.start, e.end) for e in pd_entities if e.type is EntityType.PERSON]
+    gated = {g.id for g in groups if g.needs_subject}
+    raw = [
+        c for c in _keyword_candidates(t, groups)
+        if c.group_id not in gated or _has_subject(t, c, persons)
+    ] + _account_candidates(text)
     trimmed = [c for c in (_trim_to_free(text, c, pd) for c in raw) if c is not None]
     return _resolve_overlaps(trimmed)
 
@@ -434,7 +587,7 @@ def detect_dict(
     pd_entities: Sequence[Entity] = (),
     groups: Sequence[DictGroup] | None = None,
 ) -> list[Entity]:
-    """Ищет TRADE_SECRET и FINANCIAL по словарям и шаблонам, без LLM.
+    """Ищет TRADE_SECRET, FINANCIAL и SPECIAL_CATEGORY по словарям и шаблонам, без LLM.
 
     detector="dict", координаты — в исходном doc.text, value_masked == doc.text[start:end].
     pd_entities — уже найденные ПДн (regex + NER): спаны обрезаются так, чтобы не

@@ -200,7 +200,7 @@ def _write_corpus(folder: Path) -> None:
     (folder / "a.txt").write_text(
         "Участник: [[PERSON:Белоусов Тимур Ренатович]], СНИЛС [[SNILS:526-018-159 61]]\n"
         "ИНН организации 6723288166, КПП 701701001.\n"
-        "[[TRADE_SECRET:Минимальная цена, ниже которой не опускаемся: 1 290 000 руб.]]\n",
+        "[[TRADE_SECRET:Поставщик комплектующих — завод в Казани, договор до 2028 года]]\n",
         encoding="utf-8",
     )
     text_b = "Тел. +7 913 802-44-17, почта t.belousov91@example.com, наценка 14%."
@@ -266,7 +266,7 @@ def test_end_to_end_metrics_and_errors_without_pd(tmp_path: Path) -> None:
 
     metrics = Metrics.model_validate_json((out / METRICS_FILE).read_text(encoding="utf-8"))
     assert metrics.documents == 3 and metrics.corpus == "corpus"
-    assert metrics.trade_secret_recall == 0.0  # «минимальная цена» словарём не ловится
+    assert metrics.trade_secret_recall == 0.0  # сведения о поставщике словарём не ловятся
     errors_raw = (out / ERRORS_FILE).read_text(encoding="utf-8")
     errors = json.loads(errors_raw)
     assert any(e["kind"] == "missed" and e["type"] == "TRADE_SECRET" for e in errors)
@@ -328,7 +328,7 @@ def test_seed_corpus_is_valid_and_large_enough() -> None:
         pytest.skip(f"{SEED_DIR} недоступен (образ api без папки eval/)")
     docs = load_corpus(SEED_DIR)
     counts = Counter(g.type for d in docs for g in d.gold)
-    assert 20 <= len(docs) <= 30
+    assert 20 <= len(docs) <= 40   # 25 + 6 отложенных документов T-019a
     assert sum(counts.values()) >= 120
     assert counts[T.TRADE_SECRET] >= 15
     for d in docs:
