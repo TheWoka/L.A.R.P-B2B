@@ -44,7 +44,7 @@ services:
   worker:
     # Тот же Dockerfile, что у api: второй build берёт слои из кэша.
     build: ./backend
-    command: celery -A app.worker.celery_app worker --loglevel=info
+    command: celery -A app.worker.celery_app worker -B --loglevel=info
     env_file: .env
     volumes:
       - uploads:/data/uploads

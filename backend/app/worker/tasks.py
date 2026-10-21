@@ -12,6 +12,7 @@ from app.db.session import SessionLocal
 from app.schemas import DocPurpose, ExtractedDocument, Stage, TextSegment
 from app.services.extraction.extract import extract
 from app.services.pipeline import run_audit
+from app.services.retention import purge_expired
 from app.services.storage import delete_file
 from app.worker.celery_app import celery_app
 
@@ -113,3 +114,10 @@ def process_document(task_id: str) -> None:
     """Запускает конвейер в собственной сессии БД."""
     with SessionLocal() as session:
         run_pipeline(task_id, session)
+
+
+@celery_app.task(name="app.worker.tasks.purge_expired_reports")
+def purge_expired_reports() -> int:
+    """Удаляет просроченные отчёты в собственной сессии БД."""
+    with SessionLocal() as session:
+        return purge_expired(session)
