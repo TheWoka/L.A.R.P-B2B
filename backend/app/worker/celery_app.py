@@ -1,4 +1,4 @@
-"""Приложение Celery. Запуск: `celery -A app.worker.celery_app worker --loglevel=info`."""
+"""Приложение Celery. Запуск: `celery -A app.worker.celery_app worker -B --loglevel=info`."""
 
 from celery import Celery
 
@@ -21,6 +21,12 @@ celery_app.conf.update(
     task_track_started=True,
     worker_hijack_root_logger=False,
     broker_connection_retry_on_startup=True,
+    beat_schedule={
+        "purge-expired-reports": {
+            "task": "app.worker.tasks.purge_expired_reports",
+            "schedule": 3600.0,
+        },
+    },
 )
 
 # `celery -A app.worker.celery_app` ищет в модуле атрибут `app` — даём ему ссылку.

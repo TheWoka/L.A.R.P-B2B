@@ -1,8 +1,9 @@
 """Чтение сохранённых отчётов и текста проверки.
 
-Заглушки: экспорт — T-015; журнал LLM — T-013; обезличенная копия — T-026.
+Заглушки: PDF — T-020; журнал LLM — T-013; обезличенная копия — T-026.
 """
 
+import json
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Response
@@ -15,7 +16,7 @@ from app.schemas import LlmCall, Report, ReportText
 router = APIRouter(tags=["reports"])
 DbSession = Annotated[Session, Depends(get_db)]
 
-NOT_IMPLEMENTED = "Будет реализовано в T-009"
+NOT_IMPLEMENTED_PDF = "Будет реализовано в T-020"
 NOT_IMPLEMENTED_LLM_LOG = "Будет реализовано в T-013"
 NOT_IMPLEMENTED_REDACTED = "Будет реализовано в T-026"
 
@@ -51,8 +52,17 @@ def get_report_text(report_id: str, session: DbSession) -> ReportText:
     summary="Скачать отчёт файлом",
     responses={200: {"content": {"application/json": {}, "application/pdf": {}}}},
 )
-def export_report(report_id: str, format: Literal["json", "pdf"] = "json") -> Response:
-    raise HTTPException(status_code=501, detail=NOT_IMPLEMENTED)
+def export_report(
+    report_id: str, session: DbSession, format: Literal["json", "pdf"] = "json",
+) -> Response:
+    if format == "pdf":
+        raise HTTPException(status_code=501, detail=NOT_IMPLEMENTED_PDF)
+    report = get_report(report_id, session)
+    return Response(
+        content=json.dumps(report.model_dump(mode="json"), ensure_ascii=False, indent=2),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="report_{report_id}.json"'},
+    )
 
 
 @router.get(

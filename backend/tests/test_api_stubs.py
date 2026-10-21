@@ -102,9 +102,16 @@ def test_api_version(client: TestClient) -> None:
     assert client.get("/openapi.json").json()["info"]["version"] == APP_VERSION
 
 
-def test_export_still_returns_501(client: TestClient) -> None:
-    response = client.get("/api/reports/some-id/export")
+def test_export_json_returns_404(client: TestClient, report_db: Session) -> None:
+    response = client.get("/api/reports/some-id/export?format=json")
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Отчёт не найден"}
+
+
+def test_export_pdf_still_returns_501(client: TestClient) -> None:
+    response = client.get("/api/reports/some-id/export?format=pdf")
     assert response.status_code == 501
+    assert response.json() == {"detail": "Будет реализовано в T-020"}
 
 
 @pytest.mark.parametrize(
