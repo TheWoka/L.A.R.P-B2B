@@ -1,0 +1,44 @@
+# T-017a. Ожидания записаны ДО прогона из docs/rules.md и eval/README.md.
+# Режим сравнения: LLM_PROVIDER=mock; entities — число упоминаний по типу.
+# Неперечисленные типы имеют ожидаемое количество 0.
+- file: 01_tz_publication.docx
+  purpose: publication
+  overall: red
+  entities: {PERSON: 1, PHONE: 1, TRADE_SECRET: 1}
+  violations: [PD_IN_PUBLICATION, TRADE_SECRET_IN_PUBLICATION, TRADE_SECRET_WITHOUT_MARK]
+
+# Green: есть согласование, гриф, согласие, срок хранения и подробное поручение.
+# Паспорт подписанта не создаёт нарушения при наличии необходимых маркеров.
+- file: 02_contract_clean.docx
+  purpose: contract
+  overall: green
+  entities: {PERSON: 1, PASSPORT: 1}
+  violations: []
+
+# Помимо двух условий задачи, каталог требует согласование и срок хранения.
+- file: 03_application_pd.pdf
+  purpose: contract
+  overall: red
+  entities: {PERSON: 1, PASSPORT: 1, SNILS: 1, INN: 1, BIRTH_DATE: 1}
+  violations: [PD_ENTRUSTMENT_MISSING, CONSENT_MISSING_FOR_CONTRACT, CHECKLIST_NO_APPROVAL, CHECKLIST_NO_RETENTION]
+
+- file: 04_estimate.xlsx
+  purpose: internal
+  overall: red
+  entities: {TRADE_SECRET: 2}
+  violations: [TRADE_SECRET_WITHOUT_MARK, CHECKLIST_NO_APPROVAL]
+
+# Особые сведения связаны с конкретным работником; согласия нет.
+- file: 05_anketa_special.docx
+  purpose: internal
+  overall: red
+  entities: {PERSON: 1, SPECIAL_CATEGORY: 2}
+  violations: [SPECIAL_PD_NO_CONSENT, CHECKLIST_NO_APPROVAL]
+
+# Медицинские показания к товару не являются сведениями о конкретном физлице.
+# Общая линия 8-800 и общий ящик info@ организации — не ПДн (eval/README.md).
+- file: 06_medical_tz.docx
+  purpose: publication
+  overall: green
+  entities: {}
+  violations: []
