@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from app.db.models import Base, DocumentRow, ReportRow, TaskRow
-from app.schemas import DocPurpose, ExtractedDocument, Report, ReportText, Stage, TextSegment
+from app.schemas import DocPurpose, ExtractedDocument, Report, ReportText, Rule, Stage, TextSegment
 from app.services import pipeline
 from app.services.extraction.extract import extract
 from app.services.pipeline import AuditResult
@@ -159,7 +159,7 @@ def test_worker_stages_and_private_data(
 
     def checked_run(
         doc: ExtractedDocument, purpose: DocPurpose, source_bytes: bytes,
-        on_stage: Callable[[Stage, int], None],
+        on_stage: Callable[[Stage, int], None], rules: list[Rule] | None = None,
     ) -> AuditResult:
         def checked_stage(stage: Stage, progress: int) -> None:
             on_stage(stage, progress)
@@ -167,7 +167,7 @@ def test_worker_stages_and_private_data(
                 row = observer.get(TaskRow, task.id)
                 assert row.status == "processing"
                 states.append((row.stage, row.progress))
-        return original_run(doc, purpose, source_bytes, checked_stage)
+        return original_run(doc, purpose, source_bytes, checked_stage, rules=rules)
 
     monkeypatch.setattr(tasks, "run_audit", checked_run)
     with caplog.at_level(logging.INFO):

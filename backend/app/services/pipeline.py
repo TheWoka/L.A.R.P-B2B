@@ -66,8 +66,9 @@ def build_audit(source_bytes: bytes, rules: list[Rule], budget: CallBudget) -> A
 def run_audit(
     doc: ExtractedDocument, purpose: DocPurpose, source_bytes: bytes,
     on_stage: Callable[[Stage, int], None] | None = None,
+    rules: list[Rule] | None = None,
 ) -> AuditResult:
-    """Проверяет документ; callback вызывается перед началом каждой стадии."""
+    """Проверяет переданные правила; без них читает YAML. Callback отмечает стадии."""
     started = monotonic()
     if on_stage is not None:
         on_stage(Stage.detecting, 30)
@@ -79,7 +80,8 @@ def run_audit(
     text = mask_preserving_length(doc.text, entities)
     if on_stage is not None:
         on_stage(Stage.checking, 70)
-    rules = load_rules(_rules_path("rules.yaml"))
+    if rules is None:
+        rules = load_rules(_rules_path("rules.yaml"))
     ctx = RuleContext(
         doc=doc, masked_text=masked.masked_text,
         entities=entities, markers=markers, purpose=purpose,

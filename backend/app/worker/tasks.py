@@ -13,6 +13,7 @@ from app.schemas import DocPurpose, ExtractedDocument, Stage, TextSegment
 from app.services.extraction.extract import extract
 from app.services.pipeline import run_audit
 from app.services.retention import purge_expired
+from app.services.rules import repository
 from app.services.storage import delete_file
 from app.worker.celery_app import celery_app
 
@@ -58,7 +59,8 @@ def _audit_document(document: DocumentRow, task: TaskRow, session: Session, star
     doc = extract_document(document)
     if document.filename is None:
         source_bytes = doc.text.encode("utf-8")
-    result = run_audit(doc, DocPurpose(document.purpose), source_bytes, on_stage)
+    rules = repository.list_rules(session)
+    result = run_audit(doc, DocPurpose(document.purpose), source_bytes, on_stage, rules=rules)
     report, report_text = result.report, result.report_text
     session.add(ReportRow(
         id=report.report_id, document_id=document.id,
