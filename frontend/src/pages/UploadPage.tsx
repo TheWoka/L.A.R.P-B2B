@@ -104,7 +104,11 @@ export default function UploadPage() {
         onRemove={() => setFileList([])}
         showUploadList={{ showPreviewIcon: false }}
       >
-        <span className="upload-symbol" aria-hidden="true">↑</span>
+        <span className="upload-symbol" aria-hidden="true">
+          <svg viewBox="0 0 84 84" fill="none" focusable="false">
+            <path d="M42 55V15M22 35L42 15L62 35M11 69H73" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </span>
         <strong>Перетащите документ сюда</strong>
         <span className="dropzone-hint">PDF, DOCX или XLSX · до 50 МБ</span>
         <span className="choose-file">Выбрать файл</span>
@@ -155,6 +159,8 @@ export default function UploadPage() {
       <header className="page-heading">
         <h1>Проверка документа</h1>
         <p>Загрузите файл, а мы покажем риски и объясним каждый результат.</p>
+        <h1 className="mobile-upload-title">Проверьте документ</h1>
+        <p className="mobile-upload-subtitle">Риски и рекомендации в одном месте</p>
       </header>
       <div className="upload-layout">
         <section className="upload-primary">

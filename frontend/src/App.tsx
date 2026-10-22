@@ -53,17 +53,23 @@ export default function App() {
       </Sider>
       <Layout className="app-main">
         <header className="mobile-header">
-          <Link to="/" className="mobile-brand">ГРИФ</Link>
+          <Link to="/" className="mobile-brand" aria-label="ГРИФ — проверка документа">
+            <span className="brand-mark" aria-hidden="true" />
+            <span>ГРИФ</span>
+          </Link>
           <span>{NAV_ITEMS.find((item) => item.path === selected)?.label}</span>
+          <details className="mobile-menu">
+            <summary aria-label="Открыть разделы"><span aria-hidden="true" /></summary>
+            <nav aria-label="Основная навигация">
+              {NAV_ITEMS.map((item) => (
+                <Link key={item.path} to={item.path} className={selected === item.path ? "is-active" : ""}>
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
+          </details>
         </header>
         <Content className="app-content">
-          <nav className="mobile-nav" aria-label="Основная навигация">
-            {NAV_ITEMS.map((item) => (
-              <Link key={item.path} to={item.path} className={selected === item.path ? "is-active" : ""}>
-                {item.label}
-              </Link>
-            ))}
-          </nav>
           <Routes>
             <Route path="/" element={<UploadPage />} />
             <Route path="/tasks/:taskId" element={<TaskPage />} />
