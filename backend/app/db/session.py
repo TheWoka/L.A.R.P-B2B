@@ -38,4 +38,8 @@ def init_db() -> None:
     with engine.begin() as conn:
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
     Base.metadata.create_all(bind=engine)
+    # create_all не добавляет колонки в существующие таблицы: том pgdata мог остаться
+    # со схемой до T-013b. Колонка журнала LLM добавляется идемпотентно.
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE reports ADD COLUMN IF NOT EXISTS llm_log JSONB"))
     logger.info("База данных инициализирована")

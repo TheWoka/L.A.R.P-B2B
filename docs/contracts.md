@@ -318,6 +318,7 @@ class RuleContext(BaseModel):
     entities: list[Entity]
     markers: list[Marker]
     purpose: DocPurpose
+    mask_spans: list[MaskSpan] = []  # MaskResult.spans — перевод цитат LLM в исходные координаты
 def evaluate(rules: list[Rule], ctx: RuleContext) -> list[Violation]: ...
 
 # services/report/builder.py
@@ -436,6 +437,7 @@ REPORT_TTL_DAYS=7
 
 | Дата | Что изменилось | Кто решил |
 |---|---|---|
+| 2026-10-21 | T-013b: RuleContext.mask_spans для перевода цитат LLM | Данила (тимлид) |
 | 2026-10-17 | T-009b: build_report принимает audit: AuditInfo (собирает конвейер: хэш исходника, версии правил и словарей, счётчик LLM) | Данила (тимлид) |
 | 2026-10-17 | **Контракт v2** (T-030). Раздел 1: `AuditInfo`, в `Report` — `audit` (обязательное) и `redacted_available` (по умолчанию `false`); `LlmCall` (журнал «что видела нейросеть»); `Metrics`, `TypeMetrics`. Раздел 4: `GET /api/reports/{id}/llm-log`, `GET /api/reports/{id}/redacted`, `GET /api/metrics`; обезличенная копия создаётся до удаления исходника и хранится `REPORT_TTL_DAYS`. Раздел 4.1: правила копии (ПДн удаляются физически, в PDF — редакция; КТ не трогается); `value_masked` у `trade_secret`/`financial` — исходный фрагмент без маскирования. Реализация: T-016 (audit), T-013/T-027b (llm-log), T-026 (redacted), T-028 (metrics). | Данила (тимлид) |
 | 2026-10-16 | Ревью T-001: `Evidence.quote` и `Entity.value_masked` — маскирование с сохранением длины, `quote == ReportText.text[start:end]`. Определено правило маскирования (слово = `\w+`; буквенное слово — первая буква видна; цифровое — скрыто целиком; разделители видны). В раздел 3 добавлена `mask_preserving_length(text, entities) -> str` (T-008). Уточнена `to_original_offset` внутри плейсхолдера; границы цитат LLM расширяются до целых плейсхолдеров (T-013). | Данила (тимлид) |

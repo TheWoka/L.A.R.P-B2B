@@ -117,7 +117,6 @@ def test_export_pdf_still_returns_501(client: TestClient) -> None:
 @pytest.mark.parametrize(
     ("path", "task"),
     [
-        ("/api/reports/rep_1/llm-log", "T-013"),
         ("/api/reports/rep_1/redacted", "T-026"),
         ("/api/metrics", "T-028"),
     ],

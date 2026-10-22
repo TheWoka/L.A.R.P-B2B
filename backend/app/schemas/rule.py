@@ -6,7 +6,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 from app.schemas.document import DocPurpose, ExtractedDocument
-from app.schemas.entity import Entity
+from app.schemas.entity import Entity, MaskSpan
 from app.schemas.marker import Evidence, Marker
 
 
@@ -52,3 +52,4 @@ class RuleContext(BaseModel):
     entities: list[Entity]
     markers: list[Marker]
     purpose: DocPurpose
+    mask_spans: list[MaskSpan] = []  # MaskResult.spans: перевод цитат LLM в исходные координаты

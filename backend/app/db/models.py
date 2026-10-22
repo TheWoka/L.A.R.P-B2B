@@ -55,6 +55,9 @@ class ReportRow(Base):
     document_id: Mapped[str] = mapped_column(ForeignKey("documents.id", ondelete="CASCADE"))
     data: Mapped[dict] = mapped_column(JSONB().with_variant(JSON(), "sqlite"))
     text: Mapped[dict | None] = mapped_column(JSONB().with_variant(JSON(), "sqlite"))
+    # Журнал «Что видела нейросеть»: list[LlmCall] в JSON, только замаскированные фрагменты.
+    # None — отчёт создан до T-013b (API отдаёт []).
+    llm_log: Mapped[list | None] = mapped_column(JSONB().with_variant(JSON(), "sqlite"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

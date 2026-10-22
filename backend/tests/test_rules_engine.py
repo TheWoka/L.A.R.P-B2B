@@ -260,7 +260,7 @@ def test_severity_sort_is_stable_within_each_level(rule_context: RuleContext) ->
     ]
 
 
-def test_llm_stub_returns_no_violation_and_logs_no_document(
+def test_llm_in_mock_returns_no_violation_and_logs_no_document(
     rule_context: RuleContext, caplog: pytest.LogCaptureFixture
 ) -> None:
     question = "Синтетический вопрос, который не нужно логировать"
