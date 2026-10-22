@@ -1,11 +1,11 @@
-# T-017a. Ожидания записаны ДО прогона из docs/rules.md и eval/README.md.
+# T-017a / T-017b. Ожидания записаны ДО прогона из каталога правил и eval/README.md.
 # Режим сравнения: LLM_PROVIDER=mock; entities — число упоминаний по типу.
 # Неперечисленные типы имеют ожидаемое количество 0.
 - file: 01_tz_publication.docx
   purpose: publication
   overall: red
   entities: {PERSON: 1, PHONE: 1, TRADE_SECRET: 1}
-  violations: [PD_IN_PUBLICATION, TRADE_SECRET_IN_PUBLICATION, TRADE_SECRET_WITHOUT_MARK]
+  violations: [PD_IN_PUBLICATION, TRADE_SECRET_IN_PUBLICATION]
 
 # Green: есть согласование, гриф, согласие, срок хранения и подробное поручение.
 # Паспорт подписанта не создаёт нарушения при наличии необходимых маркеров.
@@ -28,12 +28,12 @@
   entities: {TRADE_SECRET: 2}
   violations: [TRADE_SECRET_WITHOUT_MARK, CHECKLIST_NO_APPROVAL]
 
-# Особые сведения связаны с конкретным работником; согласия нет.
+# Особые сведения связаны с конкретным работником; согласия, грифа и срока хранения нет.
 - file: 05_anketa_special.docx
   purpose: internal
   overall: red
   entities: {PERSON: 1, SPECIAL_CATEGORY: 2}
-  violations: [SPECIAL_PD_NO_CONSENT, CHECKLIST_NO_APPROVAL]
+  violations: [SPECIAL_PD_NO_CONSENT, CHECKLIST_NO_APPROVAL, CHECKLIST_NO_MARK, CHECKLIST_NO_RETENTION]
 
 # Медицинские показания к товару не являются сведениями о конкретном физлице.
 # Общая линия 8-800 и общий ящик info@ организации — не ПДн (eval/README.md).

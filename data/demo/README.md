@@ -1,4 +1,4 @@
-# Демо-набор ИИ-аудитора — T-017a
+# Демо-набор ИИ-аудитора — T-017a / T-017b
 
 Шесть коротких документов закупки для жюри и видео. Все люди, организации и реквизиты
 придуманы; документы помечены как учебные. Личный телефон имеет код 999, общие контакты
@@ -39,23 +39,26 @@ docker-compose run --rm --no-deps -v "${PWD}/data:/data_rw" api ruff check /data
 
 `answers.yaml` записан **до первой проверки** из `docs/rules.md`,
 `data/rules/rules.yaml` и правил разметки `eval/README.md`, без подстройки под детектор.
+В T-017b ожидания 01 и 05 обновлены до повторного прогона по согласованным правкам каталога:
+для публикации гриф КТ не требуется; особые категории ПДн требуют грифа и срока хранения.
 Формат: `file`, `purpose`, `overall`, `entities`, `violations`. Считаются отдельные
 упоминания каждого типа; отсутствующий тип означает 0. Порядок нарушений не важен.
 Ожидания относятся к mock: смысловые LLM-условия не создают нарушений.
 
 | Файл | Назначение | Страниц | Обоснование ожидания |
 |---|---|---:|---|
-| `01_tz_publication.docx` | publication | 1 | ФИО и личный телефон → `PD_IN_PUBLICATION` (152-ФЗ, ст. 7, 10.1); себестоимость с числом → `TRADE_SECRET_IN_PUBLICATION` и `TRADE_SECRET_WITHOUT_MARK` (98-ФЗ, ст. 10). Итог red. |
+| `01_tz_publication.docx` | publication | 1 | ФИО и личный телефон → `PD_IN_PUBLICATION` (152-ФЗ, ст. 7, 10.1); себестоимость с числом → `TRADE_SECRET_IN_PUBLICATION` (98-ФЗ, ст. 10). Публикация исключена из `TRADE_SECRET_WITHOUT_MARK`. Итог red. |
 | `02_contract_clean.docx` | contract | 2 | Есть паспорт подписанта, согласование, гриф, согласие, срок хранения, поручение по ч. 3 ст. 6 152-ФЗ и конкретные меры защиты. Условия нарушений каталога не выполняются; ожидаем green. |
 | `03_application_pd.pdf` | contract | 1 | Паспорт, СНИЛС, ИНН и дата рождения без поручения → red `PD_ENTRUSTMENT_MISSING`; без согласия → yellow `CONSENT_MISSING_FOR_CONTRACT`. Каталог добавляет yellow `CHECKLIST_NO_APPROVAL` и `CHECKLIST_NO_RETENTION`. |
 | `04_estimate.xlsx` | internal | 1 при печати | Себестоимость и наценка с числовыми значениями без грифа → red `TRADE_SECRET_WITHOUT_MARK`; нет согласования → yellow `CHECKLIST_NO_APPROVAL`. |
-| `05_anketa_special.docx` | internal | 1 | «Инвалид II группы» и «член профсоюза» относятся к названному работнику, согласия нет → red `SPECIAL_PD_NO_CONSENT` (152-ФЗ, ст. 10; GDPR, Art. 9). Нет согласования → yellow `CHECKLIST_NO_APPROVAL`. |
+| `05_anketa_special.docx` | internal | 1 | «Инвалид II группы» и «член профсоюза» относятся к названному работнику, согласия нет → red `SPECIAL_PD_NO_CONSENT` (152-ФЗ, ст. 10; GDPR, Art. 9). Нет согласования, грифа и срока хранения → yellow `CHECKLIST_NO_APPROVAL`, `CHECKLIST_NO_MARK`, `CHECKLIST_NO_RETENTION`. |
 | `06_medical_tz.docx` | publication | 1 | Показания к лекарствам не относятся к конкретному человеку. Общая линия 8-800 и info@ не являются ПДн по `eval/README.md`; ожидаем 0 сущностей и green. |
 
 ## Фактический прогон
 
-21.10.2026, 19:15–19:16 (Asia/Novosibirsk). Все шесть итоговых файлов загружены через
-браузер и обработаны очередью Celery. Приложение `0.1.0`, правила `940fb001e7c6`,
+Повторный прогон T-017b: 22.10.2026, 21:44–21:47 (Asia/Novosibirsk).
+Все шесть файлов загружены через браузер и обработаны очередью Celery.
+Приложение `0.1.0`, правила `cf8153a3ebe5`,
 словари `19f3427d4a9b`, детекторы `regex`, `ner:natasha-1.6.0`, `dict`.
 Провайдер mock, реальных LLM-вызовов 0.
 
@@ -64,11 +67,11 @@ docker-compose run --rm --no-deps -v "${PWD}/data:/data_rw" api ruff check /data
 
 | Файл | Ожидали | Получили | Совпало? |
 |---|---|---|---|
-| `01_tz_publication.docx` | red; 3 нарушения; PERSON=1, PHONE=1, TRADE_SECRET=1 | red; те же 3 нарушения и сущности | Да |
+| `01_tz_publication.docx` | red; 2 нарушения; PERSON=1, PHONE=1, TRADE_SECRET=1 | red; `PD_IN_PUBLICATION`, `TRADE_SECRET_IN_PUBLICATION`; те же 3 сущности | Да |
 | `02_contract_clean.docx` | green; 0 нарушений; PERSON=1, PASSPORT=1 | green; 0 нарушений; PERSON=1, PASSPORT=1 | Да по ключу; замечание к грифу ниже |
 | `03_application_pd.pdf` | red; 4 нарушения; PERSON, PASSPORT, SNILS, INN, BIRTH_DATE по 1 | red; те же 4 нарушения и 5 сущностей | Да |
 | `04_estimate.xlsx` | red; 2 нарушения; TRADE_SECRET=2 | **yellow**; только `CHECKLIST_NO_APPROVAL`; **0 сущностей** | **Нет** |
-| `05_anketa_special.docx` | red; 2 нарушения; PERSON=1, SPECIAL_CATEGORY=2 | red; те же 2 нарушения и 3 сущности | Да |
+| `05_anketa_special.docx` | red; 4 нарушения; PERSON=1, SPECIAL_CATEGORY=2 | red; `SPECIAL_PD_NO_CONSENT`, `CHECKLIST_NO_APPROVAL`, `CHECKLIST_NO_MARK`, `CHECKLIST_NO_RETENTION`; те же 3 сущности | Да |
 | `06_medical_tz.docx` | green; 0 нарушений; 0 сущностей | green; 0 нарушений; 0 сущностей | Да |
 
 ### Расхождения и наблюдения
@@ -82,34 +85,65 @@ docker-compose run --rm --no-deps -v "${PWD}/data:/data_rw" api ruff check /data
   не распознана: `_is_classification` в `services/markers/find_markers.py` принимает
   отдельную короткую плашку, колонтитул или некоторые фразы заглавными. Это пропуск
   маркера; green соответствует каталогу, поскольку `CHECKLIST_NO_MARK` действует только для internal.
-- **01, пояснения чек-листа.** При нарушении «Коммерческая тайна без грифа»
-  чек-лист одновременно сообщает «Гриф не требуется». В `services/report/builder.py`
-  publication исключено из требования грифа; для жюри это неоднозначность пояснений,
-  итог red и ключ не меняются.
-- **05, чек-лист шире правил.** Чек-лист требует гриф и срок хранения для
-  SPECIAL_CATEGORY, хотя правила `CHECKLIST_NO_MARK`/`CHECKLIST_NO_RETENTION`
-  используют паспорт, СНИЛС, ИНН и дату рождения. Дополнительных нарушений нет;
-  это различие чек-листа и каталога, а не пропуск red-правила.
+- **01, исправлено в T-017b.** Публикация исключена из `TRADE_SECRET_WITHOUT_MARK`:
+  гриф не требуется, а сведения КТ нужно убрать по `TRADE_SECRET_IN_PUBLICATION`.
+  Чек-лист и нарушения больше не противоречат друг другу; итог остаётся red.
+- **05, исправлено в T-017b.** `CHECKLIST_NO_MARK` и `CHECKLIST_NO_RETENTION`
+  учитывают `SPECIAL_CATEGORY` категории `pd_special`, как и чек-лист отчёта.
+  В анкете нет грифа и срока хранения: появились оба ожидаемых yellow-нарушения,
+  итог остаётся red. Все три пункта чек-листа имеют статус `missing`.
 
-Код backend/frontend, словари и правила при разборе расхождений не исправлялись.
+В T-017b изменён только каталог правил, его документация, тесты и ключ демо.
+Код backend/frontend и словари не менялись. Расхождения 02 и 04 сохраняются;
+ожидания для них не подстраивались под результат системы.
 
 ### Идентификаторы отчётов
 
 | Файл | report_id | Обработка, мс |
 |---|---|---:|
-| 01 | `6d8393e475d74d508b1d33cc13b4b42c` | 135 |
-| 02 | `3ff388c556764ad0bd8a97b37d1bd891` | 137 |
-| 03 | `eace316e1b0f487292cb7b2d248e731d` | 144 |
-| 04 | `4672f2eb86cd43d8ac29f9c7cbb8039a` | 114 |
-| 05 | `5373e5c21a75400998abfe73cc88d468` | 114 |
-| 06 | `ec7f36ced7da46d695cc4036427a3173` | 134 |
+| 01 | `d56a333169644c079355133d4b4044f9` | 796 |
+| 02 | `ede7facefeb54b22ae0b4a85e3d4c795` | 98 |
+| 03 | `18afe88ff7324576aaff77394e2f894b` | 105 |
+| 04 | `6ed0b0573e894ac1902af752efed9221` | 82 |
+| 05 | `6f928c08d567419397e323540c253450` | 117 |
+| 06 | `c612976403ba4d6995a87dac1527f3fa` | 118 |
 
 Отчёт: `http://localhost:3000/reports/<report_id>`, JSON:
 `http://localhost:8000/api/reports/<report_id>`. Отчёты временные, со сроком хранения
 стенда; после очистки БД повторите прогон. SHA-256 всех шести файлов совпал с
-`audit.document_sha256`. Скриншоты 01/06 и JSON сохранены вне репозитория в артефактах чата.
+`audit.document_sha256`. Скриншоты и JSON всех шести отчётов сохранены вне репозитория
+в артефактах чата. Полная сверка цвета, наборов ID нарушений и `stats` с ключом:
+совпало 5 из 6, единственное несовпадение — 04.
 
-## Проверки и отклонения окружения
+## Окружение повторного прогона T-017b
+
+- Первой командой была `docker-compose build api`. Потребовались явное имя проекта,
+  запуск Docker Desktop и доступ к Docker Buildx. Стандартная сборка дошла до
+  скачивания зависимостей; затем пользователь сообщил об отключении интернета.
+  **Чистая стандартная сборка API не подтверждена.**
+- API и worker собраны с **временным Compose override вне репозитория**:
+  `FROM larp-b2b-main-api:latest`, удаление прежних `/app/app` и `/app/tests` внутри
+  образа и копирование текущего backend. Python 3.11.17; все 18 закреплённых
+  зависимостей, включая pytest и ruff, совпали с `requirements.txt` и
+  `requirements-dev.txt`. Dockerfile и Compose проекта не менялись.
+- `docker-compose build api` и `docker-compose up --build -d` с этим override
+  завершились успешно. Фронтенд собран штатным Dockerfile; слой `npm ci` взят из кэша.
+- Создан отдельный проект `ai-auditor-t017b` со свежей БД в томе
+  `ai-auditor-t017b_pgdata`. Прежний `larp-b2b-main` остановлен для освобождения
+  портов 3000/8000; его контейнеры и тома сохранены. Ни один том не удалялся.
+- Измеренные 82–796 мс — время конвейера, а не HTTP-загрузки и не нагрузочный тест.
+
+Каталог артефактов T-017b:
+`C:\Users\alpet\.codex\visualizations\2026\10\22\01a163c1-2559-7af2-b076-761c77b0e97d`.
+Для того же стенда из корня проекта, PowerShell:
+
+```powershell
+$env:COMPOSE_PROJECT_NAME = 'ai-auditor-t017b'
+$env:COMPOSE_FILE = "${PWD}/docker-compose.yml;<каталог артефактов T-017b>/offline.compose.yaml"
+docker-compose up --build -d
+```
+
+## История проверок и окружения T-017a (21.10.2026)
 
 - 7 встроенных тестов прошли, ruff — без замечаний. Проверены форматы, повторная
   генерация и сохранность ключа, неверный путь, пустые страницы, переполнение PDF,

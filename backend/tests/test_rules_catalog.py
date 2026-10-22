@@ -94,6 +94,13 @@ CASES: list[tuple[str, ContextArgs, bool]] = [
     ("BANK_DATA_IN_PUBLICATION", {"purpose": "contract", "entity_types": ["CARD"]}, False),
     ("BANK_DATA_IN_PUBLICATION", {"purpose": "publication", "entity_types": ["PERSON"]}, False),
     ("TRADE_SECRET_WITHOUT_MARK", {"purpose": "internal", "entity_types": ["TRADE_SECRET"]}, True),
+    ("TRADE_SECRET_WITHOUT_MARK", {"purpose": "contract", "entity_types": ["TRADE_SECRET"]}, True),
+    ("TRADE_SECRET_WITHOUT_MARK", {
+        "purpose": "international", "entity_types": ["TRADE_SECRET"],
+    }, True),
+    ("TRADE_SECRET_WITHOUT_MARK", {
+        "purpose": "publication", "entity_types": ["TRADE_SECRET"],
+    }, False),
     ("TRADE_SECRET_WITHOUT_MARK", {"purpose": "internal", "entity_types": []}, False),
     ("TRADE_SECRET_WITHOUT_MARK", {
         "purpose": "internal", "entity_types": ["TRADE_SECRET"],
@@ -155,10 +162,24 @@ CASES: list[tuple[str, ContextArgs, bool]] = [
         "purpose": "internal", "entity_types": ["INN"],
         "present_markers": ["classification_mark"],
     }, False),
+    ("CHECKLIST_NO_MARK", {
+        "purpose": "internal", "entity_types": ["SPECIAL_CATEGORY"],
+        "present_markers": ["classification_mark"],
+    }, False),
+    ("CHECKLIST_NO_MARK", {
+        "purpose": "publication", "entity_types": ["SPECIAL_CATEGORY"],
+    }, False),
+    ("CHECKLIST_NO_MARK", {
+        "purpose": "contract", "entity_types": ["SPECIAL_CATEGORY"],
+    }, False),
     ("CHECKLIST_NO_RETENTION", {"purpose": "publication", "entity_types": ["BIRTH_DATE"]}, True),
     ("CHECKLIST_NO_RETENTION", {"purpose": "publication", "entity_types": ["PERSON"]}, False),
     ("CHECKLIST_NO_RETENTION", {
         "purpose": "publication", "entity_types": ["BIRTH_DATE"],
+        "present_markers": ["retention_period"],
+    }, False),
+    ("CHECKLIST_NO_RETENTION", {
+        "purpose": "internal", "entity_types": ["SPECIAL_CATEGORY"],
         "present_markers": ["retention_period"],
     }, False),
 ]
@@ -171,8 +192,9 @@ for rule_id, purpose, kinds in [
     ("CONSENT_MISSING_FOR_CONTRACT", "contract", ["PASSPORT", "INN"]),
     ("GDPR_CROSS_BORDER", "international", ["SPECIAL_CATEGORY"]),
     ("GDPR_NO_DPA", "international", ["SPECIAL_CATEGORY"]),
-    ("CHECKLIST_NO_MARK", "internal", ["PASSPORT", "SNILS", "BIRTH_DATE"]),
-    ("CHECKLIST_NO_RETENTION", "internal", ["PASSPORT", "SNILS", "INN"]),
+    ("CHECKLIST_NO_MARK", "internal", ["PASSPORT", "SNILS", "BIRTH_DATE", "SPECIAL_CATEGORY"]),
+    ("CHECKLIST_NO_RETENTION", "internal", ["PASSPORT", "SNILS", "INN", "SPECIAL_CATEGORY"]),
+    ("CHECKLIST_NO_RETENTION", "publication", ["SPECIAL_CATEGORY"]),
 ]:
     CASES.extend((rule_id, {"purpose": purpose, "entity_types": [kind]}, True) for kind in kinds)
 
@@ -216,6 +238,16 @@ def test_financial_data_in_publication_is_not_trade_secret(rules: list[Rule]) ->
         violation.rule_id for violation in evaluate(rules, ctx("publication", ["FINANCIAL"]))
     }
     assert not any(rule_id.startswith("TRADE_SECRET_") for rule_id in violation_ids)
+
+
+def test_publication_requires_removing_trade_secret_without_requiring_mark(
+    rules: list[Rule],
+) -> None:
+    violation_ids = {
+        violation.rule_id for violation in evaluate(rules, ctx("publication", ["TRADE_SECRET"]))
+    }
+    assert "TRADE_SECRET_IN_PUBLICATION" in violation_ids
+    assert "TRADE_SECRET_WITHOUT_MARK" not in violation_ids
 
 
 def test_catalog_has_sixteen_rules_in_table_order(rules: list[Rule]) -> None:
