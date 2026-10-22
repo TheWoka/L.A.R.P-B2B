@@ -1,6 +1,6 @@
 """Чтение сохранённых отчётов и текста проверки.
 
-Заглушки: PDF — T-020; журнал LLM — T-013; обезличенная копия — T-026.
+Заглушки: PDF — T-020; обезличенная копия — T-026. Журнал LLM — T-013b.
 """
 
 import json
@@ -17,7 +17,6 @@ router = APIRouter(tags=["reports"])
 DbSession = Annotated[Session, Depends(get_db)]
 
 NOT_IMPLEMENTED_PDF = "Будет реализовано в T-020"
-NOT_IMPLEMENTED_LLM_LOG = "Будет реализовано в T-013"
 NOT_IMPLEMENTED_REDACTED = "Будет реализовано в T-026"
 
 
@@ -70,12 +69,16 @@ def export_report(
     response_model=list[LlmCall],
     summary="Что видела нейросеть: журнал вызовов LLM",
 )
-def get_llm_log(report_id: str) -> list[LlmCall]:
+def get_llm_log(report_id: str, session: DbSession) -> list[LlmCall]:
     """Каждый вызов LLM с РОВНО тем замаскированным фрагментом, что ушёл в модель.
 
-    В режиме mock — пустой список или mock-вызовы с verdict="unknown".
+    В режиме mock вызовов нет — пустой список. Нет отчёта → 404; отчёт без журнала
+    (создан до T-013b) → []. Исходный текст не восстанавливается (AGENTS.md, правило 5).
     """
-    raise HTTPException(status_code=501, detail=NOT_IMPLEMENTED_LLM_LOG)
+    row = session.get(ReportRow, report_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Отчёт не найден")
+    return [LlmCall.model_validate(call) for call in row.llm_log or []]
 
 
 @router.get(

@@ -14,6 +14,10 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
+from dataclasses import dataclass
 from typing import Literal
 
 import httpx
@@ -43,12 +47,14 @@ __all__ = [
     "LLMError",
     "LLMRequestError",
     "LLMResponseError",
+    "CacheTrace",
     "complete_json",
     "is_llm_enabled",
     "llm_call_budget",
     "reset_mock_responses",
     "run_complete_json",
     "set_mock_response",
+    "trace_cache",
 ]
 
 logger = logging.getLogger(__name__)
@@ -57,6 +63,31 @@ ProviderName = Literal["mock", "openai_compatible"]
 MAX_JSON_ATTEMPTS = 2  # первый ответ + один повтор с текстом ошибки валидации
 
 _fallback_warned = False
+
+
+@dataclass
+class CacheTrace:
+    """Был ли ответ последнего complete_json внутри `with trace_cache()` взят из кэша."""
+
+    hit: bool = False
+
+
+_cache_trace: ContextVar[CacheTrace | None] = ContextVar("llm_cache_trace", default=None)
+
+
+@contextmanager
+def trace_cache() -> Iterator[CacheTrace]:
+    """Отмечает попадание в кэш для журнала LLM (LlmCall.cached), не меняя complete_json.
+
+    Сигнатура complete_json — контракт, поэтому признак «из кэша» передаётся через
+    contextvars, как лимит вызовов (budget.py). Вне блока ничего не записывается.
+    """
+    trace = CacheTrace()
+    token = _cache_trace.set(trace)
+    try:
+        yield trace
+    finally:
+        _cache_trace.reset(token)
 
 
 def resolve_provider(settings: Settings) -> ProviderName:
@@ -122,6 +153,9 @@ def run_complete_json(
     key = make_cache_key("openai_compatible", settings.llm_model, system, user, schema)
     cached = _read_cache(active_cache, key, schema)
     if cached is not None:
+        trace = _cache_trace.get()
+        if trace is not None:
+            trace.hit = True
         _log_call(settings, len(system) + len(user), 0.0, {}, cache_hit=True, attempt=0)
         return cached
     result = _call_with_repair(system, user, schema, settings, transport, sleep)

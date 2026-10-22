@@ -1,6 +1,11 @@
-"""Проверка деревьев условий по контракту. LLM подключается отдельно в T-013."""
+"""Проверка деревьев условий по контракту. Условие `llm` — T-013b.
+
+LLM получает только ctx.masked_text (плейсхолдеры [PERSON_1]); цитаты переводятся в исходные
+координаты через ctx.mask_spans. Каждый реальный вызов пишется в журнал llm_call_log().
+"""
 
 import logging
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import TypeAlias
 
@@ -14,8 +19,12 @@ from app.schemas import (
     Rule,
     RuleContext,
     Severity,
+    TextSegment,
     Violation,
 )
+from app.services.llm import client
+from app.services.llm.checks import check_llm_condition, record_llm_call
+from app.services.masking.masker import mask_preserving_length
 
 logger = logging.getLogger(__name__)
 ConditionResult: TypeAlias = tuple[bool, list[Evidence]]
@@ -26,22 +35,47 @@ _LEAF_FIELDS: dict[str, tuple[set[str], set[str]]] = {
     "purpose_is": ({"type", "purposes"}, set()),
     "llm": ({"type", "question"}, set()),
 }
+LLM_UNDER_NOT = (
+    "условие llm нельзя использовать внутри not: ответ «не знаю» превратился бы в нарушение"
+)
+
+
+@dataclass
+class _EvalState:
+    """Состояние одного evaluate(): текущее правило и лениво посчитанный текст отчёта."""
+
+    ctx: RuleContext
+    rule_id: str = ""
+    _report_text: str | None = field(default=None, repr=False)
+
+    @property
+    def report_text(self) -> str:
+        """Текст с маскированием, сохраняющим длину (ReportText.text) — для Evidence.quote."""
+        if self._report_text is None:
+            self._report_text = mask_preserving_length(self.ctx.doc.text, self.ctx.entities)
+        return self._report_text
 
 
 def validate_condition(condition: object) -> None:
     """Проверяет всё дерево условия без документа и выполнения LLM-условий."""
     try:
-        _validate_condition(condition, frozenset())
+        _validate_condition(condition, frozenset(), under_not=False)
     except RecursionError:
         raise ValueError("условие имеет слишком большую глубину вложенности") from None
 
 
-def _validate_condition(condition: object, ancestors: frozenset[int]) -> None:
-    """Проверяет узел и всех потомков, отслеживая циклы только в текущей ветви."""
+def _validate_condition(condition: object, ancestors: frozenset[int], *, under_not: bool) -> None:
+    """Проверяет узел и всех потомков, отслеживая циклы только в текущей ветви.
+
+    llm на любой глубине внутри not запрещено: при сбое или молчании LLM (unknown)
+    «НЕ вопрос» стало бы истинным и дало бы ложное нарушение.
+    """
     node, operator = _condition_parts(condition, ancestors)
     if operator is not None:
         for child in _logical_children(operator, node[operator]):
-            _validate_condition(child, ancestors | {id(condition)})
+            _validate_condition(
+                child, ancestors | {id(condition)}, under_not=under_not or operator == "not",
+            )
         return
     kind = _leaf_kind(node)
     if kind == "entity_present":
@@ -52,16 +86,25 @@ def _validate_condition(condition: object, ancestors: frozenset[int]) -> None:
         _enum_values(node, "purposes", DocPurpose)
     else:
         _validate_question(node)
+        if under_not:
+            raise ValueError(LLM_UNDER_NOT)
 
 
 def evaluate(rules: list[Rule], ctx: RuleContext) -> list[Violation]:
-    """Возвращает нарушения применимых правил: сначала red, затем yellow."""
+    """Возвращает нарушения применимых правил: сначала red, затем yellow.
+
+    Условие llm спрашивает LLM только по ctx.masked_text и только если исход правила от него
+    зависит (см. _check_logical). Вызовы пишутся в журнал llm_call_log() (кроме mock).
+    """
     violations: list[Violation] = []
+    state = _EvalState(ctx=ctx)
     for rule in rules:
         if not rule.enabled or (rule.applies_to and ctx.purpose not in rule.applies_to):
             continue
+        state.rule_id = rule.id
         try:
-            matched, evidence = _check_condition(rule.condition, ctx)
+            validate_condition(rule.condition)
+            matched, evidence = _check_condition(rule.condition, state)
         except (ValueError, RecursionError) as exc:
             raise ValueError(f"Правило {rule.id}: {exc}") from exc
         if matched:
@@ -81,14 +124,14 @@ def evaluate(rules: list[Rule], ctx: RuleContext) -> list[Violation]:
 
 def _check_condition(
     condition: object,
-    ctx: RuleContext,
+    state: _EvalState,
     ancestors: frozenset[int] = frozenset(),
 ) -> ConditionResult:
-    """Проверяет узел целиком, включая ветви, не влияющие на итоговый ответ."""
+    """Проверяет узел; дешёвые ветви — всегда, ветви с llm — только если они решают исход."""
     node, operator = _condition_parts(condition, ancestors)
     if operator is None:
-        return _check_leaf(node, ctx)
-    return _check_logical(operator, node[operator], ctx, ancestors | {id(condition)})
+        return _check_leaf(node, state)
+    return _check_logical(operator, node[operator], state, ancestors | {id(condition)})
 
 
 def _condition_parts(
@@ -121,15 +164,26 @@ def _logical_children(operator: str, value: object) -> list[object]:
 def _check_logical(
     operator: str,
     value: object,
-    ctx: RuleContext,
+    state: _EvalState,
     ancestors: frozenset[int],
 ) -> ConditionResult:
-    """Вычисляет логическую операцию и сохраняет доказательства истинных частей."""
+    """Вычисляет логическую операцию и сохраняет доказательства истинных частей.
+
+    Сначала проверяются ветви без llm. Если исход уже ясен (all — есть ложная ветвь,
+    any — есть истинная), ветви с llm не вычисляются: не тратим бюджет вызовов LLM.
+    """
     children = _logical_children(operator, value)
     if operator == "not":
-        matched, _ = _check_condition(children[0], ctx, ancestors)
+        matched, _ = _check_condition(children[0], state, ancestors)
         return not matched, []
-    results = [_check_condition(child, ctx, ancestors) for child in children]
+    cheap = [child for child in children if not _contains_llm(child)]
+    results = [_check_condition(child, state, ancestors) for child in cheap]
+    decided = any(flag != (operator == "all") for flag, _ in results)
+    if not decided:
+        results += [
+            _check_condition(child, state, ancestors)
+            for child in children if _contains_llm(child)
+        ]
     flags = [matched for matched, _ in results]
     matched = all(flags) if operator == "all" else any(flags)
     if not matched:
@@ -137,8 +191,22 @@ def _check_logical(
     return True, [item for truth, items in results if truth for item in items]
 
 
-def _check_leaf(condition: dict[str, object], ctx: RuleContext) -> ConditionResult:
+def _contains_llm(condition: object) -> bool:
+    """Есть ли в поддереве условие llm (форма узлов уже проверена validate_condition)."""
+    if not isinstance(condition, dict):
+        return False
+    if condition.get("type") == "llm":
+        return True
+    nested: list[object] = []
+    for key in ("all", "any", "not"):
+        child = condition.get(key)
+        nested.extend(child if isinstance(child, list) else [child])
+    return any(_contains_llm(item) for item in nested)
+
+
+def _check_leaf(condition: dict[str, object], state: _EvalState) -> ConditionResult:
     """Проверяет поля и вычисляет одно условие без вложенных операторов."""
+    ctx = state.ctx
     kind = _leaf_kind(condition)
     if kind == "entity_present":
         return _check_entities(condition, ctx)
@@ -148,8 +216,34 @@ def _check_leaf(condition: dict[str, object], ctx: RuleContext) -> ConditionResu
         purposes = _enum_values(condition, "purposes", DocPurpose)
         return ctx.purpose in purposes, []
     _validate_question(condition)
-    logger.debug("LLM-условие пропущено: реализация запланирована в T-013")
-    return False, []
+    return _check_llm(str(condition["question"]), state)
+
+
+def _check_llm(question: str, state: _EvalState) -> ConditionResult:
+    """Условие llm истинно только при Evidence (yes + дословная цитата)."""
+    if not client.is_llm_enabled():
+        logger.debug("LLM-условие правила %s: режим mock, ответ unknown", state.rule_id)
+        return False, []
+    ctx = state.ctx
+    evidence, call = check_llm_condition(
+        question, ctx.masked_text, ctx.mask_spans, state.rule_id,
+        report_text=state.report_text,
+    )
+    record_llm_call(call)
+    if evidence is None:
+        return False, []
+    segment = _segment_at(ctx.doc.segments, evidence.start)
+    if segment is not None:
+        evidence = evidence.model_copy(update={"page": segment.page, "section": segment.section})
+    return True, [evidence]
+
+
+def _segment_at(segments: list[TextSegment], offset: int) -> TextSegment | None:
+    """Сегмент, в который попадает смещение исходного текста, или None."""
+    for segment in segments:
+        if segment.offset <= offset < segment.offset + len(segment.text):
+            return segment
+    return None
 
 
 def _leaf_kind(condition: dict[str, object]) -> str:

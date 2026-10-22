@@ -2,7 +2,7 @@
 
 import json
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from hashlib import sha256
 from importlib.metadata import version
 from pathlib import Path
@@ -12,9 +12,19 @@ import yaml
 
 from app.core.config import get_settings
 from app.core.version import APP_VERSION
-from app.schemas import AuditInfo, DocPurpose, ExtractedDocument, Report, ReportText, Rule, Stage
+from app.schemas import (
+    AuditInfo,
+    DocPurpose,
+    ExtractedDocument,
+    LlmCall,
+    Report,
+    ReportText,
+    Rule,
+    Stage,
+)
 from app.services.detection.detect import detect
 from app.services.llm import client
+from app.services.llm.checks import llm_call_log
 from app.services.llm.client import CallBudget, llm_call_budget
 from app.services.markers.find_markers import find_markers
 from app.services.masking.masker import mask, mask_preserving_length
@@ -27,6 +37,7 @@ from app.services.rules.loader import load_rules
 class AuditResult:
     report: Report
     report_text: ReportText
+    llm_log: list[LlmCall] = field(default_factory=list)  # «Что видела нейросеть»; mock → []
 
 
 def _rules_path(filename: str) -> Path:
@@ -84,9 +95,9 @@ def run_audit(
         rules = load_rules(_rules_path("rules.yaml"))
     ctx = RuleContext(
         doc=doc, masked_text=masked.masked_text,
-        entities=entities, markers=markers, purpose=purpose,
+        entities=entities, markers=markers, purpose=purpose, mask_spans=masked.spans,
     )
-    with llm_call_budget() as budget:
+    with llm_call_budget() as budget, llm_call_log() as llm_log:
         violations = evaluate(rules, ctx)
     if on_stage is not None:
         on_stage(Stage.reporting, 90)
@@ -96,4 +107,6 @@ def run_audit(
     segments = [segment.model_copy(update={
         "text": text[segment.offset:segment.offset + len(segment.text)],
     }) for segment in doc.segments]
-    return AuditResult(report=report, report_text=ReportText(text=text, segments=segments))
+    return AuditResult(
+        report=report, report_text=ReportText(text=text, segments=segments), llm_log=llm_log,
+    )

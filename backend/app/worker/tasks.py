@@ -65,6 +65,7 @@ def _audit_document(document: DocumentRow, task: TaskRow, session: Session, star
     session.add(ReportRow(
         id=report.report_id, document_id=document.id,
         data=report.model_dump(mode="json"), text=report_text.model_dump(mode="json"),
+        llm_log=[call.model_dump(mode="json") for call in result.llm_log],
     ))
     task.status, task.progress, task.report_id = "done", 100, report.report_id
     counts = Counter(entity.type.value for entity in report.entities)
