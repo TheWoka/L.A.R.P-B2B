@@ -119,7 +119,6 @@ def test_export_pdf_still_returns_501(client: TestClient) -> None:
     [
         ("/api/reports/rep_1/llm-log", "T-013"),
         ("/api/reports/rep_1/redacted", "T-026"),
-        ("/api/metrics", "T-028"),
     ],
 )
 def test_contract_v2_stubs_return_501_with_task_number(
