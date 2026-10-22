@@ -2,6 +2,7 @@ import { Layout, Menu, Typography } from "antd";
 import { Link, Route, Routes, useLocation } from "react-router-dom";
 
 import ReportPage from "./pages/ReportPage";
+import QualityPage from "./pages/QualityPage";
 import RulesPage from "./pages/RulesPage";
 import TaskPage from "./pages/TaskPage";
 import UploadPage from "./pages/UploadPage";
@@ -11,11 +12,12 @@ const { Header, Content, Footer } = Layout;
 const MENU_ITEMS = [
   { key: "/", label: <Link to="/">Проверка документа</Link> },
   { key: "/rules", label: <Link to="/rules">Правила</Link> },
+  { key: "/quality", label: <Link to="/quality">Качество</Link> },
 ];
 
 export default function App() {
   const { pathname } = useLocation();
-  const selected = pathname.startsWith("/rules") ? "/rules" : "/";
+  const selected = pathname.startsWith("/rules") ? "/rules" : pathname.startsWith("/quality") ? "/quality" : "/";
 
   return (
     <Layout style={{ minHeight: "100vh" }}>
@@ -37,6 +39,7 @@ export default function App() {
           <Route path="/tasks/:taskId" element={<TaskPage />} />
           <Route path="/reports/:reportId" element={<ReportPage />} />
           <Route path="/rules" element={<RulesPage />} />
+          <Route path="/quality" element={<QualityPage />} />
         </Routes>
       </Content>
       <Footer style={{ textAlign: "center" }}>Хакатон B2B-РТС · AI Procurement Copilot</Footer>
