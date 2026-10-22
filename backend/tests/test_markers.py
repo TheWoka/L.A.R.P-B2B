@@ -183,6 +183,79 @@ def test_classification_is_an_isolated_short_line(phrase: str) -> None:
     _assert_evidence(doc, MarkerType.classification_mark, phrase)
 
 
+@pytest.mark.parametrize(("text", "quote"), [
+    ("Конфиденциально. ООО «Пример», г. Томск", "Конфиденциально"),
+    ("Коммерческая тайна: АО «Пример» (обладатель), 634000, г. Томск", "Коммерческая тайна"),
+    ("КОНФИДЕНЦИАЛЬНО — ООО «Пример»", "КОНФИДЕНЦИАЛЬНО"),
+    ("Конфиденциально, обладатель — учебная организация «Пример»", "Конфиденциально"),
+    ("Конфиденциально. ООО «Пример Закупки», 634000, г. Томск", "Конфиденциально"),
+    ("Для служебного пользования. МУП «Пример»", "Для служебного пользования"),
+    ("ДСП: ИП Тестов Тест Тестович", "ДСП"),
+    ("Конфиденциально. ФГУП «Пример»", "Конфиденциально"),
+    ("Конфиденциально: ПАО «Пример»", "Конфиденциально"),
+    ("Конфиденциально — ЗАО «Пример»", "Конфиденциально"),
+    ("Конфиденциально, ГБУ «Пример»", "Конфиденциально"),
+    ("Конфиденциально. ОГБУ «Пример»", "Конфиденциально"),
+    ("конфиденциально: ооо «Пример»", "конфиденциально"),
+    ("Конфиденциально. Обладатель информации — " + "учебный филиал «Пример» " * 8,
+     "Конфиденциально"),
+])
+def test_classification_with_owner_preserves_quote_and_metadata(text: str, quote: str) -> None:
+    doc = _document(("Учебное введение", 1, "Введение"),
+                    (text, 7, "Синтетический раздел"))
+    _assert_evidence(doc, MarkerType.classification_mark, quote)
+
+
+@pytest.mark.parametrize("prefix", [" \t", "«", "“", '\u2003"'])
+def test_classification_with_owner_allows_only_spacing_and_quotes_before_label(prefix: str) -> None:
+    doc = _document((f"Учебный заголовок\n{prefix}Конфиденциально: ООО «Пример»",
+                     7, "Синтетический раздел"))
+    _assert_evidence(doc, MarkerType.classification_mark, "Конфиденциально")
+
+
+@pytest.mark.parametrize("text", [
+    "Конфиденциально сообщаем, что ООО «Пример» выполняет учебный договор.",
+    "Стороны обеспечивают конфиденциальность. ООО «Пример» выполняет учебный договор.",
+    "Условия: Конфиденциально. ООО «Пример», г. Томск",
+    "Сведения, составляющие коммерческую тайну, передаются ООО «Пример».",
+    "Конфиденциально передаются сведения ООО «Пример».",
+    "Конфиденциально. Учебное примечание без указания компании.",
+    "Конфиденциально. Учебное примечание\nООО «Пример»",
+    "Конфиденциально: учебное примечание\nОбладатель — ООО «Пример»",
+    "Конфиденциально, ОООшибка «Пример»",
+    "Конфиденциально. ПсевдоООО «Пример»",
+    "Конфиденциально: обладательница учебного пропуска",
+    "Конфиденциально; ООО «Пример»",
+    "Конфиденциально / ООО «Пример»",
+    "«Учебное пояснение» Конфиденциально: ООО «Пример»",
+    "(Конфиденциально. ООО «Пример»)",
+    "Коммерческая\nтайна: ООО «Пример»",
+])
+def test_classification_with_owner_rejects_prose_and_invalid_boundaries(text: str) -> None:
+    marker = _marker(_document((text, 7, None)), MarkerType.classification_mark)
+    assert not marker.present
+    assert marker.evidence is None
+
+
+def test_first_classification_with_owner_skips_prose() -> None:
+    doc = _document(("Конфиденциально сообщаем, что ООО «Пример» учебное.", 1, "Введение"),
+                    ("Конфиденциально. ООО «Пример», г. Томск", 7, "Синтетический раздел"),
+                    ("Коммерческая тайна", 8, "Позже"))
+    _assert_evidence(doc, MarkerType.classification_mark, "Конфиденциально")
+
+
+def test_classification_with_owner_without_segments() -> None:
+    text = ' \t«Конфиденциально: ООО «Пример», г. Томск'
+    doc = ExtractedDocument(
+        document_id="synthetic-owner", filename="test.txt", text=text, segments=[],
+    )
+    marker = _marker(doc, MarkerType.classification_mark)
+    assert marker.present and marker.evidence is not None
+    assert marker.evidence.quote == "Конфиденциально"
+    assert text[marker.evidence.start:marker.evidence.end] == marker.evidence.quote
+    assert marker.evidence.page is None and marker.evidence.section is None
+
+
 @pytest.mark.parametrize("section", ["Верхний колонтитул", "Нижний колонтитул"])
 @pytest.mark.parametrize("phrase", ["конфиденциально", "КОНФИДЕНЦИАЛЬНО", "ДСП"])
 def test_classification_in_long_margin_segment(section: str, phrase: str) -> None:
