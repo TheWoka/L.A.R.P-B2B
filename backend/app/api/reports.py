@@ -1,23 +1,37 @@
 """Чтение сохранённых отчётов и текста проверки.
 
-Заглушки: PDF — T-020; обезличенная копия — T-026. Журнал LLM — T-013b.
+Заглушка: PDF — T-020. Журнал LLM — T-013b. Обезличенная копия — T-026.
 """
 
 import json
+import re
+from functools import lru_cache
+from pathlib import Path
 from typing import Annotated, Literal
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 
 from app.db.models import ReportRow
 from app.db.session import get_db
-from app.schemas import LlmCall, Report, ReportText
+from app.schemas import ExtractedDocument, LlmCall, Report, ReportText, TextSegment
+from app.services.detection.detect import detect
+from app.services.masking.masker import MASKED_CATEGORIES
+from app.services.redaction.redact import MEDIA_TYPES
 
 router = APIRouter(tags=["reports"])
 DbSession = Annotated[Session, Depends(get_db)]
 
 NOT_IMPLEMENTED_PDF = "Будет реализовано в T-020"
-NOT_IMPLEMENTED_REDACTED = "Будет реализовано в T-026"
+REDACTED_UNAVAILABLE = "Обезличенная копия недоступна"
+REDACTED_SUFFIX = "_обезличено"
+QUERY_NAME, SAFE_NAME = "запрос", "документ"
+# Одиночную фамилию без имени («Иванов_заявка») NER не видит: в имени файла нет контекста.
+# Имя копии — не место для риска: слово с фамильным окончанием тоже считаем ПДн.
+_SURNAME_LIKE_RE = re.compile(
+    r"(?<![\w])[А-ЯЁ][а-яё]+(?:ов|ев|ёв|ин|ын|ова|ева|ёва|ина|ына|ский|цкий|ская|цкая)(?![\w])",
+)
 
 
 @router.get("/reports/{report_id}", response_model=Report, summary="Отчёт проверки")
@@ -99,6 +113,45 @@ def get_llm_log(report_id: str, session: DbSession) -> list[LlmCall]:
         404: {"description": "Обезличенная копия недоступна"},
     },
 )
-def get_redacted(report_id: str) -> Response:
-    """ПДн удалены физически (в PDF — редакция, а не закраска); коммерческая тайна не трогается."""
-    raise HTTPException(status_code=501, detail=NOT_IMPLEMENTED_REDACTED)
+def get_redacted(report_id: str, session: DbSession) -> Response:
+    """ПДн удалены физически (в PDF — редакция, а не закраска); коммерческая тайна не трогается.
+
+    Имя файла — «<имя>_обезличено.<ext>»; <имя> — основа исходного имени, но если
+    в нём самом найдены ПДн («Иванов_заявка.docx») — «документ», для запроса — «запрос».
+    """
+    row = session.get(ReportRow, report_id)
+    if row is None or row.redacted is None or row.redacted_ext not in MEDIA_TYPES:
+        raise HTTPException(status_code=404, detail=REDACTED_UNAVAILABLE)
+    filename = f"{download_stem(row.data.get('filename'))}{REDACTED_SUFFIX}.{row.redacted_ext}"
+    disposition = (
+        f'attachment; filename="redacted.{row.redacted_ext}"; '
+        f"filename*=UTF-8''{quote(filename, safe='')}"
+    )
+    return Response(
+        content=row.redacted, media_type=MEDIA_TYPES[row.redacted_ext],
+        headers={"Content-Disposition": disposition},
+    )
+
+
+def download_stem(filename: str | None) -> str:
+    """Основа имени скачиваемой копии без ПДн (RFC 5987 кодирует кириллицу в заголовке)."""
+    if filename is None:
+        return QUERY_NAME
+    name = Path(filename).name
+    stem = (name.rpartition(".")[0] if "." in name else name).strip()  # ".pdf" → ""
+    if not stem or _has_personal_data(stem):
+        return SAFE_NAME
+    return stem
+
+
+@lru_cache(maxsize=256)
+def _has_personal_data(stem: str) -> bool:
+    """Тот же детектор, что и для документа; «_» в именах файлов — вместо пробела."""
+    text = stem.replace("_", " ")
+    if _SURNAME_LIKE_RE.search(text):
+        return True
+    doc = ExtractedDocument(
+        document_id="filename-check", filename=stem, text=text,
+        segments=[TextSegment(id=0, text=text, offset=0)],
+    )
+    return any(entity.category in MASKED_CATEGORIES for entity in detect(doc))

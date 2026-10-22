@@ -7,7 +7,17 @@
 
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    LargeBinary,
+    String,
+    Text,
+    func,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -58,6 +68,11 @@ class ReportRow(Base):
     # Журнал «Что видела нейросеть»: list[LlmCall] в JSON, только замаскированные фрагменты.
     # None — отчёт создан до T-013b (API отдаёт []).
     llm_log: Mapped[list | None] = mapped_column(JSONB().with_variant(JSON(), "sqlite"))
+    # Обезличенная копия (T-026): байты файла в формате исходника и его расширение без точки.
+    # Хранится в строке отчёта — retention удаляет её вместе с отчётом. deferred: копия
+    # до 50 МБ не читается при каждом GET /reports/{id}, только в GET /redacted.
+    redacted: Mapped[bytes | None] = mapped_column(LargeBinary, deferred=True)
+    redacted_ext: Mapped[str | None] = mapped_column(String(8))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
