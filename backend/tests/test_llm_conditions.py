@@ -51,6 +51,7 @@ from app.services.llm.checks import (
 from app.services.llm.client import LLMRequestError, LLMResponseError, llm_call_budget
 from app.services.llm.providers import ChatResult, build_default_instance
 from app.services.masking.masker import mask, mask_preserving_length, mask_value
+from app.services.rules import repository
 from app.services.rules.engine import evaluate, validate_condition
 from app.services.rules.loader import load_rules
 from app.worker import tasks
@@ -417,6 +418,7 @@ def db() -> Iterator[Session]:
 def run_worker(db: Session, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TaskRow:
     """Текстовый запрос через настоящий воркер; правила — одно LLM-правило."""
     monkeypatch.setattr(pipeline, "load_rules", lambda path: [make_rule(LLM_RULE)])
+    monkeypatch.setattr(repository, "list_rules", lambda session: [make_rule(LLM_RULE)])
     path = tmp_path / "query.txt"
     path.write_text(TEXT, encoding="utf-8")
     db.add(DocumentRow(id="doc-llm", filename=None, purpose="contract", stored_path=str(path)))
