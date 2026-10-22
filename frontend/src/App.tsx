@@ -1,4 +1,4 @@
-import { Layout, Menu, Typography } from "antd";
+import { Layout } from "antd";
 import { Link, Route, Routes, useLocation } from "react-router-dom";
 
 import ReportPage from "./pages/ReportPage";
@@ -6,43 +6,73 @@ import QualityPage from "./pages/QualityPage";
 import RulesPage from "./pages/RulesPage";
 import TaskPage from "./pages/TaskPage";
 import UploadPage from "./pages/UploadPage";
+import "./styles.css";
 
-const { Header, Content, Footer } = Layout;
+const { Sider, Content } = Layout;
 
-const MENU_ITEMS = [
-  { key: "/", label: <Link to="/">Проверка документа</Link> },
-  { key: "/rules", label: <Link to="/rules">Правила</Link> },
-  { key: "/quality", label: <Link to="/quality">Качество</Link> },
+const NAV_ITEMS = [
+  { path: "/", label: "Проверка" },
+  { path: "/reports/example", label: "Отчёты" },
+  { path: "/rules", label: "Правила" },
+  { path: "/quality", label: "Качество" },
 ];
+
+function activePath(pathname: string): string {
+  if (pathname.startsWith("/reports")) return "/reports/example";
+  if (pathname.startsWith("/rules")) return "/rules";
+  if (pathname.startsWith("/quality")) return "/quality";
+  return "/";
+}
 
 export default function App() {
   const { pathname } = useLocation();
-  const selected = pathname.startsWith("/rules") ? "/rules" : pathname.startsWith("/quality") ? "/quality" : "/";
+  const selected = activePath(pathname);
 
   return (
-    <Layout style={{ minHeight: "100vh" }}>
-      <Header style={{ display: "flex", alignItems: "center", gap: 32 }}>
-        <Typography.Title level={4} style={{ color: "#fff", margin: 0, whiteSpace: "nowrap" }}>
-          ИИ-аудитор документов
-        </Typography.Title>
-        <Menu
-          theme="dark"
-          mode="horizontal"
-          selectedKeys={[selected]}
-          items={MENU_ITEMS}
-          style={{ flex: 1, minWidth: 0 }}
-        />
-      </Header>
-      <Content style={{ padding: "24px clamp(16px, 4vw, 48px)" }}>
-        <Routes>
-          <Route path="/" element={<UploadPage />} />
-          <Route path="/tasks/:taskId" element={<TaskPage />} />
-          <Route path="/reports/:reportId" element={<ReportPage />} />
-          <Route path="/rules" element={<RulesPage />} />
-          <Route path="/quality" element={<QualityPage />} />
-        </Routes>
-      </Content>
-      <Footer style={{ textAlign: "center" }}>Хакатон B2B-РТС · AI Procurement Copilot</Footer>
+    <Layout className="app-shell">
+      <Sider width={252} theme="light" className="app-sidebar">
+        <Link to="/" className="brand" aria-label="ГРИФ — проверка документа">
+          <span className="brand-mark" aria-hidden="true" />
+          <span>ГРИФ</span>
+        </Link>
+        <div className="sidebar-caption">РАБОЧЕЕ ПРОСТРАНСТВО</div>
+        <nav className="sidebar-nav" aria-label="Основная навигация">
+          {NAV_ITEMS.map((item) => (
+            <Link
+              key={item.path}
+              to={item.path}
+              className={`sidebar-link${selected === item.path ? " is-active" : ""}`}
+              aria-current={selected === item.path ? "page" : undefined}
+            >
+              <span className="nav-mark" aria-hidden="true" />
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+        <div className="sidebar-foot">ИИ-аудитор документов</div>
+      </Sider>
+      <Layout className="app-main">
+        <header className="mobile-header">
+          <Link to="/" className="mobile-brand">ГРИФ</Link>
+          <span>{NAV_ITEMS.find((item) => item.path === selected)?.label}</span>
+        </header>
+        <Content className="app-content">
+          <nav className="mobile-nav" aria-label="Основная навигация">
+            {NAV_ITEMS.map((item) => (
+              <Link key={item.path} to={item.path} className={selected === item.path ? "is-active" : ""}>
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+          <Routes>
+            <Route path="/" element={<UploadPage />} />
+            <Route path="/tasks/:taskId" element={<TaskPage />} />
+            <Route path="/reports/:reportId" element={<ReportPage />} />
+            <Route path="/rules" element={<RulesPage />} />
+            <Route path="/quality" element={<QualityPage />} />
+          </Routes>
+        </Content>
+      </Layout>
     </Layout>
   );
 }

@@ -104,14 +104,14 @@ export default function RulesPage() {
   ];
 
   return (
-    <>
+    <div className="page-container">
       {messageContext}
+      <div className="page-eyebrow">ГРИФ / Правила проверки</div>
+      <header className="page-heading">
+        <h1>Правила проверки</h1>
+        <p>Выключенные правила не применяются к новым проверкам.</p>
+      </header>
       <Card>
-        <Typography.Title level={2} style={{ marginTop: 0 }}>Правила проверки</Typography.Title>
-        <Typography.Paragraph type="secondary">
-          Выключенные правила не применяются к новым проверкам.
-        </Typography.Paragraph>
-
         {loadError ? (
           <Alert
             type="error"
@@ -161,6 +161,6 @@ export default function RulesPage() {
         )}
       </Card>
       <RuleDetails rule={selectedRule} onClose={() => setSelectedId(null)} />
-    </>
+    </div>
   );
 }

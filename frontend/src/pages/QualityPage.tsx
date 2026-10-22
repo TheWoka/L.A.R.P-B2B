@@ -16,22 +16,22 @@ function percentage(value: number): string {
 function MetricCard({ title, value, target }: { title: string; value: number; target: number }) {
   const passed = value >= target;
   return (
-    <Card style={{ height: "100%" }}>
+    <Card className="quality-metric" style={{ height: "100%" }}>
       <Typography.Text strong>{title}</Typography.Text>
       <Statistic
         value={value * 100}
         precision={1}
         suffix="%"
-        styles={{ content: { color: passed ? "#237804" : "#cf1322" } }}
+        styles={{ content: { color: "#1c1c1e" } }}
       />
-      <Typography.Text type={passed ? "success" : "danger"}>
-        {passed ? "✅ Цель достигнута" : "❌ Ниже цели"} · нужно не меньше {Math.round(target * 100)}%
+      <Typography.Text className={passed ? "metric-status is-passed" : "metric-status is-below"}>
+        {passed ? "Цель достигнута" : "Ниже цели"} · порог {Math.round(target * 100)}%
       </Typography.Text>
       <div style={{ position: "relative", marginTop: 14 }}>
-        <Progress percent={Math.round(value * 100)} showInfo={false} strokeColor={passed ? "#389e0d" : "#cf1322"} />
+        <Progress percent={Math.round(value * 100)} showInfo={false} strokeColor="#087ff5" />
         <span
           aria-hidden="true"
-          style={{ position: "absolute", left: `${target * 100}%`, top: 3, height: 10, borderLeft: "2px solid #262626" }}
+          style={{ position: "absolute", left: `${target * 100}%`, top: 3, height: 10, borderLeft: "2px solid #1c1c1e" }}
         />
       </div>
       <Typography.Text type="secondary">Чёрная отметка на шкале — порог {Math.round(target * 100)}%.</Typography.Text>
@@ -95,13 +95,12 @@ export default function QualityPage() {
 
   const { data, example } = loaded;
   return (
-    <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-      <Typography.Title level={2} style={{ marginTop: 0 }}>
-        Качество проверки {example && <Tag color="blue">Пример данных</Tag>}
-      </Typography.Title>
-      <Typography.Paragraph type="secondary">
-        Сколько важных сведений находит система и как мы это проверяем.
-      </Typography.Paragraph>
+    <div className="page-container quality-page">
+      <div className="page-eyebrow">ГРИФ / Качество проверки</div>
+      <header className="page-heading">
+        <h1>Качество проверки {example && <Tag color="blue">Пример данных</Tag>}</h1>
+        <p>Показатели на эталонных документах. Показываем результат без приукрашивания.</p>
+      </header>
 
       {example && (
         <Alert

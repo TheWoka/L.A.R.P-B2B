@@ -71,9 +71,13 @@ export default function TaskPage() {
 
   const current = task?.stage ? STAGES.findIndex((item) => item.stage === task.stage) : 0;
   return (
-    <Card>
-      <Typography.Title level={2}>{task?.status === "failed" ? "Не удалось проверить документ" : "Документ проверяется"}</Typography.Title>
-      <Typography.Paragraph type="secondary">Номер проверки: {taskId}</Typography.Paragraph>
+    <div className="page-container">
+      <div className="page-eyebrow">ГРИФ / Проверка документа</div>
+      <header className="page-heading">
+        <h1>{task?.status === "failed" ? "Не удалось проверить документ" : "Документ проверяется"}</h1>
+        <p>Номер проверки: {taskId}</p>
+      </header>
+      <Card>
       {task?.status !== "failed" && (
         <Typography.Paragraph>Этапы обновляются автоматически. Можно оставить эту страницу открытой до появления отчёта.</Typography.Paragraph>
       )}
@@ -86,6 +90,7 @@ export default function TaskPage() {
         <Alert type="warning" showIcon title={errorMessage} description={networkErrors >= 5 ? "Не удалось восстановить соединение. Обновите страницу, чтобы повторить попытку." : undefined} style={{ marginTop: 16 }} />
       )}
       {networkErrors >= 5 && <Button style={{ marginTop: 12 }} onClick={() => window.location.reload()}>Обновить страницу</Button>}
-    </Card>
+      </Card>
+    </div>
   );
 }
