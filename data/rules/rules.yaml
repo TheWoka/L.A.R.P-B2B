@@ -27,6 +27,7 @@
   description: В документе есть сведения, составляющие коммерческую тайну, но нет грифа.
   severity: red
   law_refs: [{law: 98-ФЗ, article: ст. 10}]
+  applies_to: [internal, contract, international]
   condition:
     all:
       - {type: entity_present, categories: [trade_secret]}
@@ -161,7 +162,7 @@
 
 - id: CHECKLIST_NO_MARK
   title: Нет грифа на документе с ПДн
-  description: Внутренний документ содержит паспортные данные, СНИЛС, ИНН или дату рождения без грифа конфиденциальности.
+  description: Внутренний документ содержит паспортные данные, СНИЛС, ИНН, дату рождения или особые категории ПДн без грифа конфиденциальности.
   severity: yellow
   law_refs:
     - {law: 152-ФЗ, article: ст. 7}
@@ -169,19 +170,19 @@
   applies_to: [internal]
   condition:
     all:
-      - {type: entity_present, categories: [pd], types: [PASSPORT, SNILS, INN, BIRTH_DATE]}
+      - {type: entity_present, categories: [pd, pd_special], types: [PASSPORT, SNILS, INN, BIRTH_DATE, SPECIAL_CATEGORY]}
       - {type: marker_absent, marker: classification_mark}
   recommendation: Нанесите гриф «Конфиденциально» по внутренней политике обработки ПДн.
 
 - id: CHECKLIST_NO_RETENTION
   title: Не указан срок хранения ПДн
-  description: Документ содержит паспортные данные, СНИЛС, ИНН или дату рождения без срока хранения ПДн.
+  description: Документ содержит паспортные данные, СНИЛС, ИНН, дату рождения или особые категории ПДн без срока хранения ПДн.
   severity: yellow
   law_refs:
     - {law: 152-ФЗ, article: ст. 5 ч. 7}
     - {law: GDPR, article: Art. 5}
   condition:
     all:
-      - {type: entity_present, categories: [pd], types: [PASSPORT, SNILS, INN, BIRTH_DATE]}
+      - {type: entity_present, categories: [pd, pd_special], types: [PASSPORT, SNILS, INN, BIRTH_DATE, SPECIAL_CATEGORY]}
       - {type: marker_absent, marker: retention_period}
   recommendation: Укажите срок хранения ПДн или условие их уничтожения (например, «до истечения срока исковой давности по контракту»).

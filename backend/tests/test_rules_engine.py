@@ -420,8 +420,7 @@ def test_actual_yaml_rules_evaluate_document(
     expected = ["TRADE_SECRET_WITHOUT_MARK"]
     if purpose == DocPurpose.publication:
         # По docs/rules.md: есть ПДн и коммерческая тайна в документе для публикации.
-        expected.insert(0, "PD_IN_PUBLICATION")
-        expected.append("TRADE_SECRET_IN_PUBLICATION")
+        expected = ["PD_IN_PUBLICATION", "TRADE_SECRET_IN_PUBLICATION"]
     assert [item.rule_id for item in evaluate(rules, ctx)] == expected
 
 
