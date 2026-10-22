@@ -3,20 +3,27 @@
 import logging
 from collections.abc import Callable
 from datetime import datetime
+from io import BytesIO
 from pathlib import Path
+from random import Random
 
 import pymupdf
 import pytest
 from docx import Document
 from docx.enum.style import WD_STYLE_TYPE
 from docx.shared import Inches
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 
-from app.schemas import ExtractedDocument, TextSegment
+from app.evaluation.generator.values import card, inn_person, snils
+from app.schemas import EntityType, ExtractedDocument, TextSegment
+from app.services.detection.detect import detect
+from app.services.detection.validators import only_digits
 from app.services.extraction.docx import extract_docx
 from app.services.extraction.extract import extract
 from app.services.extraction.pdf import extract_pdf, is_numbered_heading
 from app.services.extraction.xlsx import extract_xlsx
+from app.services.redaction.check import count_leftovers
+from app.services.redaction.redact import redact
 
 
 @pytest.fixture
@@ -222,6 +229,153 @@ def test_xlsx_sections_and_values(xlsx_path: Path) -> None:
     ]
     assert document.pages is None
     assert all(segment.page is None for segment in document.segments)
+    assert_offsets(document)
+
+
+@pytest.mark.parametrize("value, number_format, expected", [
+    (0.25, "0%", "25%"),
+    (0.125, "0.0%", "12,5%"),
+    (0, "0%", "0%"),
+    (-0.125, "0.0%", "-12,5%"),
+    (0.125, "0%", "13%"),
+    (0.125, "0.##%", "12,5%"),
+    (0.25, "0.##%", "25%"),
+    (48300, "#,##0", "48300"),
+    (48300, "# ##0", "48300"),
+    (1234.5, "#,##0.00", "1234.5"),
+    (-1234.5, "#,##0.00", "-1234.5"),
+    (1234.5, "#,##0.##", "1234.5"),
+    (48300, '#,##0 "₽"', "48300"),
+    (48300, '0 "руб."', "48300"),
+    (1234.5, '#,##0.00 "р."', "1234.5"),
+    (25, '0 "%"', "25"),
+    (25, r"0\%", "25"),
+    (48300.0, "General", "48300"),
+    (12.5, "General", "12.5"),
+    (datetime(2026, 3, 12, 15, 30), "dd.mm.yyyy hh:mm", "2026-03-12 15:30:00"),
+    ("Выдуманный текст", "0%", "Выдуманный текст"),
+    (False, "0%", "False"),
+    (None, "0%", ""),
+])
+def test_xlsx_cell_formats(
+    tmp_path: Path, value: str | int | float | datetime | None,
+    number_format: str, expected: str,
+) -> None:
+    path = tmp_path / "formats.xlsx"
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet["B2"] = value
+    sheet["B2"].number_format = number_format
+    sheet["A4"] = "Конец выдуманной таблицы"
+    workbook.save(path)
+    workbook.close()
+
+    document = extract(path, path.name, "synthetic-formats")
+    assert document.text == (expected + "\n" if expected else "") + "Конец выдуманной таблицы"
+    assert [segment.section for segment in document.segments] == (
+        (["Sheet!B2:B2"] if expected else []) + ["Sheet!A4:A4"]
+    )
+    assert_offsets(document)
+
+
+@pytest.mark.parametrize("value, number_format, unit, expected", [
+    (48300, "General", "руб.", "48300 руб."),
+    (48300, "#,##0", "руб.", "48300 руб."),
+    (48300, "General", "руб", "48300 руб"),
+    (48300, "General", "₽", "48300 ₽"),
+    (25, "General", "%", "25 %"),
+    (20, "General", "шт.", "20 шт."),
+    (48.3, "General", "тыс. руб.", "48.3 тыс. руб."),
+    (1.2, "General", "млн руб.", "1.2 млн руб."),
+    (0.25, "0%", "%", "25%"),
+    (48300, '#,##0 "₽"', "руб.", "48300 руб."),
+    (0, "General", "руб.", "0 руб."),
+    (False, "General", "руб.", "False | руб."),
+    ("48300", "General", "руб.", "48300 | руб."),
+    (48300, "General", "Комментарий", "48300 | Комментарий"),
+])
+def test_xlsx_adjacent_units(
+    tmp_path: Path, value: str | int | float, number_format: str, unit: str, expected: str,
+) -> None:
+    path = tmp_path / "units.xlsx"
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Смета"
+    sheet.append(["Себестоимость единицы", value, unit, "Примечание"])
+    sheet["B1"].number_format = number_format
+    sheet.append([48300, None, "руб."])
+    sheet.append(["руб.", 20])
+    workbook.save(path)
+    workbook.close()
+
+    document = extract(path, path.name, "synthetic-units")
+    assert [segment.text for segment in document.segments] == [
+        f"Себестоимость единицы | {expected} | Примечание", "48300 | руб.", "руб. | 20",
+    ]
+    assert [segment.section for segment in document.segments] == [
+        "Смета!A1:D1", "Смета!A2:C2", "Смета!A3:B3",
+    ]
+    assert_offsets(document)
+
+
+@pytest.mark.parametrize("kind, number_format", [
+    (EntityType.INN, "General"),
+    (EntityType.INN, "#,##0"),
+    (EntityType.SNILS, "#,##0"),
+    (EntityType.CARD, "#,##0"),
+    (EntityType.BIRTH_DATE, "dd.mm.yyyy"),
+])
+def test_xlsx_formats_preserve_pd_redaction(
+    tmp_path: Path, kind: EntityType, number_format: str,
+) -> None:
+    rng = Random(26)
+    samples = {
+        EntityType.INN: ("ИНН физического лица", int(inn_person(rng))),
+        EntityType.SNILS: ("СНИЛС", int(only_digits(snils(rng)))),
+        EntityType.CARD: ("Номер карты", int(only_digits(card(rng)))),
+        EntityType.BIRTH_DATE: ("Дата рождения", datetime(1991, 3, 12)),
+    }
+    label, value = samples[kind]
+    path = tmp_path / "synthetic-pd.xlsx"
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.append([label, value])
+    sheet["B1"].number_format = number_format
+    workbook.save(path)
+    workbook.close()
+
+    document = extract(path, path.name, "synthetic-pd-formats")
+    assert document.segments[0].text == f"{label} | {value}"
+    entities = detect(document)
+    assert any(entity.type == kind for entity in entities)
+    redacted = redact(path, document, entities)
+    copy = load_workbook(BytesIO(redacted.content))
+    try:
+        assert isinstance(copy.active["B1"].value, str)
+        assert copy.active["B1"].value.startswith("[")
+    finally:
+        copy.close()
+    assert count_leftovers(redacted, document, entities) == 0
+    assert_offsets(document)
+
+
+def test_xlsx_demo_estimate_trade_secrets() -> None:
+    path = Path(__file__).resolve().parents[2] / "data" / "demo" / "04_estimate.xlsx"
+    if not path.is_file():
+        path = Path("/data/demo/04_estimate.xlsx")
+    if not path.is_file():
+        pytest.skip("Демо-смета отсутствует в репозитории или образе")
+    document = extract(path, path.name, "synthetic-demo-estimate")
+    entities = [entity for entity in detect(document) if entity.type == EntityType.TRADE_SECRET]
+    for section, keyword, value in [
+        ("Смета!A6:C6", "себестоимость", "48300 руб."),
+        ("Смета!A7:C7", "наценка", "25%"),
+    ]:
+        matching = [entity for entity in entities if entity.section == section]
+        assert matching, f"Не найдена коммерческая тайна: {section}"
+        assert any(keyword in document.text[e.start:e.end].lower() for e in matching)
+        assert any(value in document.text[e.start:e.end] for e in matching)
+        assert all(e.value_masked == document.text[e.start:e.end] for e in matching)
     assert_offsets(document)
 
 
