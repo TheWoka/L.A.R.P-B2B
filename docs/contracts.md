@@ -136,17 +136,6 @@ class Violation(BaseModel):
 
 
 # ---------- Отчёт ----------
-class AuditInfo(BaseModel):          # след проверки: отчёт можно воспроизвести и проверить
-    document_sha256: str             # sha256 исходного файла (для текстового запроса — его текста в UTF-8)
-    ruleset_version: str             # первые 12 hex sha256 канонического JSON включённых правил
-    dictionaries_version: str        # то же для data/rules/dictionaries.yaml
-    app_version: str                 # версия приложения (FastAPI app.version)
-    detectors: list[str]             # например ["regex", "ner:natasha-1.6.0", "dict"]
-    llm_provider: Literal["mock", "openai_compatible"]
-    llm_model: str | None            # None в режиме mock
-    llm_calls: int = Field(0, ge=0)  # реальных вызовов LLM (без кэша и mock)
-
-
 class ChecklistItem(BaseModel):
     category: Literal["approvals", "classification", "retention"]
     status: Literal["ok", "missing", "not_required"]
@@ -167,38 +156,6 @@ class Report(BaseModel):
     checklist: list[ChecklistItem]   # ровно 3 элемента
     violations: list[Violation]
     llm_used: bool                   # False, если работали в режиме mock / без ключа
-    audit: AuditInfo                 # след проверки (контракт v2)
-    redacted_available: bool = False # есть ли обезличенная копия (GET /api/reports/{id}/redacted)
-
-
-# ---------- «Что видела нейросеть»: журнал вызовов LLM (schemas/llm_log.py) ----------
-class LlmCall(BaseModel):
-    purpose: Literal["rule_condition", "trade_secret"]
-    rule_id: str | None              # для purpose="rule_condition", иначе None
-    question: str
-    masked_fragment: str             # РОВНО тот текст, что ушёл в LLM: только замаскированный ([PERSON_1] …)
-    verdict: Literal["yes", "no", "unknown"]
-    quote: str | None                # цитата из ответа LLM (в координатах masked_fragment), если есть
-    cached: bool                     # ответ взят из кэша Redis
-
-
-# ---------- Метрики качества (schemas/metrics.py) ----------
-class TypeMetrics(BaseModel):
-    type: str                        # значение EntityType
-    precision: float = Field(ge=0, le=1)
-    recall: float = Field(ge=0, le=1)
-    f1: float = Field(ge=0, le=1)
-    support: int = Field(ge=0)       # число эталонных сущностей
-
-
-class Metrics(BaseModel):
-    corpus: str                      # название/версия корпуса
-    documents: int
-    created_at: datetime
-    by_type: list[TypeMetrics]
-    pd_recall: float = Field(ge=0, le=1)            # по всем ПДн — критерий ≥ 0.90
-    trade_secret_recall: float = Field(ge=0, le=1)  # критерий ≥ 0.85
-    matching: str                    # правило совпадения, например "overlap ≥ 50% и тот же type"
 
 
 # ---------- Задачи ----------
@@ -225,11 +182,6 @@ class TaskInfo(BaseModel):
     report_id: str | None = None
     error: str | None = None         # понятный пользователю текст, без технических деталей
 ```
-
-**След проверки (`Report.audit`).** Тот же документ + те же правила и словари + та же версия
-приложения = тот же результат. `ruleset_version` и `dictionaries_version` — первые 12 hex
-sha256 канонического JSON (ключи отсортированы, без пробелов) включённых правил и содержимого
-`data/rules/dictionaries.yaml`. Значения ПДн в `audit` не попадают.
 
 **Правило итогового светофора:** `red`, если есть хотя бы одно нарушение `red`; иначе `yellow`, если есть хотя бы одно `yellow`; иначе `green`.
 
@@ -318,11 +270,10 @@ class RuleContext(BaseModel):
     entities: list[Entity]
     markers: list[Marker]
     purpose: DocPurpose
-    mask_spans: list[MaskSpan] = []  # MaskResult.spans — перевод цитат LLM в исходные координаты
 def evaluate(rules: list[Rule], ctx: RuleContext) -> list[Violation]: ...
 
 # services/report/builder.py
-def build_report(ctx: RuleContext, violations: list[Violation], processing_ms: int, llm_used: bool, audit: AuditInfo) -> Report: ...
+def build_report(ctx: RuleContext, violations: list[Violation], processing_ms: int, llm_used: bool) -> Report: ...
 ```
 
 ## 4. REST API
@@ -335,9 +286,6 @@ def build_report(ctx: RuleContext, violations: list[Violation], processing_ms: i
 | GET | `/api/reports/{report_id}` | — | `Report` |
 | GET | `/api/reports/{report_id}/text` | — | `ReportText` — текст с **замаскированными** ПДн для подсветки |
 | GET | `/api/reports/{report_id}/export?format=json\|pdf` | — | файл отчёта |
-| GET | `/api/reports/{report_id}/llm-log` | — | `list[LlmCall]` — «что видела нейросеть»; в режиме mock — `[]` или mock-вызовы с `verdict: "unknown"` |
-| GET | `/api/reports/{report_id}/redacted` | — | обезличенная копия в формате исходника (`.pdf` / `.docx` / `.xlsx`, для текстового запроса — `.txt`), `Content-Disposition: attachment; filename="<имя>_обезличено.<ext>"`; копии нет → `404 {detail: "Обезличенная копия недоступна"}` |
-| GET | `/api/metrics` | — | `Metrics` из `eval/results/metrics.json` (пишет `eval/run_eval.py`); файла нет → `404 {detail: "Метрики ещё не посчитаны"}` |
 | GET | `/api/rules` | — | `list[Rule]` |
 | POST | `/api/rules` | `Rule` | `201 Rule` |
 | PUT | `/api/rules/{id}` | `Rule` | `Rule` |
@@ -346,7 +294,6 @@ def build_report(ctx: RuleContext, violations: list[Violation], processing_ms: i
 
 Ограничения: файл до 50 МБ; форматы .pdf, .docx, .xlsx; иначе `400 {detail: "понятное сообщение"}`.
 Исходные файлы удаляются после обработки; отчёты хранятся `REPORT_TTL_DAYS` дней (по умолчанию 7) — система сама соблюдает сроки хранения, которые проверяет.
-Обезличенная копия создаётся в конвейере **до** удаления исходника и хранится тот же срок, что отчёт (`REPORT_TTL_DAYS`); правила копии — в разделе 4.1.
 
 ### 4.1. Модели запросов и ответов API (Pydantic v2)
 
@@ -397,19 +344,6 @@ class HealthStatus(BaseModel):       # ответ GET /api/health
 | `+7 (912) 345-67-89` | `+█ (███) ███-██-██` |
 | `ivan.petrov@mail.ru` | `i███.p█████@m███.r█` |
 
-**`value_masked` у коммерческой тайны и финансов.** Маскирование применяется только к ПДн.
-У сущностей категорий `trade_secret` и `financial` `value_masked` — исходный фрагмент без
-маскирования (решение 17.10): юристу нужно видеть, что именно найдено.
-
-**Обезличенная копия (`GET /api/reports/{report_id}/redacted`).**
-- Создаётся в конвейере до удаления исходника; хранится `REPORT_TTL_DAYS`, как отчёт. Нет копии → `Report.redacted_available = false` и эндпоинт отвечает `404`.
-- ПДн (категории `pd`, `pd_special`) удаляются **физически**: в PDF — редакция (redaction annotations + применение), а не закраска поверх текста; в .docx / .xlsx / .txt — замена значения. Скопировать ПДн из копии нельзя.
-- Коммерческая тайна и финансы не трогаются (решение 17.10): маскируются только ПДн.
-
-**Журнал LLM (`LlmCall`).** `masked_fragment` — ровно то, что ушло в LLM, поэтому в журнале
-только плейсхолдеры (`[PERSON_1]`). Исходный текст в журнал не пишется и при показе не
-восстанавливается (AGENTS.md, правило 5).
-
 Текст для LLM (`MaskResult.masked_text`, плейсхолдеры `[PERSON_1]`) имеет другую длину. Цитаты из
 ответа LLM переводятся в исходные координаты через `to_original_offset(masked_offset, spans)`.
 
@@ -437,9 +371,6 @@ REPORT_TTL_DAYS=7
 
 | Дата | Что изменилось | Кто решил |
 |---|---|---|
-| 2026-10-21 | T-013b: RuleContext.mask_spans для перевода цитат LLM | Данила (тимлид) |
-| 2026-10-17 | T-009b: build_report принимает audit: AuditInfo (собирает конвейер: хэш исходника, версии правил и словарей, счётчик LLM) | Данила (тимлид) |
-| 2026-10-17 | **Контракт v2** (T-030). Раздел 1: `AuditInfo`, в `Report` — `audit` (обязательное) и `redacted_available` (по умолчанию `false`); `LlmCall` (журнал «что видела нейросеть»); `Metrics`, `TypeMetrics`. Раздел 4: `GET /api/reports/{id}/llm-log`, `GET /api/reports/{id}/redacted`, `GET /api/metrics`; обезличенная копия создаётся до удаления исходника и хранится `REPORT_TTL_DAYS`. Раздел 4.1: правила копии (ПДн удаляются физически, в PDF — редакция; КТ не трогается); `value_masked` у `trade_secret`/`financial` — исходный фрагмент без маскирования. Реализация: T-016 (audit), T-013/T-027b (llm-log), T-026 (redacted), T-028 (metrics). | Данила (тимлид) |
 | 2026-10-16 | Ревью T-001: `Evidence.quote` и `Entity.value_masked` — маскирование с сохранением длины, `quote == ReportText.text[start:end]`. Определено правило маскирования (слово = `\w+`; буквенное слово — первая буква видна; цифровое — скрыто целиком; разделители видны). В раздел 3 добавлена `mask_preserving_length(text, entities) -> str` (T-008). Уточнена `to_original_offset` внутри плейсхолдера; границы цитат LLM расширяются до целых плейсхолдеров (T-013). | Данила (тимлид) |
 | 2026-10-15 | T-001 (правка 2): единая система координат — все смещения в `Report` и `ReportText.segments` в координатах исходного текста; `ReportText.text` — маскирование с сохранением длины (`█`, кроме первой буквы слова). В `MaskResult` добавлено `spans: list[MaskSpan]`, добавлена функция `to_original_offset` (реализация — T-008). Health: `status = "degraded"`, если `db` или `redis` = false (HTTP 200). | Данила (тимлид) |
 | 2026-10-15 | T-001: `GET /api/health` возвращает `HealthStatus {status, db, redis}` вместо `{status}`. Добавлен раздел 4.1 с моделями `TaskCreated`, `QueryRequest`, `ReportText`, `HealthStatus` — раньше эти формы были описаны только в таблице раздела 4 без имён. Поля и смысл ответов не изменились, кроме двух новых полей health. | Данила (тимлид) |
