@@ -114,18 +114,11 @@ def test_export_pdf_still_returns_501(client: TestClient) -> None:
     assert response.json() == {"detail": "Будет реализовано в T-020"}
 
 
-@pytest.mark.parametrize(
-    ("path", "task"),
-    [
-        ("/api/reports/rep_1/redacted", "T-026"),
-    ],
-)
-def test_contract_v2_stubs_return_501_with_task_number(
-    client: TestClient, path: str, task: str
-) -> None:
-    response = client.get(path)
-    assert response.status_code == 501
-    assert task in response.json()["detail"]
+def test_missing_redacted_copy_returns_404(client: TestClient, report_db: Session) -> None:
+    """Заглушка 501 снята в T-026: нет отчёта или копии — 404 по контракту."""
+    response = client.get("/api/reports/rep_1/redacted")
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Обезличенная копия недоступна"}
 
 
 def test_llm_log_response_schema_is_list_of_llm_call(client: TestClient) -> None:

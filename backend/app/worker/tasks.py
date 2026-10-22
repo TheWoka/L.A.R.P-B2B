@@ -9,9 +9,11 @@ from sqlalchemy.orm import Session
 
 from app.db.models import DocumentRow, ReportRow, TaskRow
 from app.db.session import SessionLocal
-from app.schemas import DocPurpose, ExtractedDocument, Stage, TextSegment
+from app.schemas import DocPurpose, Entity, ExtractedDocument, Stage, TextSegment
 from app.services.extraction.extract import extract
 from app.services.pipeline import run_audit
+from app.services.redaction.check import count_leftovers
+from app.services.redaction.redact import RedactedFile, redact
 from app.services.retention import purge_expired
 from app.services.rules import repository
 from app.services.storage import delete_file
@@ -43,6 +45,33 @@ def extract_document(document: DocumentRow) -> ExtractedDocument:
     return extract(path, document.filename, document.id)
 
 
+def make_redacted_copy(
+    source: Path, doc: ExtractedDocument, entities: list[Entity], task_id: str,
+) -> RedactedFile | None:
+    """Обезличенная копия до удаления исходника; None — копию не предлагаем.
+
+    Любая ошибка не ломает проверку. Копия, в которой самопроверка повторным
+    извлечением находит исходное значение ПДн, не отдаётся. В лог — только тип
+    исключения, формат и число оставшихся значений (AGENTS.md, правило 4).
+    """
+    try:
+        redacted = redact(source, doc, entities)
+        remaining = count_leftovers(redacted, doc, entities)
+    except Exception as exc:
+        logger.error("task_id=%s redaction failed exception_type=%s", task_id, type(exc).__name__)
+        return None
+    if remaining:
+        logger.error(
+            "task_id=%s redaction self-check failed: ext=%s remaining_values=%d",
+            task_id, redacted.ext, remaining,
+        )
+        return None
+    logger.info(
+        "task_id=%s redaction=ok ext=%s bytes=%d", task_id, redacted.ext, len(redacted.content),
+    )
+    return redacted
+
+
 def _audit_document(document: DocumentRow, task: TaskRow, session: Session, started: float) -> None:
     """Запускает проверку, фиксирует стадии и сохраняет только безопасный результат."""
     def on_stage(stage: Stage, progress: int) -> None:
@@ -62,10 +91,15 @@ def _audit_document(document: DocumentRow, task: TaskRow, session: Session, star
     rules = repository.list_rules(session)
     result = run_audit(doc, DocPurpose(document.purpose), source_bytes, on_stage, rules=rules)
     report, report_text = result.report, result.report_text
+    redacted = make_redacted_copy(Path(document.stored_path), doc, report.entities, task.id)
+    if redacted is not None:
+        report = report.model_copy(update={"redacted_available": True})
     session.add(ReportRow(
         id=report.report_id, document_id=document.id,
         data=report.model_dump(mode="json"), text=report_text.model_dump(mode="json"),
         llm_log=[call.model_dump(mode="json") for call in result.llm_log],
+        redacted=redacted.content if redacted else None,
+        redacted_ext=redacted.ext if redacted else None,
     ))
     task.status, task.progress, task.report_id = "done", 100, report.report_id
     counts = Counter(entity.type.value for entity in report.entities)
