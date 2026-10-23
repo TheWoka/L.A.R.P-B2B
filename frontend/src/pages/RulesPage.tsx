@@ -6,6 +6,7 @@ import { ApiError, listRules, updateRule } from "../api/client";
 import type { Rule, Severity } from "../api/types";
 import { PURPOSE_LABELS, SEVERITY_LABELS } from "../components/labels";
 import RuleDetails from "../components/RuleDetails";
+import RuleForm from "../components/RuleForm";
 
 type SeverityFilter = "all" | Severity;
 
@@ -21,6 +22,7 @@ export default function RulesPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [editor, setEditor] = useState<{ rule: Rule | null } | null>(null);
   const [query, setQuery] = useState("");
   const [severity, setSeverity] = useState<SeverityFilter>("all");
   const [messageApi, messageContext] = message.useMessage();
@@ -65,7 +67,7 @@ export default function RulesPage() {
 
   const columns: TableColumnsType<Rule> = [
     {
-      title: "ID", dataIndex: "id", key: "id", width: 210,
+      title: "Код", dataIndex: "id", key: "id", width: 210,
       render: (id: string) => <Typography.Text code>{id}</Typography.Text>,
     },
     { title: "Название", dataIndex: "title", key: "title", width: 260 },
@@ -111,6 +113,13 @@ export default function RulesPage() {
         <Typography.Paragraph type="secondary">
           Выключенные правила не применяются к новым проверкам.
         </Typography.Paragraph>
+        <Button
+          type="primary"
+          style={{ marginBottom: 16 }}
+          onClick={() => setEditor({ rule: null })}
+        >
+          Добавить правило
+        </Button>
 
         {loadError ? (
           <Alert
@@ -124,7 +133,7 @@ export default function RulesPage() {
           <>
             <Space wrap style={{ marginBottom: 16 }}>
               <Input.Search
-                placeholder="Поиск по ID или названию"
+                placeholder="Поиск по коду или названию"
                 aria-label="Поиск правил"
                 allowClear
                 value={query}
@@ -160,7 +169,28 @@ export default function RulesPage() {
           </>
         )}
       </Card>
-      <RuleDetails rule={selectedRule} onClose={() => setSelectedId(null)} />
+      <RuleDetails
+        rule={selectedRule}
+        onClose={() => setSelectedId(null)}
+        onEdit={(rule) => { setSelectedId(null); setEditor({ rule }); }}
+        onDeleted={(id) => {
+          setRules((current) => current.filter((rule) => rule.id !== id));
+          setSelectedId(null);
+          void load();
+        }}
+      />
+      {editor && (
+        <RuleForm
+          rule={editor.rule}
+          onCancel={() => setEditor(null)}
+          onSaved={(saved) => {
+            messageApi.success(editor.rule ? "Правило изменено" : "Правило добавлено");
+            setRules((current) => [...current.filter((rule) => rule.id !== saved.id), saved]);
+            setEditor(null);
+            void load();
+          }}
+        />
+      )}
     </>
   );
 }
