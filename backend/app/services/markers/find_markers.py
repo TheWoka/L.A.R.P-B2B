@@ -38,6 +38,12 @@ RETENTION_GOODS_PREFIXES = ("товар", "продукц", "издели", "г�
 WORD_PATTERN = re.compile(r"\w+")
 MARGIN_SECTIONS = frozenset({"Верхний колонтитул", "Нижний колонтитул"})
 CLASSIFICATION_MAX_LENGTH = 80
+CLASSIFICATION_QUOTES = "«»\"'“”„"
+CLASSIFICATION_OWNER_RE = re.compile(
+    r"(?<!\w)(?:ООО|АО|ПАО|ЗАО|ОАО|ИП|ФГУП|ГУП|МУП|ФГБУ|ГБУ|ОГБУ|МБУ|"
+    r"ФКУ|ГКУ|ОГКУ|МКУ|ФГАУ|ГАУ|ОГАУ|МАУ|ФГБОУ|ГБОУ|МБОУ|АНО|НКО|обладатель)(?!\w)",
+    re.IGNORECASE,
+)
 LAW_REFERENCE_DISTANCE = 80  # Максимальное расстояние между краями статьи и 152-ФЗ.
 LABEL_DECORATION = " \t\r\n\v\f\u00a0«»\"'“”„:;,.()[]‐‑–—-"
 ARTICLE_REFERENCE = r"(?P<article>ч\.\s*3\s*ст\.\s*6|части\s+3\s+статьи\s+6)(?![.,]\d)"
@@ -135,7 +141,7 @@ def _is_approval_label(text: str, match: re.Match[str]) -> bool:
 
 
 def _is_classification(text: str, match: re.Match[str], segment: TextSegment | None) -> bool:
-    """Гриф — короткая плашка, колонтитул или фраза из нескольких слов заглавными."""
+    """Гриф — плашка, колонтитул, фраза заглавными либо реквизит с обладателем."""
     quote = match.group()
     if (quote.isupper() and len(quote.split()) >= 2) or (
         segment is not None and segment.section in MARGIN_SECTIONS
@@ -143,7 +149,17 @@ def _is_classification(text: str, match: re.Match[str], segment: TextSegment | N
         return True
     line_start = text.rfind("\n", 0, match.start()) + 1
     line_end = text.find("\n", match.end())
-    units = [text[line_start:line_end if line_end >= 0 else len(text)]]
+    line_end = line_end if line_end >= 0 else len(text)
+    prefix = text[line_start:match.start()]
+    suffix = text[match.end():line_end].lstrip()
+    if (
+        "\n" not in quote
+        and all(char.isspace() or char in CLASSIFICATION_QUOTES for char in prefix)
+        and suffix.startswith((".", ":", "—", ","))
+        and CLASSIFICATION_OWNER_RE.search(suffix[1:]) is not None
+    ):
+        return True
+    units = [text[line_start:line_end]]
     if segment is not None:
         units.append(segment.text)
     return any(
