@@ -10,11 +10,11 @@ interface ViolationsTableProps {
   onShowLaw?: (law: LawRef) => void;
 }
 
-function evidenceLocation(evidence: Evidence): string {
+function evidenceLocation(evidence: Evidence): string | null {
   const parts: string[] = [];
   if (evidence.page !== null) parts.push(`стр. ${evidence.page}`);
   if (evidence.section) parts.push(evidence.section);
-  return parts.join(" · ") || "Место не указано";
+  return parts.length > 0 ? parts.join(" · ") : null;
 }
 
 function LawReference({ law, onShow }: { law: LawRef; onShow?: (law: LawRef) => void }) {
@@ -94,7 +94,9 @@ export default function ViolationsTable({ violations, onSelectEvidence, onShowLa
             <List
               size="small"
               dataSource={record.evidence}
-              renderItem={(evidence, index) => (
+              renderItem={(evidence, index) => {
+                const location = evidenceLocation(evidence);
+                return (
                 <List.Item key={`${evidence.start}-${evidence.end}-${index}`}>
                   <div style={{ width: "100%" }}>
                     {onSelectEvidence ? (
@@ -102,13 +104,16 @@ export default function ViolationsTable({ violations, onSelectEvidence, onShowLa
                         {evidence.quote || "Показать фрагмент в тексте"}
                       </Button>
                     ) : <Typography.Text>{evidence.quote}</Typography.Text>}
-                    <br />
-                    <Typography.Text type="secondary">
-                      {evidenceLocation(evidence)}
-                    </Typography.Text>
+                    {location && (
+                      <>
+                        <br />
+                        <Typography.Text type="secondary">{location}</Typography.Text>
+                      </>
+                    )}
                   </div>
                 </List.Item>
-              )}
+                );
+              }}
             />
           ) : (
             <Typography.Text type="secondary">Цитаты не указаны.</Typography.Text>

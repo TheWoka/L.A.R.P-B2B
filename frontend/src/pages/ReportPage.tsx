@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Alert, Button, Card, Col, Descriptions, Modal, Result, Row, Skeleton, Space, Statistic, Tag, Typography } from "antd";
 import { useNavigate, useParams } from "react-router-dom";
 
-import { ApiError, getReport, getReportText } from "../api/client";
+import { ApiError, exportUrl, getReport, getReportText, redactedUrl } from "../api/client";
 import type { DocPurpose, Evidence, LawRef, Report, ReportText } from "../api/types";
 import Checklist from "../components/Checklist";
 import DocumentText from "../components/DocumentText";
@@ -77,6 +77,28 @@ export default function ReportPage() {
         </Typography.Paragraph>
         {!report.llm_used && <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>Смысловые проверки нейросетью не выполнялись (режим без LLM).</Typography.Paragraph>}
         <Descriptions column={{ xs: 1, sm: 2, md: 2 }} items={details} />
+        {reportId !== "example" && (
+          <div style={{ marginTop: 20 }}>
+            <Space wrap>
+              <Button
+                type="primary"
+                href={report.redacted_available ? redactedUrl(report.report_id) : undefined}
+                disabled={!report.redacted_available}
+              >
+                Скачать обезличенную копию
+              </Button>
+              <Button href={exportUrl(report.report_id)}>Скачать отчёт (JSON)</Button>
+            </Space>
+            {!report.redacted_available && (
+              <Typography.Paragraph type="secondary" style={{ margin: "8px 0 0" }}>
+                Копия недоступна: в документе не нашлось персональных данных или её не удалось безопасно сделать.
+              </Typography.Paragraph>
+            )}
+            <Typography.Paragraph type="secondary" style={{ margin: "8px 0 0", fontSize: 12 }}>
+              Персональные данные удалены из файла, их нельзя скопировать. Коммерческая тайна оставлена.
+            </Typography.Paragraph>
+          </div>
+        )}
         <Row gutter={[12, 12]} style={{ marginTop: 20 }}>
           <Col xs={12} md={8}>
             <Card size="small">
