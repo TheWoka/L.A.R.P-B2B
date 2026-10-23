@@ -7,7 +7,11 @@ from pathlib import Path
 import pytest
 
 # До импорта приложения: тесты всегда в режиме mock, без ключей (AGENTS.md, правило 7).
-os.environ.setdefault("LLM_PROVIDER", "mock")
+# Присваивание, а не setdefault: docker-compose run подставляет .env с реальным провайдером,
+# и тесты не должны уходить во внешний API (деньги, лимиты, данные наружу).
+os.environ["LLM_PROVIDER"] = "mock"
+for _name in ("LLM_BASE_URL", "LLM_API_KEY", "LLM_MODEL"):
+    os.environ.pop(_name, None)
 
 from fastapi.testclient import TestClient  # noqa: E402
 

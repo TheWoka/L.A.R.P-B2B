@@ -46,6 +46,7 @@ class _EvalState:
 
     ctx: RuleContext
     rule_id: str = ""
+    condition: object = None  # условие текущего правила — для подсказок окнам LLM (T-013c)
     _report_text: str | None = field(default=None, repr=False)
 
     @property
@@ -101,7 +102,7 @@ def evaluate(rules: list[Rule], ctx: RuleContext) -> list[Violation]:
     for rule in rules:
         if not rule.enabled or (rule.applies_to and ctx.purpose not in rule.applies_to):
             continue
-        state.rule_id = rule.id
+        state.rule_id, state.condition = rule.id, rule.condition
         try:
             validate_condition(rule.condition)
             matched, evidence = _check_condition(rule.condition, state)
@@ -225,17 +226,45 @@ def _check_llm(question: str, state: _EvalState) -> ConditionResult:
         logger.debug("LLM-условие правила %s: режим mock, ответ unknown", state.rule_id)
         return False, []
     ctx = state.ctx
-    evidence, call = check_llm_condition(
+    evidence, calls = check_llm_condition(
         question, ctx.masked_text, ctx.mask_spans, state.rule_id,
         report_text=state.report_text,
+        priority_offsets=_marker_offsets(state.condition, ctx),
     )
-    record_llm_call(call)
+    for call in calls:
+        record_llm_call(call)
     if evidence is None:
         return False, []
     segment = _segment_at(ctx.doc.segments, evidence.start)
     if segment is not None:
         evidence = evidence.model_copy(update={"page": segment.page, "section": segment.section})
     return True, [evidence]
+
+
+def _marker_offsets(condition: object, ctx: RuleContext) -> list[int]:
+    """Начала evidence найденных маркеров из marker_present того же правила (T-013c).
+
+    Окно LLM, где стоит такой маркер, спрашивается первым: для SECURITY_MEASURES_VAGUE —
+    раздел о поручении обработки ПДн, для KII_INCIDENTS_NOT_REGULATED — упоминание КИИ.
+    """
+    names = set(_marker_names(condition))
+    return [
+        marker.evidence.start for marker in ctx.markers
+        if marker.present and marker.evidence is not None and marker.type.value in names
+    ]
+
+
+def _marker_names(condition: object) -> list[str]:
+    """Имена маркеров из листьев marker_present вне not (форма проверена validate_condition)."""
+    if not isinstance(condition, dict):
+        return []
+    if condition.get("type") == "marker_present":
+        return [str(condition.get("marker"))]
+    nested: list[object] = []
+    for key in ("all", "any"):
+        child = condition.get(key)
+        nested.extend(child if isinstance(child, list) else [])
+    return [name for item in nested for name in _marker_names(item)]
 
 
 def _segment_at(segments: list[TextSegment], offset: int) -> TextSegment | None:
