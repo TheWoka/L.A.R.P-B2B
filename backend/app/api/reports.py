@@ -69,7 +69,13 @@ def export_report(
     report_id: str, session: DbSession, format: Literal["json", "pdf"] = "json",
 ) -> Response:
     if format == "pdf":
-        raise HTTPException(status_code=501, detail=NOT_IMPLEMENTED_PDF)
+        from app.services.report.pdf_export import render_report_pdf
+
+        report = get_report(report_id, session)
+        return Response(
+            content=render_report_pdf(report), media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="report_{report_id}.pdf"'},
+        )
     report = get_report(report_id, session)
     return Response(
         content=json.dumps(report.model_dump(mode="json"), ensure_ascii=False, indent=2),
