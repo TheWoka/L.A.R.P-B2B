@@ -22,9 +22,10 @@ export default function App() {
   return (
     <Layout style={{ minHeight: "100vh" }}>
       <Header style={{ display: "flex", alignItems: "center", gap: 32 }}>
-        <Typography.Title level={4} style={{ color: "#fff", margin: 0, whiteSpace: "nowrap" }}>
-          ИИ-аудитор документов
-        </Typography.Title>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 10, whiteSpace: "nowrap" }}>
+          <Typography.Title level={3} style={{ color: "#fff", margin: 0 }}>Гриф</Typography.Title>
+          <Typography.Text style={{ color: "#d9d9d9", fontSize: 12 }}>ИИ-аудитор документов</Typography.Text>
+        </div>
         <Menu
           theme="dark"
           mode="horizontal"
