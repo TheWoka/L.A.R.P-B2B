@@ -1,7 +1,7 @@
 """Конвейер проверки: исходный текст и mapping остаются только в памяти."""
 
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from hashlib import sha256
 from importlib.metadata import version
@@ -15,8 +15,10 @@ from app.core.version import APP_VERSION
 from app.schemas import (
     AuditInfo,
     DocPurpose,
+    Entity,
     ExtractedDocument,
     LlmCall,
+    MaskResult,
     Report,
     ReportText,
     Rule,
@@ -26,12 +28,16 @@ from app.services.detection.detect import detect
 from app.services.llm import client
 from app.services.llm.checks import llm_call_log
 from app.services.llm.client import CallBudget, llm_call_budget
+from app.services.llm.special_category import detect_special_llm
 from app.services.llm.trade_secret import detect_trade_secrets_llm
 from app.services.markers.find_markers import find_markers
 from app.services.masking.masker import mask, mask_preserving_length
 from app.services.report.builder import build_report
 from app.services.rules.engine import RuleContext, evaluate
 from app.services.rules.loader import load_rules
+
+# Назначения журнала, при которых нейросеть сама ищет сущности (а не проверяет условие правила).
+LLM_SEARCH_PURPOSES = frozenset({"trade_secret", "special_category"})
 
 
 @dataclass
@@ -56,11 +62,24 @@ def _version_hash(data: object) -> str:
     return sha256(canonical.encode("utf-8")).hexdigest()[:12]
 
 
-def build_audit(source_bytes: bytes, rules: list[Rule], budget: CallBudget) -> AuditInfo:
-    """Фиксирует версии входов и фактический счётчик обращений к LLM без ПДн."""
+def build_audit(
+    source_bytes: bytes, rules: list[Rule], budget: CallBudget,
+    llm_log: Sequence[LlmCall] = (),
+) -> AuditInfo:
+    """Фиксирует версии входов и фактический счётчик обращений к LLM без ПДн.
+
+    T-013e: если нейросеть искала сущности в этом документе (в журнале есть запись КТ или
+    особых категорий с отправленным текстом, в том числе из кэша) — в detectors "llm:<модель>".
+    """
     with _rules_path("dictionaries.yaml").open(encoding="utf-8") as stream:
         dictionaries = yaml.safe_load(stream)
     enabled = client.is_llm_enabled()
+    model = get_settings().llm_model if enabled else None
+    detectors = ["regex", f"ner:natasha-{version('natasha')}", "dict"]
+    if enabled and any(
+        call.purpose in LLM_SEARCH_PURPOSES and call.masked_fragment for call in llm_log
+    ):
+        detectors.append(f"llm:{model}")
     return AuditInfo(
         document_sha256=sha256(source_bytes).hexdigest(),
         ruleset_version=_version_hash([
@@ -68,11 +87,25 @@ def build_audit(source_bytes: bytes, rules: list[Rule], budget: CallBudget) -> A
         ]),
         dictionaries_version=_version_hash(dictionaries),
         app_version=APP_VERSION,
-        detectors=["regex", f"ner:natasha-{version('natasha')}", "dict"],
+        detectors=detectors,
         llm_provider="openai_compatible" if enabled else "mock",
-        llm_model=get_settings().llm_model if enabled else None,
+        llm_model=model,
         llm_calls=budget.used,
     )
+
+
+def _find_special_llm(
+    doc: ExtractedDocument, masked: MaskResult, entities: list[Entity],
+) -> tuple[list[Entity], MaskResult]:
+    """T-013e: особые категории через LLM на первом masked_text; есть находки — маска заново.
+
+    Находка — ПДн (pd_special): все следующие вызовы LLM (КТ, условия правил) получают
+    текст, где она уже заменена плейсхолдером. mock → ничего не делает, повторной маски нет.
+    """
+    found = detect_special_llm(doc, masked, entities)
+    if len(found) == len(entities):
+        return entities, masked
+    return found, mask(doc.text, found)
 
 
 def run_audit(
@@ -89,22 +122,23 @@ def run_audit(
     if on_stage is not None:
         on_stage(Stage.masking, 55)
     masked = mask(doc.text, entities)
-    text = mask_preserving_length(doc.text, entities)
     if on_stage is not None:
         on_stage(Stage.checking, 70)
     if rules is None:
         rules = load_rules(_rules_path("rules.yaml"))
     with llm_call_budget() as budget, llm_call_log() as llm_log:
-        # T-013d: КТ через LLM — до правил, бюджет общий; КТ не маскируется, masked/text те же.
+        entities, masked = _find_special_llm(doc, masked, entities)
+        # T-013d: КТ через LLM — до правил, бюджет общий; КТ не маскируется, masked тот же.
         entities = detect_trade_secrets_llm(doc, masked, entities)
         ctx = RuleContext(
             doc=doc, masked_text=masked.masked_text,
             entities=entities, markers=markers, purpose=purpose, mask_spans=masked.spans,
         )
         violations = evaluate(rules, ctx)
+    text = mask_preserving_length(doc.text, entities)
     if on_stage is not None:
         on_stage(Stage.reporting, 90)
-    audit = build_audit(source_bytes, rules, budget)
+    audit = build_audit(source_bytes, rules, budget, llm_log)
     llm_used = audit.llm_provider == "openai_compatible" and audit.llm_calls > 0
     report = build_report(ctx, violations, int((monotonic() - started) * 1000), llm_used, audit)
     segments = [segment.model_copy(update={

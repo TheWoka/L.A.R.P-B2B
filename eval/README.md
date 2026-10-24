@@ -26,15 +26,20 @@ docker-compose run --rm --no-deps -v "${PWD}/eval:/eval" api python /eval/run_ev
 Код 2 — ошибка в корпусе (неизвестный тип, вложенная разметка, нет пары `.json` и т.п.)
 или `--llm` без настроенной нейросети.
 
-### Флаг `--llm` — коммерческая тайна нейросетью (T-013d)
+### Флаг `--llm` — особые категории ПДн и коммерческая тайна нейросетью (T-013e, T-013d)
 
-С флагом к обычной детекции добавляется тот же шаг, что в конвейере: `detect` → `mask` →
-`detect_trade_secrets_llm`. Нейросеть видит только замаскированные строки-кандидаты и предлагает
-цитаты; находка засчитывается, только если цитата дословно есть в тексте (подробно —
+С флагом к обычной детекции добавляются те же шаги и в том же порядке, что в конвейере:
+`detect` → `mask` → `detect_special_llm` (особые категории ПДн, ст. 10 152-ФЗ) → если что-то
+найдено, `mask` заново (находка — ПДн, дальше её не видит ни один вызов) →
+`detect_trade_secrets_llm`. Особые категории: в LLM уходят только строки с привязкой к
+человеку (`[PERSON_n]` рядом, «работник», «он» …), до 2 пакетов на документ
+(`backend/app/services/llm/special_category.py`).
+Нейросеть видит только замаскированные строки-кандидаты и предлагает цитаты; находка засчитывается, только если цитата дословно есть в тексте (подробно —
 `backend/app/services/llm/trade_secret.py`). Лимит — `LLM_MAX_CALLS_PER_DOC` на документ.
 
 ```powershell
-docker-compose run --rm --no-deps -v "${PWD}/eval:/eval" api python /eval/run_eval.py --corpus /eval/seed --out /eval/results/seed-llm --llm
+docker-compose up -d redis
+docker-compose run --rm -v "${PWD}/eval:/eval" -v "${PWD}/eval/results:/out" api python /eval/run_eval.py --corpus /eval/seed --out /out/seed-llm --llm
 ```
 
 - `metrics.json` получает `corpus` с суффиксом « + LLM» (`seed + LLM`), чтобы страница
@@ -43,7 +48,8 @@ docker-compose run --rm --no-deps -v "${PWD}/eval:/eval" api python /eval/run_ev
 
 > ⚠️ **Нужен ключ в `.env`** (`LLM_PROVIDER=openai_compatible`, `LLM_BASE_URL`, `LLM_API_KEY`,
 > `LLM_MODEL`). Без него скрипт завершится с кодом 2 и ничего не посчитает.
-> **Вызовы платные:** до 3 запросов на документ (на `eval/seed` — около 21 запроса на 31 документ).
+> **Вызовы платные:** до 5 запросов на документ — до 2 на особые категории и до 3 на КТ
+> (на `eval/seed` по расчёту отбора кандидатов — 26 + 21 = 47 запросов на 31 документ).
 > Повторный прогон того же корпуса идёт из кэша Redis бесплатно — если Redis запущен
 > (`docker-compose up -d redis`); с `--no-deps` без Redis кэша нет и каждый прогон платный.
 > **`eval/blind`** прогоняется с `--llm` один раз, в самом конце; настраивать промпт по нему нельзя.
