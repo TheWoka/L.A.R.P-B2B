@@ -20,11 +20,12 @@ from typing import Any
 import httpx
 from pydantic import BaseModel, ValidationError
 
-from app.core.config import Settings
+from app.core.config import DEFAULT_LLM_TIMEOUT_S, Settings
 
 logger = logging.getLogger(__name__)
 
-REQUEST_TIMEOUT_S = 30.0
+# Значение по умолчанию; фактический таймаут — Settings.llm_timeout_s (LLM_TIMEOUT_S, T-029b).
+REQUEST_TIMEOUT_S = DEFAULT_LLM_TIMEOUT_S
 MAX_HTTP_ATTEMPTS = 3
 RETRY_DELAYS_S: tuple[float, ...] = (1.0, 3.0)
 _MAX_MOCK_DEPTH = 20
@@ -202,7 +203,8 @@ def request_chat(
     """POST {LLM_BASE_URL}/chat/completions с повторами при 429/5xx и сетевых ошибках.
 
     Не больше MAX_HTTP_ATTEMPTS попыток, паузы RETRY_DELAYS_S. Другие 4xx — сразу
-    LLMRequestError. Возвращает текст ответа и usage.
+    LLMRequestError. Таймаут каждой попытки — settings.llm_timeout_s (LLM_TIMEOUT_S).
+    Возвращает текст ответа и usage.
     """
     url = settings.llm_base_url.rstrip("/") + "/chat/completions"
     body = {
@@ -212,7 +214,7 @@ def request_chat(
         "response_format": {"type": "json_object"},
     }
     headers = {"Authorization": f"Bearer {settings.llm_api_key}"}
-    with httpx.Client(transport=transport, timeout=REQUEST_TIMEOUT_S) as http:
+    with httpx.Client(transport=transport, timeout=settings.llm_timeout_s) as http:
         for attempt in range(1, MAX_HTTP_ATTEMPTS + 1):
             status = _send_once(http, url, body, headers, attempt)
             if isinstance(status, httpx.Response):

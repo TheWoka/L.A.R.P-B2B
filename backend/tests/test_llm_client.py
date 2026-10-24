@@ -11,7 +11,7 @@ from typing import Literal
 
 import httpx
 import pytest
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from app.core.config import Settings, get_settings
 from app.services.llm import client as llm_client
@@ -456,3 +456,76 @@ def test_logs_contain_no_prompt_answer_or_key(
     assert "LLM вызов" in text and "cache_hit=True" in text and "total_tokens=15" in text
     for secret in (USER_TEXT, "zebra-42", SYSTEM, FAKE_KEY, answer_quote, "мусор"):
         assert secret not in text
+
+
+# ------------------------------------------- таймаут LLM_TIMEOUT_S (T-029b) ---
+
+
+def _timeouts(request: httpx.Request) -> dict[str, float | None]:
+    """Таймауты httpx, с которыми ушёл запрос (connect/read/write/pool)."""
+    return dict(request.extensions["timeout"])
+
+
+def test_timeout_default_is_request_timeout_constant(no_sleep: list[float]) -> None:
+    from app.services.llm.providers import REQUEST_TIMEOUT_S
+
+    fake = FakeLLM([ok({"answer": False, "quote": ""})])
+    call(fake, MemoryCache(), no_sleep)
+    assert REQUEST_TIMEOUT_S == 30.0
+    assert set(_timeouts(fake.requests[0]).values()) == {REQUEST_TIMEOUT_S}
+
+
+def test_timeout_from_env_reaches_httpx_client(
+    monkeypatch: pytest.MonkeyPatch, no_sleep: list[float],
+) -> None:
+    monkeypatch.setenv("LLM_TIMEOUT_S", "120")
+    settings = real_settings()  # llm_timeout_s не передаём — значение только из окружения
+    assert settings.llm_timeout_s == 120.0
+    fake = FakeLLM([ok({"answer": False, "quote": ""})])
+    call(fake, MemoryCache(), no_sleep, settings=settings)
+    assert set(_timeouts(fake.requests[0]).values()) == {120.0}
+
+
+def test_timeout_fractional_value_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LLM_TIMEOUT_S", "0.5")
+    assert real_settings().llm_timeout_s == 0.5
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "-0.5", "abc", "inf", "nan"])
+def test_timeout_invalid_value_is_settings_error(
+    monkeypatch: pytest.MonkeyPatch, value: str,
+) -> None:
+    monkeypatch.setenv("LLM_TIMEOUT_S", value)
+    with pytest.raises(ValidationError):
+        real_settings()
+
+
+def test_timeout_exhausts_attempts_and_is_not_cached(no_sleep: list[float]) -> None:
+    fake = FakeLLM([httpx.ReadTimeout("t")] * 3)
+    cache = MemoryCache()
+    with pytest.raises(LLMRequestError, match="таймаут"):
+        call(fake, cache, no_sleep, settings=real_settings(llm_timeout_s=0.01))
+    assert len(fake.requests) == 3 and no_sleep == [1.0, 3.0]
+    assert cache.data == {}
+
+
+def test_timeout_in_condition_gives_unknown_without_exception(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.services.llm import checks, providers
+
+    settings = real_settings(llm_timeout_s=0.01)
+    fake = FakeLLM([httpx.ReadTimeout("t")] * 3)
+
+    def request_chat(s: Settings, messages: list[dict[str, str]], **_: object) -> object:
+        return providers.request_chat(s, messages, transport=fake.transport, sleep=lambda _: None)
+
+    monkeypatch.setattr(llm_client, "get_settings", lambda: settings)
+    monkeypatch.setattr(llm_client, "get_default_cache", lambda url: MemoryCache())
+    monkeypatch.setattr(llm_client, "request_chat", request_chat)
+    text = "Исполнитель принимает необходимые меры для защиты сведений."
+    with llm_call_budget() as budget:
+        outcome = checks.ask_condition("Меры описаны конкретно?", text, [], "R1", report_text=text)
+    assert outcome.verdict == "unknown" and outcome.evidence is None
+    assert [c.verdict for c in outcome.calls] == ["unknown"]
+    assert budget.used == 1 and len(fake.requests) == 3
