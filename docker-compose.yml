@@ -15,6 +15,19 @@ services:
       retries: 6
       start_period: 10s
     restart: unless-stopped
+    # Контекст модели. По умолчанию Ollama на CPU берёт 4096 токенов; если compare_models.py
+    # предупреждает о max total_tokens ≥ 3686, раскомментируйте (T-029b, docs/local-llm.md).
+    # environment:
+    #   - OLLAMA_CONTEXT_LENGTH=8192
+    # GPU NVIDIA (по умолчанию — CPU). Нужны драйвер NVIDIA и WSL2-бэкенд Docker Desktop;
+    # как включить и проверить — docs/local-llm.md, раздел «Какую модель выбрать» (T-029b).
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
 
   postgres:
     image: pgvector/pgvector:pg16

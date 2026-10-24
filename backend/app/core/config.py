@@ -7,7 +7,12 @@
 from functools import lru_cache
 from typing import Literal
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Таймаут одного запроса к LLM по умолчанию, секунды (LLM_TIMEOUT_S, T-029b).
+# providers.REQUEST_TIMEOUT_S ссылается на это же значение.
+DEFAULT_LLM_TIMEOUT_S = 30.0
 
 
 class Settings(BaseSettings):
@@ -35,6 +40,9 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     llm_model: str = ""
     llm_max_calls_per_doc: int = 30
+    # Таймаут одного HTTP-запроса к LLM, секунды; > 0, конечное число.
+    # Для локальной модели на CPU — 120 (docs/local-llm.md).
+    llm_timeout_s: float = Field(default=DEFAULT_LLM_TIMEOUT_S, gt=0, allow_inf_nan=False)
 
     # --- Прочее ---
     embedding_model: str = "intfloat/multilingual-e5-small"
