@@ -3,6 +3,7 @@ import { Alert, Button, Card, Col, Descriptions, Modal, Result, Row, Skeleton, S
 import { useNavigate, useParams } from "react-router-dom";
 
 import { ApiError, exportUrl, getReport, getReportText, redactedUrl } from "../api/client";
+import TransparencyPanel from "../components/TransparencyPanel";
 import type { DocPurpose, Evidence, LawRef, Report, ReportText } from "../api/types";
 import Checklist from "../components/Checklist";
 import DocumentText from "../components/DocumentText";
@@ -138,6 +139,8 @@ export default function ReportPage() {
         </Typography.Paragraph>
         <EntitiesTable entities={report.entities} stats={report.stats} />
       </Card>
+
+      <TransparencyPanel key={report.report_id} report={report} example={reportId === "example"} />
 
       <Button size="large" onClick={() => navigate("/")}>Проверить другой документ</Button>
 
