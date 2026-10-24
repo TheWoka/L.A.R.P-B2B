@@ -26,6 +26,7 @@ from app.services.detection.detect import detect
 from app.services.llm import client
 from app.services.llm.checks import llm_call_log
 from app.services.llm.client import CallBudget, llm_call_budget
+from app.services.llm.trade_secret import detect_trade_secrets_llm
 from app.services.markers.find_markers import find_markers
 from app.services.masking.masker import mask, mask_preserving_length
 from app.services.report.builder import build_report
@@ -93,11 +94,13 @@ def run_audit(
         on_stage(Stage.checking, 70)
     if rules is None:
         rules = load_rules(_rules_path("rules.yaml"))
-    ctx = RuleContext(
-        doc=doc, masked_text=masked.masked_text,
-        entities=entities, markers=markers, purpose=purpose, mask_spans=masked.spans,
-    )
     with llm_call_budget() as budget, llm_call_log() as llm_log:
+        # T-013d: КТ через LLM — до правил, бюджет общий; КТ не маскируется, masked/text те же.
+        entities = detect_trade_secrets_llm(doc, masked, entities)
+        ctx = RuleContext(
+            doc=doc, masked_text=masked.masked_text,
+            entities=entities, markers=markers, purpose=purpose, mask_spans=masked.spans,
+        )
         violations = evaluate(rules, ctx)
     if on_stage is not None:
         on_stage(Stage.reporting, 90)
