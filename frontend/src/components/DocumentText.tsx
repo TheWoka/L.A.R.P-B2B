@@ -28,9 +28,9 @@ export default function DocumentText({ document, entities, selected }: Props) {
   const offsets = [...boundaries].sort((a, b) => a - b);
 
   return (
-    <Card id="document-text" title="Текст документа">
+    <Card id="document-text" title="Текст документа" style={{ minWidth: 0 }}>
       <Alert type="info" showIcon title="Персональные данные скрыты" description="Подсветка и цитаты относятся к замаскированному тексту." style={{ marginBottom: 16 }} />
-      <Typography.Text style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere", lineHeight: 1.8 }}>
+      <Typography.Text style={{ display: "block", maxWidth: "100%", whiteSpace: "pre-wrap", overflowWrap: "anywhere", lineHeight: 1.8 }}>
         {offsets.slice(0, -1).map((start, index) => {
           const end = offsets[index + 1];
           const isSelected = selected != null && start >= selected.start && end <= selected.end;

@@ -1,4 +1,4 @@
-import { Space, Table, Tag, Typography } from "antd";
+import { Card, Grid, List, Space, Table, Tag, Typography } from "antd";
 import type { TableColumnsType } from "antd";
 
 import type { Entity, EntityType } from "../api/types";
@@ -17,6 +17,7 @@ function entityLocation(entity: Entity): string {
 }
 
 export default function EntitiesTable({ entities, stats }: EntitiesTableProps) {
+  const screens = Grid.useBreakpoint();
   const columns: TableColumnsType<Entity> = [
     {
       title: "Тип",
@@ -29,7 +30,7 @@ export default function EntitiesTable({ entities, stats }: EntitiesTableProps) {
       title: "Значение",
       dataIndex: "value_masked",
       key: "value_masked",
-      render: (value: string) => <Typography.Text code>{value}</Typography.Text>,
+      render: (value: string) => <Typography.Text code style={{ whiteSpace: "normal", overflowWrap: "anywhere" }}>{value}</Typography.Text>,
     },
     {
       title: "Где",
@@ -54,14 +55,33 @@ export default function EntitiesTable({ entities, stats }: EntitiesTableProps) {
           </Tag>
         ))}
       </Space>
-      <Table<Entity>
-        rowKey={(entity) => `${entity.type}-${entity.start}-${entity.end}`}
-        columns={columns}
-        dataSource={entities}
-        pagination={{ pageSize: 5, hideOnSinglePage: true }}
-        scroll={{ x: 650 }}
-        locale={{ emptyText: "Чувствительные данные не найдены" }}
-      />
+      {!screens.md ? (
+        <List<Entity>
+          dataSource={entities}
+          pagination={{ pageSize: 5, hideOnSinglePage: true }}
+          locale={{ emptyText: "Чувствительные данные не найдены" }}
+          renderItem={(entity) => (
+            <List.Item key={`${entity.type}-${entity.start}-${entity.end}`} style={{ display: "block", padding: "0 0 12px" }}>
+              <Card size="small" style={{ minWidth: 0 }}>
+                <Space orientation="vertical" size="small" style={{ width: "100%", minWidth: 0 }}>
+                  <Typography.Text strong>{ENTITY_TYPE_LABELS[entity.type] ?? entity.type}</Typography.Text>
+                  <Typography.Text code style={{ whiteSpace: "normal", overflowWrap: "anywhere" }}>{entity.value_masked}</Typography.Text>
+                  <Typography.Text type="secondary" style={{ overflowWrap: "anywhere" }}>{entityLocation(entity)}</Typography.Text>
+                </Space>
+              </Card>
+            </List.Item>
+          )}
+        />
+      ) : (
+        <Table<Entity>
+          rowKey={(entity) => `${entity.type}-${entity.start}-${entity.end}`}
+          columns={columns}
+          dataSource={entities}
+          pagination={{ pageSize: 5, hideOnSinglePage: true }}
+          scroll={{ x: 650 }}
+          locale={{ emptyText: "Чувствительные данные не найдены" }}
+        />
+      )}
     </Space>
   );
 }
