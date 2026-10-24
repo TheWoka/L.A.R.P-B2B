@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Button, Card, Input, message, Segmented, Skeleton, Space, Switch, Table, Tag, Typography } from "antd";
+import { Alert, Button, Card, Grid, Input, List, message, Segmented, Skeleton, Space, Switch, Table, Tag, Typography } from "antd";
 import type { TableColumnsType } from "antd";
 
 import { ApiError, listRules, updateRule } from "../api/client";
@@ -17,6 +17,7 @@ function errorText(error: unknown): string {
 }
 
 export default function RulesPage() {
+  const screens = Grid.useBreakpoint();
   const [rules, setRules] = useState<Rule[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -106,20 +107,15 @@ export default function RulesPage() {
   ];
 
   return (
-    <>
+    <div className="page-container rules-page">
       {messageContext}
+      <div className="page-eyebrow">Гриф / Правила проверки</div>
+      <header className="page-heading">
+        <h1>Правила проверки</h1>
+        <p>Выключенные правила не применяются к новым проверкам.</p>
+      </header>
+      <Button type="primary" className="rules-add-button" onClick={() => setEditor({ rule: null })}>Добавить правило</Button>
       <Card>
-        <Typography.Title level={2} style={{ marginTop: 0 }}>Правила проверки</Typography.Title>
-        <Typography.Paragraph type="secondary">
-          Выключенные правила не применяются к новым проверкам.
-        </Typography.Paragraph>
-        <Button
-          type="primary"
-          style={{ marginBottom: 16 }}
-          onClick={() => setEditor({ rule: null })}
-        >
-          Добавить правило
-        </Button>
 
         {loadError ? (
           <Alert
@@ -151,7 +147,31 @@ export default function RulesPage() {
                 onChange={setSeverity}
               />
             </Space>
-            {loading && rules.length === 0 ? <Skeleton active paragraph={{ rows: 8 }} /> : (
+            {loading && rules.length === 0 ? <Skeleton active paragraph={{ rows: 8 }} /> : !screens.md ? (
+              <List<Rule>
+                dataSource={filteredRules}
+                pagination={{ pageSize: 10, hideOnSinglePage: true }}
+                locale={{ emptyText: "Правила не найдены" }}
+                renderItem={(rule) => (
+                  <List.Item key={rule.id} style={{ display: "block", padding: "0 0 10px" }}>
+                    <Card size="small" className="rule-mobile-card">
+                      <Button type="text" className="rule-mobile-open" onClick={() => setSelectedId(rule.id)}>
+                        <Typography.Text code>{rule.id}</Typography.Text>
+                        <Typography.Text strong style={{ whiteSpace: "normal", overflowWrap: "anywhere" }}>{rule.title}</Typography.Text>
+                        <Tag color={rule.severity === "red" ? "red" : "gold"}>{SEVERITY_LABELS[rule.severity]}</Tag>
+                      </Button>
+                      <Switch
+                        checked={rule.enabled}
+                        loading={pendingId === rule.id}
+                        disabled={pendingId !== null && pendingId !== rule.id}
+                        onChange={() => { void toggleRule(rule); }}
+                        aria-label={`${rule.enabled ? "Выключить" : "Включить"} правило ${rule.id}`}
+                      />
+                    </Card>
+                  </List.Item>
+                )}
+              />
+            ) : (
               <Table<Rule>
                 rowKey="id"
                 columns={columns}
@@ -191,6 +211,6 @@ export default function RulesPage() {
           }}
         />
       )}
-    </>
+    </div>
   );
 }
