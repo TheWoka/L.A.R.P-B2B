@@ -2,6 +2,20 @@
 # Ключ "version" не указываем: он устарел и вызывает предупреждение в Compose v2.
 
 services:
+  ollama:
+    image: ollama/ollama:0.13.5
+    profiles: ["local-llm"]
+    volumes:
+      - ollama_models:/root/.ollama
+    # Порт не публикуется на хост: api/worker обращаются по сети Compose.
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    restart: unless-stopped
+
   postgres:
     image: pgvector/pgvector:pg16
     env_file: .env
@@ -70,5 +84,6 @@ services:
     restart: unless-stopped
 
 volumes:
+  ollama_models:
   pgdata:
   uploads:
