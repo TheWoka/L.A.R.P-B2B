@@ -452,6 +452,9 @@ def test_worker_saves_llm_log_and_api_returns_it(
     response = client.get(f"/api/reports/{task.report_id}/llm-log")
     assert response.status_code == 200
     calls = [LlmCall.model_validate(item) for item in response.json()]
+    # T-013e: в журнале есть и шаг особых категорий (строка с [PERSON_1] — кандидат)
+    assert [call.purpose for call in calls] == ["special_category", "rule_condition"]
+    calls = [call for call in calls if call.purpose == "rule_condition"]
     assert len(calls) == 1 and calls[0].verdict == "yes"
     assert "[PERSON_1]" in calls[0].masked_fragment
     for secret in (NAME, PHONE, "Сидоров"):
@@ -491,7 +494,10 @@ def test_provider_failure_does_not_break_pipeline(
     real_llm(Mock(side_effect=LLMRequestError("сбой")))
     task = run_worker(db, tmp_path, monkeypatch)
     calls = client.get(f"/api/reports/{task.report_id}/llm-log").json()
-    assert [call["verdict"] for call in calls] == ["unknown"]
+    # T-013e: сбой и на шаге особых категорий — тоже unknown, без исключения
+    assert [(call["purpose"], call["verdict"]) for call in calls] == [
+        ("special_category", "unknown"), ("rule_condition", "unknown"),
+    ]
     assert client.get(f"/api/reports/{task.report_id}").json()["violations"] == []
 
 

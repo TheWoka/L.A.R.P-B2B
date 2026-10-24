@@ -173,7 +173,7 @@ class Report(BaseModel):
 
 # ---------- «Что видела нейросеть»: журнал вызовов LLM (schemas/llm_log.py) ----------
 class LlmCall(BaseModel):
-    purpose: Literal["rule_condition", "trade_secret"]
+    purpose: Literal["rule_condition", "trade_secret", "special_category"]
     rule_id: str | None              # для purpose="rule_condition", иначе None
     question: str
     masked_fragment: str             # РОВНО тот текст, что ушёл в LLM: только замаскированный ([PERSON_1] …)
@@ -439,6 +439,7 @@ REPORT_TTL_DAYS=7
 
 | Дата | Что изменилось | Кто решил |
 |---|---|---|
+| 2026-10-24 | LlmCall.purpose += special_category (T-013e) | Данила (тимлид) |
 | 2026-10-22 | Раздел 2: зафиксирован запрет условия `llm` внутри `not` (уже реализован в T-013b, `validate_condition`). Поведение кода не меняется. | Данила (тимлид) |
 | 2026-10-21 | T-013b: RuleContext.mask_spans для перевода цитат LLM | Данила (тимлид) |
 | 2026-10-17 | T-009b: build_report принимает audit: AuditInfo (собирает конвейер: хэш исходника, версии правил и словарей, счётчик LLM) | Данила (тимлид) |

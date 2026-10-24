@@ -12,7 +12,7 @@ class LlmCall(BaseModel):
     Исходный текст в журнал не пишется (AGENTS.md, правило 5).
     """
 
-    purpose: Literal["rule_condition", "trade_secret"]
+    purpose: Literal["rule_condition", "trade_secret", "special_category"]
     rule_id: str | None              # для purpose="rule_condition", иначе None
     question: str
     masked_fragment: str             # текст с плейсхолдерами, как его видела LLM

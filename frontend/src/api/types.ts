@@ -157,7 +157,7 @@ export interface Report {
 }
 
 // ---------- «Что видела нейросеть»: журнал вызовов LLM ----------
-export type LlmPurpose = "rule_condition" | "trade_secret";
+export type LlmPurpose = "rule_condition" | "trade_secret" | "special_category";
 export type LlmVerdict = "yes" | "no" | "unknown";
 
 export interface LlmCall {

@@ -32,6 +32,7 @@ from app.evaluation.matching import (
 from app.schemas import Entity, EntityCategory, EntityType, ExtractedDocument, Metrics, TypeMetrics
 from app.services.detection.detect import detect
 from app.services.llm.client import llm_call_budget
+from app.services.llm.special_category import detect_special_llm
 from app.services.llm.trade_secret import detect_trade_secrets_llm
 from app.services.masking.masker import MASKED_CATEGORIES, mask, mask_preserving_length, mask_value
 
@@ -47,7 +48,9 @@ Detector = Callable[[ExtractedDocument], list[Entity]]
 
 @dataclass
 class LlmDetector:
-    """Детектор для --llm (T-013d): detect → mask → detect_trade_secrets_llm, как в конвейере.
+    """Детектор для --llm, тот же порядок, что в конвейере (pipeline.run_audit):
+    detect → mask → detect_special_llm (T-013e) → при находках mask заново →
+    detect_trade_secrets_llm (T-013d).
 
     На каждый документ — свой llm_call_budget (LLM_MAX_CALLS_PER_DOC). calls — сколько
     реальных запросов ушло за прогон (попадания в кэш не считаются) — для оценки стоимости.
@@ -60,7 +63,10 @@ class LlmDetector:
         entities = detect(doc)
         masked = mask(doc.text, entities)
         with llm_call_budget() as budget:
-            found = detect_trade_secrets_llm(doc, masked, entities)
+            special = detect_special_llm(doc, masked, entities)
+            if len(special) != len(entities):
+                masked = mask(doc.text, special)
+            found = detect_trade_secrets_llm(doc, masked, special)
         self.calls += budget.used
         self.documents += 1
         return found

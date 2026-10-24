@@ -438,7 +438,9 @@ def test_run_audit_adds_llm_entity_and_log_record(real_llm: Callable[[FakeLlm], 
     assert llm_entities[0].value_masked == QUOTE
     assert any(e.type == EntityType.PERSON for e in result.report.entities)
     ts_calls = [c for c in result.llm_log if c.purpose == "trade_secret"]
-    assert len(ts_calls) == 1 and result.llm_log[0].purpose == "trade_secret"  # КТ — до правил
+    assert len(ts_calls) == 1
+    # T-013e: особые категории → КТ → условия правил
+    assert [c.purpose for c in result.llm_log[:2]] == ["special_category", "trade_secret"]
     fragment = ts_calls[0].masked_fragment
     assert NAME not in fragment and "[PERSON_1]" in fragment
     assert len(result.report_text.text) == len(PIPE_TEXT)
