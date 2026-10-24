@@ -95,8 +95,9 @@ export function exportUrl(reportId: string): string {
   return `${BASE_URL}/reports/${encodeURIComponent(reportId)}/export?format=json`;
 }
 
-export function getMetrics(): Promise<Metrics> {
-  return request<Metrics>("/metrics");
+export function getMetrics(corpus?: string): Promise<Metrics> {
+  const path = corpus === undefined ? "/metrics" : `/metrics?corpus=${encodeURIComponent(corpus)}`;
+  return request<Metrics>(path);
 }
 
 export function listRules(): Promise<Rule[]> {
