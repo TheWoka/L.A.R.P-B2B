@@ -59,17 +59,17 @@ function MarkedFragment({ text, quote }: { text: string; quote: string | null })
 function LlmCallCard({ call, index }: { call: LlmCall; index: number }) {
   const verdict = VERDICTS[call.verdict];
   return (
-    <Card size="small" title={`Вызов ${index + 1}`}>
-      <Space orientation="vertical" size="small" style={{ width: "100%" }}>
-        <Typography.Text strong>{call.question}</Typography.Text>
+    <Card size="small" title={`Вызов ${index + 1}`} style={{ minWidth: 0 }}>
+      <Space orientation="vertical" size="small" style={{ width: "100%", minWidth: 0 }}>
+        <Typography.Text strong style={{ overflowWrap: "anywhere" }}>{call.question}</Typography.Text>
         <Space wrap>
           <Tag color={verdict.color}>{verdict.label}</Tag>
-          {call.rule_id && <Typography.Text type="secondary" style={{ fontSize: 12 }}>Правило: {call.rule_id}</Typography.Text>}
+          {call.rule_id && <Typography.Text type="secondary" style={{ fontSize: 12, overflowWrap: "anywhere" }}>Правило: {call.rule_id}</Typography.Text>}
           {call.cached && <Tag>Из кэша</Tag>}
         </Space>
         <Typography.Text type="secondary">Текст, отправленный нейросети:</Typography.Text>
         <MarkedFragment text={call.masked_fragment} quote={call.quote} />
-        {call.quote && <Typography.Text>Цитата, которую вернула нейросеть: «{call.quote}»</Typography.Text>}
+        {call.quote && <Typography.Text style={{ overflowWrap: "anywhere" }}>Цитата, которую вернула нейросеть: «{call.quote}»</Typography.Text>}
       </Space>
     </Card>
   );
@@ -109,7 +109,7 @@ export default function TransparencyPanel({ report, example = false }: Props) {
     { key: "rules", label: "Версия правил", children: audit.ruleset_version },
     { key: "dictionaries", label: "Версия словарей", children: audit.dictionaries_version },
     { key: "app", label: "Версия программы", children: audit.app_version },
-    { key: "detectors", label: "Детекторы", children: audit.detectors.length ? audit.detectors.map((name) => <Tag key={name}>{name}</Tag>) : "Не указаны" },
+    { key: "detectors", label: "Детекторы", children: audit.detectors.length ? audit.detectors.map((name) => <Tag key={name} style={{ whiteSpace: "normal", overflowWrap: "anywhere" }}>{name}</Tag>) : "Не указаны" },
     { key: "llm", label: "Нейросеть", children: audit.llm_provider === "mock" ? "Не использовалась" : audit.llm_model ?? "Модель не указана" },
     { key: "calls", label: "Вызовов нейросети", children: audit.llm_calls },
   ];
@@ -128,7 +128,7 @@ export default function TransparencyPanel({ report, example = false }: Props) {
   }
 
   return (
-    <Card title="Прозрачность проверки">
+    <Card title="Прозрачность проверки" style={{ minWidth: 0 }}>
       <Collapse
         onChange={(keys) => setLlmOpen(keys.includes("llm"))}
         items={[

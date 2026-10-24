@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Alert, Button, Card, Col, Descriptions, Modal, Result, Row, Skeleton, Space, Statistic, Tag, Typography } from "antd";
+import { Alert, Button, Card, Col, Descriptions, Grid, Modal, Result, Row, Skeleton, Space, Statistic, Tag, Typography } from "antd";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { ApiError, exportUrl, getReport, getReportText, redactedUrl } from "../api/client";
@@ -15,6 +15,8 @@ import TrafficLight, { OVERALL } from "../components/TrafficLight";
 import mockReport from "../mocks/report.example.json";
 
 export default function ReportPage() {
+  const screens = Grid.useBreakpoint();
+  const narrow = !screens.md;
   const { reportId } = useParams<{ reportId: string }>();
   const navigate = useNavigate();
   const [liveReport, setLiveReport] = useState<Report | null>(null);
@@ -53,17 +55,17 @@ export default function ReportPage() {
   const overall = OVERALL[report.overall];
 
   const details = [
-    { key: "file", label: "Документ", children: report.filename ?? "Текстовый запрос" },
+    { key: "file", label: "Документ", children: <span style={{ overflowWrap: "anywhere" }}>{report.filename ?? "Текстовый запрос"}</span> },
     { key: "purpose", label: "Назначение", children: PURPOSE_LABELS[report.purpose as DocPurpose] },
     { key: "created", label: "Дата проверки", children: new Date(report.created_at).toLocaleString("ru-RU") },
     { key: "duration", label: "Время обработки", children: `${(report.processing_ms / 1000).toLocaleString("ru-RU")} с` },
   ];
 
   return (
-    <Space orientation="vertical" size="large" style={{ width: "100%" }}>
+    <Space orientation="vertical" size="large" style={{ width: "100%", minWidth: 0 }}>
       {reportId === "example" && <Alert type="info" showIcon title="Демонстрационный отчёт" description="Данные в этом отчёте вымышленные." />}
 
-      <Card>
+      <Card style={{ minWidth: 0 }}>
         <Typography.Title level={2} style={{ marginTop: 0 }}>
           Результат проверки
         </Typography.Title>
@@ -80,15 +82,16 @@ export default function ReportPage() {
         <Descriptions column={{ xs: 1, sm: 2, md: 2 }} items={details} />
         {reportId !== "example" && (
           <div style={{ marginTop: 20 }}>
-            <Space wrap>
+            <Space orientation={narrow ? "vertical" : "horizontal"} wrap={!narrow} style={{ width: narrow ? "100%" : undefined }}>
               <Button
                 type="primary"
                 href={report.redacted_available ? redactedUrl(report.report_id) : undefined}
                 disabled={!report.redacted_available}
+                block={narrow}
               >
                 Скачать обезличенную копию
               </Button>
-              <Button href={exportUrl(report.report_id)}>Скачать отчёт (JSON)</Button>
+              <Button href={exportUrl(report.report_id)} block={narrow}>Скачать отчёт (JSON)</Button>
             </Space>
             {!report.redacted_available && (
               <Typography.Paragraph type="secondary" style={{ margin: "8px 0 0" }}>
@@ -101,17 +104,17 @@ export default function ReportPage() {
           </div>
         )}
         <Row gutter={[12, 12]} style={{ marginTop: 20 }}>
-          <Col xs={12} md={8}>
+          <Col xs={24} md={8}>
             <Card size="small">
               <Statistic title="Найдено фрагментов с чувствительными данными" value={entityCount} />
             </Card>
           </Col>
-          <Col xs={12} md={8}>
+          <Col xs={24} md={8}>
             <Card size="small">
               <Statistic title="Серьёзные нарушения" value={redCount} valueStyle={{ color: "#cf1322" }} />
             </Card>
           </Col>
-          <Col xs={12} md={8}>
+          <Col xs={24} md={8}>
             <Card size="small">
               <Statistic title="Замечания" value={yellowCount} valueStyle={{ color: "#d48806" }} />
             </Card>
