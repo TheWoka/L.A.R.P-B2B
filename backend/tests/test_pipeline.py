@@ -129,6 +129,7 @@ def test_masking_segments_across_entity_boundary(monkeypatch: pytest.MonkeyPatch
     assert NAME not in result.report_text.model_dump_json()
 
 
+@pytest.mark.usefixtures("without_model")  # точный список detectors без модели (T-036b)
 def test_audit_hashes(repo_root: Path) -> None:
     rules = load_rules(repo_root / "data/rules/rules.yaml")
     audit = pipeline.build_audit(TEXT.encode("utf-8"), rules, CallBudget(30))

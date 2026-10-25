@@ -24,6 +24,7 @@ from app.schemas import (
     Rule,
     Stage,
 )
+from app.services.detection import model_detector
 from app.services.detection.detect import detect
 from app.services.llm import client
 from app.services.llm.checks import llm_call_log
@@ -70,12 +71,16 @@ def build_audit(
 
     T-013e: если нейросеть искала сущности в этом документе (в журнале есть запись КТ или
     особых категорий с отправленным текстом, в том числе из кэша) — в detectors "llm:<модель>".
+    T-036b: если классификатор загружен — "model:grif-cls-<первые 8 hex md5 model.onnx>".
     """
     with _rules_path("dictionaries.yaml").open(encoding="utf-8") as stream:
         dictionaries = yaml.safe_load(stream)
     enabled = client.is_llm_enabled()
     model = get_settings().llm_model if enabled else None
     detectors = ["regex", f"ner:natasha-{version('natasha')}", "dict"]
+    model_version = model_detector.model_version()
+    if model_version is not None:
+        detectors.append(f"model:{model_version}")
     if enabled and any(
         call.purpose in LLM_SEARCH_PURPOSES and call.masked_fragment for call in llm_log
     ):
@@ -122,6 +127,8 @@ def run_audit(
     if on_stage is not None:
         on_stage(Stage.masking, 55)
     masked = mask(doc.text, entities)
+    # T-036b: классификатор КТ и особых категорий (CPU, без ключа); находки → маска заново.
+    entities, masked = model_detector.apply_model(doc, entities, masked)
     if on_stage is not None:
         on_stage(Stage.checking, 70)
     if rules is None:

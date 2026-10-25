@@ -30,3 +30,11 @@ def client() -> Iterator[TestClient]:
 @pytest.fixture
 def repo_root() -> Path:
     return REPO_ROOT
+
+
+@pytest.fixture
+def without_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Классификатор grif-cls выключен (T-036b): тесты LLM-шагов проверяют их отдельно от модели."""
+    from app.services.detection import model_detector
+
+    monkeypatch.setattr(model_detector, "load_model", lambda: None)

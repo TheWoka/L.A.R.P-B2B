@@ -5,12 +5,13 @@
 
 Как устроено:
 1. Кандидаты без LLM — куски masked_text (строки; длинные — по предложениям), где есть привязка
-   к конкретному человеку: плейсхолдер [PERSON_n] в этом или соседнем куске (±1) или слово-лицо
-   («работник», «кандидат», «он», «у неё» …) в самом куске; либо корень особой категории
-   («инфаркт», «судим», «церк» …) и слово-лицо в соседнем куске. Без человека кусок не берётся:
-   «Поставка инсулина для городской больницы № 3» — не ПДн. Куски, целиком покрытые уже
-   найденной SPECIAL_CATEGORY, куски без текста вне плейсхолдеров и куски «Поле: [МЕТКА]»
-   отбрасываются.
+   к конкретному человеку (has_person_context, общая с классификатором T-036b): плейсхолдер
+   человека ([PERSON_n], [SNILS_n], [PASSPORT_n], [BIRTH_DATE_n]) в этом или соседнем куске
+   (±1) или слово-лицо («работник», «кандидат», «он», «у неё» …) в самом куске; либо корень
+   особой категории («инфаркт», «судим», «церк» …) и слово-лицо в соседнем куске. Без человека
+   кусок не берётся: «Поставка инсулина для городской больницы № 3» — не ПДн. Куски, целиком
+   покрытые уже найденной SPECIAL_CATEGORY, куски без текста вне плейсхолдеров и куски
+   «Поле: [МЕТКА]» отбрасываются.
 2. Пакеты ≤ MAX_BATCH_CHARS, не больше MAX_SPECIAL_BATCHES; если не помещается всё —
    первыми идут куски с корнем особой категории.
 3. LLM только ПРЕДЛАГАЕТ цитаты. Засчитывает код: цитата дословно есть в пакете, длина
@@ -33,6 +34,7 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -74,7 +76,9 @@ MAX_QUOTE_CHARS = 200
 EXCLUDE_LEFT_CHARS = 40       # окно слева от цитаты для признака требования
 LLM_CONFIDENCE = 0.7
 
-PERSON_PLACEHOLDER_RE = re.compile(r"\[PERSON_\d+\]")
+# Плейсхолдеры, которые всегда обозначают конкретного человека (ФИО и его документы).
+# Телефон, e-mail, адрес и ИНН бывают и у организации — привязкой к человеку не считаются.
+PERSON_PLACEHOLDER_RE = re.compile(r"\[(?:PERSON|SNILS|PASSPORT|BIRTH_DATE)_\d+\]")
 PERSON_WORD_RE = re.compile(
     r"(?<!\w)(?:работни\w*|сотрудни\w*|кандидат\w*|заявител\w*|участник\w*|исполнител\w*"
     r"|специалист\w*|гражданин\w*|гражданк\w*|он|она|его|е[её]|ему|ей|у\s+него|у\s+н[её]е)(?!\w)",
@@ -153,13 +157,11 @@ def select_candidates(
     special = [e for e in entities if e.type == EntityType.SPECIAL_CATEGORY]
     bounds = pieces(masked_text)
     texts = [masked_text[start:end] for start, end in bounds]
-    has_placeholder = [PERSON_PLACEHOLDER_RE.search(t) is not None for t in texts]
-    has_word = [PERSON_WORD_RE.search(PLACEHOLDER_RE.sub(" ", t)) is not None for t in texts]
+    bound = has_person_context(texts, word_in_neighbors=False)
+    bound_near = has_person_context(texts, word_in_neighbors=True)
     result: list[Candidate] = []
     for i, (start, end) in enumerate(bounds):
-        near = range(max(i - 1, 0), min(i + 2, len(bounds)))
-        bound = has_word[i] or any(has_placeholder[j] for j in near)
-        if not bound and not (has_special_stem(texts[i]) and any(has_word[j] for j in near)):
+        if not bound[i] and not (has_special_stem(texts[i]) and bound_near[i]):
             continue
         if len(PLACEHOLDER_RE.sub("", texts[i]).strip()) < MIN_QUOTE_CHARS:
             continue
@@ -168,6 +170,25 @@ def select_candidates(
         if covered_by(start, end, spans, special):
             continue
         result.append(Candidate(start, end, defuse(texts[i])))
+    return result
+
+
+def has_person_context(texts: Sequence[str], *, word_in_neighbors: bool) -> list[bool]:
+    """Для каждого куска masked_text: есть ли привязка к конкретному человеку (ст. 10 152-ФЗ).
+
+    Привязка — плейсхолдер человека (PERSON_PLACEHOLDER_RE) в этом или соседнем куске (±1)
+    либо слово-лицо (PERSON_WORD_RE, вне плейсхолдеров) в самом куске, а при
+    word_in_neighbors=True — и в соседнем. Общая проверка для LLM-шага (отбор кандидатов,
+    T-013e) и классификатора (model_detector, T-036b): «Поставка препаратов для лечения
+    онкологических заболеваний для больницы № 3» — без человека, это не ПДн.
+    """
+    has_placeholder = [PERSON_PLACEHOLDER_RE.search(t) is not None for t in texts]
+    has_word = [PERSON_WORD_RE.search(PLACEHOLDER_RE.sub(" ", t)) is not None for t in texts]
+    result: list[bool] = []
+    for i in range(len(texts)):
+        near = range(max(i - 1, 0), min(i + 2, len(texts)))
+        word = any(has_word[j] for j in near) if word_in_neighbors else has_word[i]
+        result.append(word or any(has_placeholder[j] for j in near))
     return result
 
 

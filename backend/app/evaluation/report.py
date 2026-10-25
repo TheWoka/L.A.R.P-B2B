@@ -31,6 +31,7 @@ from app.evaluation.matching import (
 )
 from app.schemas import Entity, EntityCategory, EntityType, ExtractedDocument, Metrics, TypeMetrics
 from app.services.detection.detect import detect
+from app.services.detection.model_detector import apply_model
 from app.services.llm.client import llm_call_budget
 from app.services.llm.special_category import detect_special_llm
 from app.services.llm.trade_secret import detect_trade_secrets_llm
@@ -42,15 +43,24 @@ PD_CATEGORIES = frozenset({EntityCategory.pd, EntityCategory.pd_special})
 CONTEXT_CHARS = 30
 METRICS_FILE, ERRORS_FILE = "metrics.json", "errors.json"
 LLM_CORPUS_SUFFIX = " + LLM"  # Metrics.corpus при --llm: страница «Качество» не спутает прогоны
+NO_MODEL_CORPUS_SUFFIX = " (без классификатора)"  # Metrics.corpus при --no-model
 
 Detector = Callable[[ExtractedDocument], list[Entity]]
+
+
+def detect_with_model(doc: ExtractedDocument) -> list[Entity]:
+    """Детектор run_eval по умолчанию (T-036b), как в конвейере без ключа:
+    detect → mask → классификатор (apply_model). Модели нет — то же, что detect."""
+    entities = detect(doc)
+    entities, _ = apply_model(doc, entities, mask(doc.text, entities))
+    return entities
 
 
 @dataclass
 class LlmDetector:
     """Детектор для --llm, тот же порядок, что в конвейере (pipeline.run_audit):
-    detect → mask → detect_special_llm (T-013e) → при находках mask заново →
-    detect_trade_secrets_llm (T-013d).
+    detect → mask → классификатор (T-036b, при use_model) → при находках mask заново →
+    detect_special_llm (T-013e) → при находках mask заново → detect_trade_secrets_llm (T-013d).
 
     На каждый документ — свой llm_call_budget (LLM_MAX_CALLS_PER_DOC). calls — сколько
     реальных запросов ушло за прогон (попадания в кэш не считаются) — для оценки стоимости.
@@ -58,10 +68,13 @@ class LlmDetector:
 
     calls: int = 0
     documents: int = 0
+    use_model: bool = True
 
     def __call__(self, doc: ExtractedDocument) -> list[Entity]:
         entities = detect(doc)
         masked = mask(doc.text, entities)
+        if self.use_model:
+            entities, masked = apply_model(doc, entities, masked)
         with llm_call_budget() as budget:
             special = detect_special_llm(doc, masked, entities)
             if len(special) != len(entities):

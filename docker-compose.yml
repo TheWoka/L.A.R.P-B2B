@@ -61,6 +61,7 @@ services:
       - uploads:/data/uploads
       - ./data/rules:/data/rules:ro
       - ./data/legal:/data/legal:ro
+      - ./data/models:/data/models:ro
       - ./eval/results:/eval/results:ro
     depends_on:
       postgres:
@@ -78,6 +79,7 @@ services:
       - uploads:/data/uploads
       - ./data/rules:/data/rules:ro
       - ./data/legal:/data/legal:ro
+      - ./data/models:/data/models:ro
     depends_on:
       postgres:
         condition: service_healthy

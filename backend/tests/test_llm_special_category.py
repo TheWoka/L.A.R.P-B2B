@@ -55,6 +55,10 @@ from app.services.redaction.redact import RedactedFile
 from app.services.rules.engine import RuleContext
 from app.worker import tasks
 
+# T-036b: здесь проверяются LLM-шаги, классификатор grif-cls выключен (его тесты —
+# test_model_detector.py), иначе он находит те же сведения раньше фиктивной нейросети.
+pytestmark = pytest.mark.usefixtures("without_model")
+
 NAME = "Сидоров Семён Семёнович"
 PHONE = "+7 (900) 111-22-33"
 FACT = "лежал в больнице с инфарктом"

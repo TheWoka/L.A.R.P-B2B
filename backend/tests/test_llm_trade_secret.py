@@ -51,6 +51,10 @@ from app.services.llm.trade_secret import (
 )
 from app.services.masking.masker import mask, mask_value
 
+# T-036b: здесь проверяются LLM-шаги, классификатор grif-cls выключен (его тесты —
+# test_model_detector.py), иначе он находит те же сведения раньше фиктивной нейросети.
+pytestmark = pytest.mark.usefixtures("without_model")
+
 NAME = "Сидоров Семён Семёнович"
 PHONE = "+7 (900) 111-22-33"
 DEAL = "берём у поставщика по 900 руб., отдаём клиенту по 1 200 руб."

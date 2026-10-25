@@ -9,9 +9,13 @@
 Код выхода: 0 — успех; 1 — с --strict не выполнен критерий (recall ПДн < 0.90 или
 коммерческой тайны < 0.85); 2 — ошибка в корпусе (разметка, файлы) или --llm без ключа.
 
---llm (T-013d): к detect добавляется поиск коммерческой тайны нейросетью, как в конвейере
-(detect → mask → detect_trade_secrets_llm). Нужен LLM_PROVIDER=openai_compatible и ключ в .env;
-вызовы платные (до 3 на документ). Без флага — как раньше, без сети.
+По умолчанию (T-036b) — как в конвейере без ключа: detect → mask → классификатор grif-cls
+(data/models/grif-cls, CPU, без сети). Страница «Качество» показывает реальную систему.
+--no-model — только regex, NER и словари (для сравнения «до/после»); в Metrics.corpus
+добавляется « (без классификатора)».
+
+--llm (T-013d, T-013e): после классификатора — поиск особых категорий и коммерческой тайны
+нейросетью, как в конвейере. Нужен LLM_PROVIDER=openai_compatible и ключ в .env; вызовы платные.
 """
 
 import argparse
@@ -45,6 +49,10 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
         "--llm", action="store_true",
         help="добавить поиск коммерческой тайны нейросетью (нужен ключ в .env, вызовы платные)",
     )
+    parser.add_argument(
+        "--no-model", action="store_true",
+        help="без классификатора grif-cls: только regex, NER и словари (для сравнения)",
+    )
     return parser.parse_args(argv)
 
 
@@ -59,9 +67,11 @@ def main(argv: list[str] | None = None) -> int:
     from app.evaluation.corpus import load_corpus
     from app.evaluation.report import (
         LLM_CORPUS_SUFFIX,
+        NO_MODEL_CORPUS_SUFFIX,
         LlmDetector,
         build_metrics,
         criteria_met,
+        detect_with_model,
         evaluate_corpus,
         format_table,
         write_results,
@@ -80,9 +90,14 @@ def main(argv: list[str] | None = None) -> int:
     except ValueError as exc:
         logger.error("Ошибка корпуса: %s", exc)
         return 2
-    llm_detector = LlmDetector() if args.llm else None
-    result = evaluate_corpus(docs, llm_detector or detect)
-    corpus = args.corpus.resolve().name + (LLM_CORPUS_SUFFIX if args.llm else "")
+    llm_detector = LlmDetector(use_model=not args.no_model) if args.llm else None
+    plain = detect if args.no_model else detect_with_model
+    result = evaluate_corpus(docs, llm_detector or plain)
+    corpus = (
+        args.corpus.resolve().name
+        + (LLM_CORPUS_SUFFIX if args.llm else "")
+        + (NO_MODEL_CORPUS_SUFFIX if args.no_model else "")
+    )
     metrics = build_metrics(result, corpus=corpus)
     write_results(metrics, result.errors, args.out)
     logger.info("%s", format_table(metrics))
