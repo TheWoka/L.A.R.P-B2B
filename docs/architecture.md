@@ -7,35 +7,35 @@
 ## Компоненты и конвейер
 
 ```mermaid
-flowchart TB
-    browser["Браузер: React + TypeScript"] --> api["FastAPI: загрузка и REST API"]
-    api --> db[("PostgreSQL: задачи, отчёты, правила")]
-    api --> redis[("Redis: очередь Celery, кэш LLM")]
-    redis --> worker["Celery worker"]
-    worker --> extract["Извлечение: PyMuPDF / python-docx / openpyxl"]
-    extract --> detect["Детекторы ПДн, КТ и финансов:<br/>регулярки с контрольными суммами, Natasha NER, словари"]
-    detect --> markers["Маркеры чек-листа:<br/>согласования, грифы, сроки хранения"]
-    markers --> mask["Маскирование найденных ПДн: [PERSON_1]"]
-    mask --> classifier["Локальный классификатор grif-cls, CPU:<br/>КТ и особые категории; при находках — повторная маска"]
-    classifier --> enabled{"LLM включена?"}
-    enabled -->|да| special["Особые категории ПДн:<br/>только маскированный текст"]
-    special --> remask["Повторная маска новых ПДн"]
-    remask --> trade["Коммерческая тайна:<br/>только маскированный текст"]
-    trade --> rules["Правила YAML / БД:<br/>условия по сущностям, маркерам и назначению;<br/>llm — только по маскированному тексту"]
-    enabled -->|нет, mock| rules
-    rules --> report["Отчёт + текст с маской + журнал LLM"]
-    report --> copy["Обезличенная копия:<br/>создание и самопроверка"]
-    copy --> deletion["Удаление исходника"]
-    copy --> db
-    report --> db
-    deletion --> ttl["Хранение отчёта и копии: REPORT_TTL_DAYS;<br/>периодическая очистка Celery"]
-    worker --> db
-    special -.-> ollama["Ollama: профиль local-llm, CPU / GPU"]
-    trade -.-> ollama
-    rules -.-> ollama
-    special -.-> cloud["Облачный OpenAI-совместимый API"]
-    trade -.-> cloud
-    rules -.-> cloud
+flowchart TD
+    B["Браузер: React + TypeScript"] --> A["FastAPI: загрузка и REST API"]
+    A --> D[("PostgreSQL: задачи, отчёты, правила")]
+    A --> R[("Redis: очередь Celery, кэш LLM")]
+    R --> W["Celery worker"]
+    W --> X["Извлечение: PyMuPDF / python-docx / openpyxl"]
+    X --> P["ПДн: регулярки с контрольными суммами, Natasha NER, словари"]
+    P --> K["Маркеры чек-листа: согласования, грифы, сроки хранения"]
+    K --> M["Маскирование найденных ПДн: [PERSON_1]"]
+    M --> C["Классификатор grif-cls: КТ и особые категории, повторная маска"]
+    C --> Q{"LLM включена?"}
+    Q -->|да| S["Особые категории ПДн: только маскированный текст"]
+    S --> N["Повторная маска новых ПДн"]
+    N --> T["Коммерческая тайна: только маскированный текст"]
+    T --> E["Правила YAML / БД: условия, в том числе llm по тексту с маской"]
+    Q -->|нет, mock| E
+    E --> F["Отчёт + текст с маской + журнал LLM"]
+    F --> G["Обезличенная копия: создание и самопроверка"]
+    G --> U["Удаление исходника"]
+    G --> D
+    F --> D
+    U --> H["Хранение отчёта и копии: REPORT_TTL_DAYS; периодическая очистка Celery"]
+    W --> D
+    S -.-> O["Ollama: профиль local-llm, CPU / GPU"]
+    T -.-> O
+    E -.-> O
+    S -.-> V["Облачный OpenAI-совместимый API"]
+    T -.-> V
+    E -.-> V
 ```
 
 Сплошные стрелки показывают обработку и сохранение, пунктирные — необязательные
