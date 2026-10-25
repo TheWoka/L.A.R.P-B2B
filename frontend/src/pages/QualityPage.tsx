@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Alert, Button, Card, Col, Progress, Row, Skeleton, Statistic, Table, Tag, Typography } from "antd";
+import type { ReactNode } from "react";
+import { Alert, Button, Card, Col, Progress, Row, Skeleton, Statistic, Table, Tabs, Tag, Typography } from "antd";
 import type { TableColumnsType } from "antd";
 
 import { ApiError, getMetrics } from "../api/client";
@@ -8,6 +9,12 @@ import { ENTITY_TYPE_LABELS } from "../components/labels";
 import exampleMetrics from "../mocks/metrics.example.json";
 
 type LoadedMetrics = { data: Metrics; example: boolean };
+type Corpus = "reference" | "blind";
+
+const CORPUS_DESCRIPTION: Record<Corpus, string> = {
+  reference: "Набор составлен вместе с разработкой детектора, на нём мы проверяем, что ничего не сломали.",
+  blind: "Документы написал участник команды, который не видел устройство детектора, и под этот набор детектор не настраивается. Это самая честная оценка: так система поведёт себя на чужих документах.",
+};
 
 function percentage(value: number): string {
   return `${(value * 100).toLocaleString("ru-RU", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
@@ -16,19 +23,19 @@ function percentage(value: number): string {
 function MetricCard({ title, value, target }: { title: string; value: number; target: number }) {
   const passed = value >= target;
   return (
-    <Card className="quality-metric" style={{ height: "100%" }}>
+    <Card className="quality-metric" style={{ height: "100%", borderColor: passed ? undefined : "#b2373d" }}>
       <Typography.Text strong>{title}</Typography.Text>
       <Statistic
         value={value * 100}
         precision={1}
         suffix="%"
-        styles={{ content: { color: "#1c1c1e" } }}
+        styles={{ content: { color: passed ? "#1c1c1e" : "#b2373d" } }}
       />
       <Typography.Text className={passed ? "metric-status is-passed" : "metric-status is-below"}>
         {passed ? "Цель достигнута" : "Ниже цели"} · порог {Math.round(target * 100)}%
       </Typography.Text>
       <div style={{ position: "relative", marginTop: 14 }}>
-        <Progress percent={Math.round(value * 100)} showInfo={false} strokeColor="#087ff5" />
+        <Progress percent={Math.round(value * 100)} showInfo={false} strokeColor={passed ? "#087ff5" : "#b2373d"} />
         <span
           aria-hidden="true"
           style={{ position: "absolute", left: `${target * 100}%`, top: 3, height: 10, borderLeft: "2px solid #1c1c1e" }}
@@ -57,31 +64,35 @@ const columns: TableColumnsType<TypeMetrics> = [
   { title: "Примеров", dataIndex: "support", key: "support", render: (value: number) => value.toLocaleString("ru-RU") },
 ];
 
-export default function QualityPage() {
+function MetricsTab({ corpus }: { corpus: Corpus }) {
   const [loaded, setLoaded] = useState<LoadedMetrics | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [requestId, setRequestId] = useState(0);
+  const [notCounted, setNotCounted] = useState(false);
 
   useEffect(() => {
     let active = true;
-    getMetrics().then(
+    (corpus === "blind" ? getMetrics("blind") : getMetrics()).then(
       (data) => { if (active) setLoaded({ data, example: false }); },
       (reason: unknown) => {
         if (!active) return;
         if (reason instanceof ApiError && (reason.status === 404 || reason.status === 501)) {
-          setLoaded({ data: exampleMetrics, example: true });
+          if (corpus === "blind") setNotCounted(true);
+          else setLoaded({ data: exampleMetrics, example: true });
         } else {
           setError(reason instanceof Error ? reason.message : "Попробуйте ещё раз.");
         }
       },
     ).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [requestId]);
+  }, [corpus, requestId]);
 
-  if (loading) return <Skeleton active paragraph={{ rows: 10 }} />;
-  if (error) {
-    return (
+  let content: ReactNode;
+  if (loading) {
+    content = <Skeleton active paragraph={{ rows: 10 }} />;
+  } else if (error) {
+    content = (
       <Alert
         type="error"
         showIcon
@@ -90,18 +101,24 @@ export default function QualityPage() {
         action={<Button size="small" onClick={() => { setError(null); setLoading(true); setRequestId((id) => id + 1); }}>Повторить</Button>}
       />
     );
+  } else if (notCounted) {
+    content = <Alert type="info" showIcon title="Слепой набор ещё не посчитан" description="Метрики появятся здесь после отдельного запуска оценки слепого набора." />;
+  } else {
+    content = loaded && <MetricsContent loaded={loaded} corpus={corpus} />;
   }
-  if (!loaded) return null;
 
+  return (
+    <>
+      <Typography.Paragraph>{CORPUS_DESCRIPTION[corpus]}</Typography.Paragraph>
+      {content}
+    </>
+  );
+}
+
+function MetricsContent({ loaded, corpus }: { loaded: LoadedMetrics; corpus: Corpus }) {
   const { data, example } = loaded;
   return (
-    <div className="page-container quality-page">
-      <div className="page-eyebrow">Гриф / Качество проверки</div>
-      <header className="page-heading">
-        <h1>Качество проверки {example && <Tag color="blue">Пример данных</Tag>}</h1>
-        <p>Показатели на эталонных документах. Показываем результат без приукрашивания.</p>
-      </header>
-
+    <>
       {example && (
         <Alert
           type="info"
@@ -119,6 +136,16 @@ export default function QualityPage() {
           <MetricCard title="Коммерческая тайна: найдено" value={data.trade_secret_recall} target={0.85} />
         </Col>
       </Row>
+
+      {corpus === "blind" && data.trade_secret_recall < 0.85 && (
+        <Alert
+          type="warning"
+          showIcon
+          title="Порог по коммерческой тайне пока не достигнут"
+          description="На чужих формулировках коммерческая тайна находится хуже. Мы добавили проверку нейросетью и расширяем словари на отдельном наборе для настройки; слепой набор пересчитываем без изменений."
+          style={{ marginTop: 16 }}
+        />
+      )}
 
       <Card style={{ marginTop: 16 }}>
         <Row gutter={[16, 16]}>
@@ -154,11 +181,31 @@ export default function QualityPage() {
             <ul style={{ margin: 0, paddingLeft: 20 }}>
               <li>Ручной набор документов содержит сложные случаи и ловушки.</li>
               <li>Независимый корпус генератора содержит 210 документов.</li>
-              <li>Слепой набор от другого автора — в работе.</li>
+              <li>Слепой набор от другого автора: 12 документов, 150 размеченных фрагментов — вкладка «Слепой набор».</li>
             </ul>
           </Card>
         </Col>
       </Row>
+    </>
+  );
+}
+
+export default function QualityPage() {
+  return (
+    <div className="page-container quality-page">
+      <div className="page-eyebrow">Гриф / Качество проверки</div>
+      <header className="page-heading">
+        <h1>Качество проверки</h1>
+        <p>Сколько важных сведений находит система и как мы это проверяем.</p>
+      </header>
+      <Tabs
+        className="upload-tabs"
+        defaultActiveKey="reference"
+        items={[
+          { key: "reference", label: "Эталонный набор", children: <MetricsTab corpus="reference" /> },
+          { key: "blind", label: "Слепой набор (другой автор)", children: <MetricsTab corpus="blind" /> },
+        ]}
+      />
     </div>
   );
 }
