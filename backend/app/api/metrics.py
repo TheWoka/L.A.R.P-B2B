@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from app.schemas import Metrics
 
@@ -17,13 +17,23 @@ METRICS_PATHS = (
 @router.get(
     "/metrics",
     response_model=Metrics,
-    summary="Метрики качества на эталонном корпусе",
+    summary="Метрики качества на выбранном корпусе",
     responses={404: {"description": "Метрики ещё не посчитаны"}},
 )
-def get_metrics() -> Metrics:
+def get_metrics(
+    corpus: str | None = Query(
+        None, pattern=r"^[a-z0-9_-]{1,32}$",
+        description="Имя корпуса; без параметра — метрики эталонного набора",
+    ),
+) -> Metrics:
     """Читает первый доступный файл; ошибки не раскрывают его содержимое."""
-    for path in METRICS_PATHS:
+    for default_path in METRICS_PATHS:
         try:
+            root = default_path.parent.resolve()
+            path = root / corpus / "metrics.json" if corpus is not None else default_path
+            path = path.resolve()
+            if not path.is_relative_to(root):
+                raise HTTPException(status_code=404, detail="Метрики ещё не посчитаны")
             return Metrics.model_validate_json(path.read_bytes())
         except FileNotFoundError:
             continue
