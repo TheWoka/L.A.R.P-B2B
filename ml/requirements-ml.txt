@@ -1,0 +1,17 @@
+# Зависимости ТОЛЬКО для обучения, оценки и экспорта классификатора (T-036a).
+# В образ api НЕ попадают. Установка в отдельный venv из корня репозитория:
+#   python -m venv .venv-ml && .venv-ml\Scripts\activate
+#   pip install -r backend/requirements.txt -r ml/requirements-ml.txt
+# GPU (необязательно): сначала torch с CUDA по инструкции pytorch.org, потом этот файл.
+# Проверено на: torch 2.14.1, transformers 5.20.2, tokenizers 0.23.3, onnx 1.23.2,
+# onnxruntime 1.29.0, scikit-learn 1.9.1, numpy 2.5.3 (Python 3.13). Диапазоны — для Python 3.11.
+torch>=2.5,<3
+transformers>=4.46,<6
+tokenizers>=0.20
+safetensors>=0.4
+scikit-learn>=1.4
+numpy>=1.26
+onnx>=1.16
+onnxruntime>=1.18
+pytest==9.1.1
+ruff==0.17.1
