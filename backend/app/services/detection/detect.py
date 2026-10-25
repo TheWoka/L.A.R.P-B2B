@@ -4,13 +4,15 @@
 """
 
 import logging
+import re
 from bisect import bisect_right
 from collections import Counter
 
-from app.schemas import Entity, ExtractedDocument
+from app.schemas import Entity, EntityCategory, EntityType, ExtractedDocument
 from app.services.detection.dict_detector import detect_dict
 from app.services.detection.ner_detector import detect_ner
 from app.services.detection.regex_detector import detect_regex
+from app.services.masking.masker import mask_value
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +48,42 @@ def merge_entities(*groups: list[Entity]) -> list[Entity]:
     return kept
 
 
+_WORD_RE = re.compile(r"\w+")
+
+
+def trim_at_newline(entities: list[Entity], text: str) -> list[Entity]:
+    """Спаны ПДн не переходят через перевод строки (T-019b).
+
+    Строка — граница поля: «ФИО: Тихонов Арсений Валерьевич\nДата рождения: …» — два поля,
+    NER иногда склеивает их в один PERSON. Из спана с «\n» остаётся строка с наибольшим числом
+    слов (при равенстве — первая): «Тихонов Арсений Валерьевич» из «…\nДата», «В. Д.» из
+    «В. Д.\nЛичный»; без букв и цифр — сущность отбрасывается. ADDRESS не режется:
+    в блоке PDF адрес переносится по строкам абзаца. КТ, FINANCIAL и особые категории — фразы,
+    их границы задают свои детекторы.
+    """
+    result: list[Entity] = []
+    for entity in entities:
+        value = text[entity.start:entity.end]
+        if (entity.category != EntityCategory.pd or entity.type == EntityType.ADDRESS
+                or "\n" not in value):
+            result.append(entity)
+            continue
+        best: tuple[int, int] | None = None
+        best_words = 0
+        pos = entity.start
+        for line in value.split("\n"):
+            words = len(_WORD_RE.findall(line))
+            if words > best_words:
+                lead = len(line) - len(line.lstrip())
+                best, best_words = (pos + lead, pos + lead + len(line.strip())), words
+            pos += len(line) + 1
+        if best is not None:
+            result.append(entity.model_copy(update={
+                "start": best[0], "end": best[1], "value_masked": mask_value(text[best[0]:best[1]]),
+            }))
+    return result
+
+
 def assign_location(entities: list[Entity], doc: ExtractedDocument) -> list[Entity]:
     """Проставляет page и section по сегменту, в который попадает start сущности."""
     if not doc.segments:
@@ -75,9 +113,12 @@ def detect(doc: ExtractedDocument) -> list[Entity]:
     «Наценка ИП Смирнова А.А. составляет 12%» даёт и PERSON, и TRADE_SECRET без пересечения,
     иначе merge_entities выкинул бы одну из сущностей.
 
+    Спаны ПДн (кроме адреса) обрезаются по переводу строки — trim_at_newline (T-019b).
+
     Контракт: docs/contracts.md, раздел 3. Задачи T-007, T-008, T-013a, исполнитель — Данила.
     """
-    regex, ner = detect_regex(doc), detect_ner(doc)
+    regex = trim_at_newline(detect_regex(doc), doc.text)
+    ner = trim_at_newline(detect_ner(doc), doc.text)
     dict_ = detect_dict(doc, pd_entities=regex + ner)
     entities = assign_location(merge_entities(regex, ner, dict_), doc)
     # В лог — только количество по типам, никаких значений (AGENTS.md, правило 4).

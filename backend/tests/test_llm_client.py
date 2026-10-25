@@ -28,6 +28,7 @@ from app.services.llm.client import (
     run_complete_json,
     set_mock_response,
 )
+from app.services.llm.providers import MAX_ANSWER_TOKENS
 
 FAKE_KEY = "sk-test-NOT-A-REAL-KEY-12345"
 USER_TEXT = "Договор с [PERSON_1], СНИЛС [SNILS_1], секретная фраза zebra-42"
@@ -529,3 +530,36 @@ def test_timeout_in_condition_gives_unknown_without_exception(
     assert outcome.verdict == "unknown" and outcome.evidence is None
     assert [c.verdict for c in outcome.calls] == ["unknown"]
     assert budget.used == 1 and len(fake.requests) == 3
+
+
+# ---------------------------------------- T-019b: потолок длины ответа ---
+
+
+def truncated(content: str = '{"items": [{"quote": "наценка 1') -> httpx.Response:
+    """Ответ, обрезанный на max_tokens: finish_reason="length", JSON неполный."""
+    data = {"choices": [{"message": {"role": "assistant", "content": content},
+                         "finish_reason": "length"}],
+            "usage": {"prompt_tokens": 10, "completion_tokens": 400, "total_tokens": 410}}
+    return httpx.Response(200, json=data)
+
+
+def test_request_body_limits_answer_length(no_sleep: list[float]) -> None:
+    fake = FakeLLM([ok({"answer": True, "quote": "x"})])
+    call(fake, MemoryCache(), no_sleep)
+    assert fake.body()["max_tokens"] == MAX_ANSWER_TOKENS == 400
+
+
+def test_truncated_answer_fails_without_repair_and_cache(no_sleep: list[float]) -> None:
+    fake = FakeLLM([truncated(), ok({"answer": True, "quote": "x"})])
+    cache = MemoryCache()
+    with pytest.raises(LLMResponseError, match="обрезан"):
+        call(fake, cache, no_sleep)
+    assert len(fake.requests) == 1                 # повтор с «исправь JSON» не тратится
+    assert cache.data == {}
+
+
+def test_finish_reason_stop_is_parsed_as_usual(no_sleep: list[float]) -> None:
+    data = {"choices": [{"message": {"content": '{"answer": true, "quote": "x"}'},
+                         "finish_reason": "stop"}]}
+    fake = FakeLLM([httpx.Response(200, json=data)])
+    assert call(fake, MemoryCache(), no_sleep) == Verdict(answer=True, quote="x")

@@ -1,4 +1,4 @@
-"""Оценка качества детекции на эталонном корпусе. Задача T-014a.
+"""Оценка качества детекции на эталонном корпусе. Задачи T-014a, T-036b, T-019b.
 
 Тонкая обёртка командной строки: вся логика — в backend/app/evaluation.
 
@@ -9,13 +9,18 @@
 Код выхода: 0 — успех; 1 — с --strict не выполнен критерий (recall ПДн < 0.90 или
 коммерческой тайны < 0.85); 2 — ошибка в корпусе (разметка, файлы) или --llm без ключа.
 
-По умолчанию (T-036b) — как в конвейере без ключа: detect → mask → классификатор grif-cls
-(data/models/grif-cls, CPU, без сети). Страница «Качество» показывает реальную систему.
---no-model — только regex, NER и словари (для сравнения «до/после»); в Metrics.corpus
-добавляется « (без классификатора)».
+Три режима (одинаковый порядок шагов с конвейером pipeline.run_audit):
 
---llm (T-013d, T-013e): после классификатора — поиск особых категорий и коммерческой тайны
-нейросетью, как в конвейере. Нужен LLM_PROVIDER=openai_compatible и ключ в .env; вызовы платные.
+  по умолчанию  detect (regex, NER, словари) → mask → классификатор grif-cls (T-036b:
+                коммерческая тайна и особые категории ПДн «по смыслу»; data/models/grif-cls,
+                CPU, без сети и ключа). Так работает система у жюри без ключа — это число
+                показывает страница «Качество проверки».
+  --no-model    без классификатора: только regex, NER и словари (сравнение «до/после»);
+                в Metrics.corpus добавляется « (без классификатора)».
+  --llm         поверх режима по умолчанию (или --no-model) — нейросеть: сначала особые
+                категории ПДн (T-013e), затем коммерческая тайна (T-013d), как в конвейере.
+                Не «только КТ». Нужен LLM_PROVIDER=openai_compatible и ключ в .env; вызовы
+                платные. В Metrics.corpus добавляется « + LLM».
 """
 
 import argparse
@@ -39,7 +44,12 @@ def ensure_app_importable() -> None:
 
 
 def parse_args(argv: list[str] | None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Precision / recall детекции на корпусе")
+    parser = argparse.ArgumentParser(
+        description=(
+            "Precision / recall детекции на корпусе. По умолчанию — regex, NER, словари и "
+            "классификатор grif-cls, как в конвейере без ключа."
+        ),
+    )
     parser.add_argument("--corpus", type=Path, required=True, help="папка корпуса")
     parser.add_argument("--out", type=Path, required=True, help="папка для metrics.json")
     parser.add_argument(
@@ -47,11 +57,17 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--llm", action="store_true",
-        help="добавить поиск коммерческой тайны нейросетью (нужен ключ в .env, вызовы платные)",
+        help=(
+            "добавить нейросеть: особые категории ПДн, затем коммерческая тайна — как в "
+            "конвейере (нужен ключ в .env, вызовы платные)"
+        ),
     )
     parser.add_argument(
         "--no-model", action="store_true",
-        help="без классификатора grif-cls: только regex, NER и словари (для сравнения)",
+        help=(
+            "без классификатора grif-cls: только regex, NER и словари (для сравнения "
+            "«до/после»; с --llm — нейросеть без классификатора)"
+        ),
     )
     return parser.parse_args(argv)
 

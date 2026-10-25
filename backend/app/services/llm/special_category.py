@@ -7,7 +7,8 @@
 1. Кандидаты без LLM — куски masked_text (строки; длинные — по предложениям), где есть привязка
    к конкретному человеку (has_person_context, общая с классификатором T-036b): плейсхолдер
    человека ([PERSON_n], [SNILS_n], [PASSPORT_n], [BIRTH_DATE_n]) в этом или соседнем куске
-   (±1) или слово-лицо («работник», «кандидат», «он», «у неё» …) в самом куске; либо корень
+   (±1) или в том же абзаце (T-019b: TextSegment, у .txt — строка), или слово-лицо
+   («работник», «кандидат», «он», «у неё» …) в самом куске; либо корень
    особой категории («инфаркт», «судим», «церк» …) и слово-лицо в соседнем куске. Без человека
    кусок не берётся: «Поставка инсулина для городской больницы № 3» — не ПДн. Куски, целиком
    покрытые уже найденной SPECIAL_CATEGORY, куски без текста вне плейсхолдеров и куски
@@ -34,6 +35,7 @@ from __future__ import annotations
 
 import logging
 import re
+from bisect import bisect_right
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -64,7 +66,7 @@ from app.services.llm.quotes import (
     pieces,
     request_quotes,
 )
-from app.services.masking.masker import PLACEHOLDER_RE, mask_value
+from app.services.masking.masker import PLACEHOLDER_RE, mask_value, to_original_offset
 
 logger = logging.getLogger(__name__)
 
@@ -127,7 +129,9 @@ def detect_special_llm(
     """
     if not client.is_llm_enabled():
         return list(entities)
-    candidates = select_candidates(masked.masked_text, masked.spans, entities)
+    candidates = select_candidates(
+        masked.masked_text, masked.spans, entities, paragraph_bounds(doc),
+    )
     batches = select_batches(candidates)
     kept = list(entities)
     stats = _Stats()
@@ -152,13 +156,21 @@ def detect_special_llm(
 
 def select_candidates(
     masked_text: str, spans: list[MaskSpan], entities: list[Entity],
+    paragraphs: Sequence[tuple[int, int]] | None = None,
 ) -> list[Candidate]:
-    """Куски с привязкой к конкретному человеку (см. docstring модуля), по порядку текста."""
+    """Куски с привязкой к конкретному человеку (см. docstring модуля), по порядку текста.
+
+    paragraphs — paragraph_bounds(doc) в исходных координатах: плейсхолдер человека в том же
+    абзаце — тоже привязка (T-019b). None — только соседние куски, как раньше.
+    """
     special = [e for e in entities if e.type == EntityType.SPECIAL_CATEGORY]
     bounds = pieces(masked_text)
     texts = [masked_text[start:end] for start, end in bounds]
-    bound = has_person_context(texts, word_in_neighbors=False)
-    bound_near = has_person_context(texts, word_in_neighbors=True)
+    ids = None
+    if paragraphs is not None:
+        ids = paragraph_ids(paragraphs, [to_original_offset(s, spans) for s, _ in bounds])
+    bound = has_person_context(texts, word_in_neighbors=False, paragraphs=ids)
+    bound_near = has_person_context(texts, word_in_neighbors=True, paragraphs=ids)
     result: list[Candidate] = []
     for i, (start, end) in enumerate(bounds):
         if not bound[i] and not (has_special_stem(texts[i]) and bound_near[i]):
@@ -173,7 +185,40 @@ def select_candidates(
     return result
 
 
-def has_person_context(texts: Sequence[str], *, word_in_neighbors: bool) -> list[bool]:
+def paragraph_bounds(doc: ExtractedDocument) -> list[tuple[int, int]]:
+    """Абзацы документа [start, end) в координатах doc.text, по возрастанию.
+
+    Абзац — TextSegment (абзац docx, ячейка xlsx, блок PDF): одно высказывание об одном
+    субъекте. В документах без страниц (docx, xlsx, .txt, текстовый запрос) перевод строки
+    внутри сегмента — тоже граница абзаца: у .txt и запроса один сегмент на весь текст, и без
+    этого «абзацем» стал бы весь документ. В PDF перевод строки внутри блока — перенос
+    строки абзаца, блок не режется.
+    """
+    bounds: list[tuple[int, int]] = []
+    for seg in sorted(doc.segments, key=lambda s: s.offset):
+        if doc.pages is not None:
+            bounds.append((seg.offset, seg.offset + len(seg.text)))
+            continue
+        pos = seg.offset
+        for line in seg.text.split("\n"):
+            bounds.append((pos, pos + len(line)))
+            pos += len(line) + 1
+    return bounds
+
+
+def paragraph_ids(bounds: Sequence[tuple[int, int]], offsets: Sequence[int]) -> list[int]:
+    """Номер абзаца (индекс в bounds) для каждого смещения исходного текста; -1 — вне абзацев."""
+    starts = [b[0] for b in bounds]
+    result: list[int] = []
+    for offset in offsets:
+        i = bisect_right(starts, offset) - 1
+        result.append(i if i >= 0 and offset <= bounds[i][1] else -1)
+    return result
+
+
+def has_person_context(
+    texts: Sequence[str], *, word_in_neighbors: bool, paragraphs: Sequence[int] | None = None,
+) -> list[bool]:
     """Для каждого куска masked_text: есть ли привязка к конкретному человеку (ст. 10 152-ФЗ).
 
     Привязка — плейсхолдер человека (PERSON_PLACEHOLDER_RE) в этом или соседнем куске (±1)
@@ -181,15 +226,37 @@ def has_person_context(texts: Sequence[str], *, word_in_neighbors: bool) -> list
     word_in_neighbors=True — и в соседнем. Общая проверка для LLM-шага (отбор кандидатов,
     T-013e) и классификатора (model_detector, T-036b): «Поставка препаратов для лечения
     онкологических заболеваний для больницы № 3» — без человека, это не ПДн.
+
+    paragraphs (T-019b) — номер абзаца каждого куска (paragraph_ids; -1 — нет абзаца).
+    Абзац — одно высказывание об одном субъекте, поэтому плейсхолдер человека в любом куске
+    того же абзаца — тоже привязка (при word_in_neighbors=True — и слово-лицо): «[PERSON_1]
+    работает с 2019 года. Отличается ответственностью. В 2024 году перенёс инфаркт».
     """
     has_placeholder = [PERSON_PLACEHOLDER_RE.search(t) is not None for t in texts]
     has_word = [PERSON_WORD_RE.search(PLACEHOLDER_RE.sub(" ", t)) is not None for t in texts]
+    in_paragraph = _paragraph_flags(has_placeholder, has_word, paragraphs, word_in_neighbors)
     result: list[bool] = []
     for i in range(len(texts)):
         near = range(max(i - 1, 0), min(i + 2, len(texts)))
         word = any(has_word[j] for j in near) if word_in_neighbors else has_word[i]
-        result.append(word or any(has_placeholder[j] for j in near))
+        result.append(word or any(has_placeholder[j] for j in near) or in_paragraph[i])
     return result
+
+
+def _paragraph_flags(
+    has_placeholder: Sequence[bool], has_word: Sequence[bool],
+    paragraphs: Sequence[int] | None, with_words: bool,
+) -> list[bool]:
+    """Для каждого куска: есть ли человек в другом куске того же абзаца."""
+    if paragraphs is None:
+        return [False] * len(has_placeholder)
+    if len(paragraphs) != len(has_placeholder):
+        raise ValueError("paragraphs: нужен номер абзаца для каждого куска")
+    bound: set[int] = set()
+    for i, paragraph in enumerate(paragraphs):
+        if paragraph >= 0 and (has_placeholder[i] or (with_words and has_word[i])):
+            bound.add(paragraph)
+    return [p >= 0 and p in bound for p in paragraphs]
 
 
 def has_special_stem(text: str) -> bool:

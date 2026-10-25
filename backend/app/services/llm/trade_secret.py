@@ -6,8 +6,15 @@
 Как устроено:
 1. Кандидаты без LLM: строки masked_text (длинные — по предложениям ≤ 400 символов), где есть
    цифра вне плейсхолдеров и денежный / процентный признак или слово из CANDIDATE_STEMS.
-   Строки, целиком покрытые уже найденной TRADE_SECRET, отбрасываются.
-2. Кандидаты пакуются в пакеты ≤ MAX_BATCH_CHARS («номер| текст»), не больше MAX_TS_BATCHES.
+   T-019b: строки без цифры — тоже кандидаты, если в них есть корень WORD_ONLY_STEMS_RE
+   («клиент», «поставщик», «рецептур», «ноу-хау», «договорённ», «перечень» …): ст. 3 98-ФЗ
+   защищает любые сведения, а не только числа — «перечень ключевых клиентов: ООО …»,
+   «рецептура: …», «условия, которые мы согласовали с заводом». Строки, целиком покрытые уже
+   найденной TRADE_SECRET, отбрасываются.
+2. Кандидаты пакуются в пакеты ≤ MAX_BATCH_CHARS («номер| текст»), не больше MAX_TS_BATCHES
+   на документ. Сначала строки с цифрой (сигнал сильнее), строкам без цифры — не больше
+   MAX_WORD_BATCHES пакета и только если общий лимит MAX_TS_BATCHES ещё не исчерпан:
+   стоимость проверки документа не растёт.
 3. LLM только ПРЕДЛАГАЕТ цитаты. Находку засчитывает код: цитата дословно есть в строке пакета,
    длина 8–200 символов, внутри нет плейсхолдера ПДн, нет пересечения с уже найденной КТ.
    Пересечение с FINANCIAL — FINANCIAL на этом месте убирается (сведения важнее суммы).
@@ -56,8 +63,9 @@ from app.services.masking.masker import PLACEHOLDER_RE
 
 __all__ = [
     "MAX_BATCH_CHARS", "MAX_CANDIDATE_CHARS", "MAX_TS_BATCHES", "QUESTION", "Batch", "Candidate",
-    "TradeSecretAnswer", "TradeSecretItem", "accept_quote", "detect_trade_secrets_llm",
-    "locate_in_batch", "pack_batches", "select_candidates",
+    "MAX_WORD_BATCHES", "TradeSecretAnswer", "TradeSecretItem", "accept_quote",
+    "detect_trade_secrets_llm", "locate_in_batch", "pack_batches", "plan_batches",
+    "select_candidates", "select_word_candidates",
 ]
 
 logger = logging.getLogger(__name__)
@@ -65,6 +73,7 @@ logger = logging.getLogger(__name__)
 PROMPT_PATH = Path(__file__).parent / "prompts" / "trade_secret.md"
 QUESTION = "Какие сведения в тексте составляют коммерческую тайну?"
 MAX_TS_BATCHES = 3            # пакетов на документ (бюджет общий с условиями правил)
+MAX_WORD_BATCHES = 1          # из них — пакетов строк без цифры (T-019b)
 MIN_QUOTE_CHARS = 8
 MAX_QUOTE_CHARS = 200
 LLM_CONFIDENCE = 0.7
@@ -79,6 +88,13 @@ MONEY_RE = re.compile(
 CANDIDATE_STEMS = (
     "закуп", "поставщик", "клиент", "себестоим", "марж", "наценк", "накрут", "скидк", "рентаб",
     "входн", "оптов", "прайс", "рецептур", "технолог", "ноу-хау", "план продаж", "объём", "объем",
+)
+# Строка без цифры — кандидат, если есть корень сведений, которые 98-ФЗ защищает и без чисел:
+# состав клиентов и поставщиков, рецептуры и технологии, договорённости, планы (T-019b).
+WORD_ONLY_STEMS_RE = re.compile(
+    r"клиент|поставщик|рецептур|технолог|ноу-хау|договор[её]нн|услови\w*\s+поставк"
+    r"|план\w*\s+продаж|перечень",
+    re.IGNORECASE,
 )
 _DIGIT_RE = re.compile(r"\d")
 
@@ -115,11 +131,12 @@ def detect_trade_secrets_llm(
     if not client.is_llm_enabled():
         return list(entities)
     candidates = select_candidates(masked.masked_text, masked.spans, entities)
-    batches = pack_batches(candidates)
+    words = select_word_candidates(masked.masked_text, masked.spans, entities)
+    batches = plan_batches(candidates, words)
     kept = list(entities)
     stats = _Stats()
     sent = 0
-    for batch in batches[:MAX_TS_BATCHES]:
+    for batch in batches:
         call = _ask_batch(batch, doc, masked.spans, kept, stats)
         if call is None:
             logger.warning("КТ через LLM: лимит вызовов исчерпан, пакетов отправлено %d", sent)
@@ -127,10 +144,10 @@ def detect_trade_secrets_llm(
         sent += 1
         record_llm_call(call)
     logger.info(
-        "КТ через LLM: document_id=%s кандидатов=%d пакетов=%d отправлено=%d принято=%d "
-        "отброшено=%d заменено_financial=%d",
-        doc.document_id, len(candidates), len(batches), sent, stats.accepted, stats.rejected,
-        stats.replaced_financial,
+        "КТ через LLM: document_id=%s кандидатов=%d без_цифр=%d пакетов=%d отправлено=%d "
+        "принято=%d отброшено=%d заменено_financial=%d",
+        doc.document_id, len(candidates), len(words), len(batches), sent, stats.accepted,
+        stats.rejected, stats.replaced_financial,
     )
     return sorted(kept, key=lambda e: (e.start, e.end))
 
@@ -152,6 +169,30 @@ def select_candidates(
             continue
         result.append(Candidate(start, end, defuse(text)))
     return result
+
+
+def select_word_candidates(
+    masked_text: str, spans: list[MaskSpan], entities: list[Entity],
+) -> list[Candidate]:
+    """Строки без цифры вне плейсхолдеров, но с корнем WORD_ONLY_STEMS_RE (T-019b)."""
+    trade_secrets = [e for e in entities if e.type == EntityType.TRADE_SECRET]
+    result: list[Candidate] = []
+    for start, end in pieces(masked_text):
+        plain = PLACEHOLDER_RE.sub(" ", masked_text[start:end])
+        if _DIGIT_RE.search(plain) or WORD_ONLY_STEMS_RE.search(plain) is None:
+            continue
+        if len(plain.strip()) < MIN_QUOTE_CHARS or covered_by(start, end, spans, trade_secrets):
+            continue
+        result.append(Candidate(start, end, defuse(masked_text[start:end])))
+    return result
+
+
+def plan_batches(candidates: list[Candidate], words: list[Candidate]) -> list[Batch]:
+    """Пакеты на документ: строки с цифрой, затем ≤ MAX_WORD_BATCHES пакета строк без цифры;
+    всего не больше MAX_TS_BATCHES."""
+    batches = pack_batches(candidates)[:MAX_TS_BATCHES]
+    room = min(MAX_WORD_BATCHES, MAX_TS_BATCHES - len(batches))
+    return batches + pack_batches(words)[:room]
 
 
 def _looks_like_candidate(text: str) -> bool:

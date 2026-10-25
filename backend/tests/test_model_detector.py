@@ -118,7 +118,7 @@ def test_person_filter_decides_for_medical_phrase(monkeypatch: pytest.MonkeyPatc
     found = detect_with_model(make_doc(with_person))         # словарь или модель — не дубль
     assert [e.type for e in found].count(EntityType.SPECIAL_CATEGORY) == 1
     monkeypatch.setattr(md, "has_person_context",
-                        lambda texts, word_in_neighbors: [True] * len(texts))
+                        lambda texts, **_: [True] * len(texts))
     assert [e.type for e in model_found(MEDICAL_TEXT)] == [EntityType.SPECIAL_CATEGORY]
 
 
@@ -374,3 +374,57 @@ def test_add_model_entities_sorted_and_keeps_other_financial() -> None:
     secret = entity(text, "Наша накрутка 20%.", EntityType.TRADE_SECRET,
                     EntityCategory.trade_secret, "model")
     assert md.add_model_entities([money], [secret]) == [money, secret]
+
+
+# ------------------------------------- T-019b: привязка к человеку в абзаце ---
+
+CHARACTERISTIC = (f"Характеристика: {EMPLOYEE} работает в отделе снабжения с 2019 года. "
+                  "Отличается аккуратностью и пунктуальностью. "
+                  "В прошлом месяце перенёс операцию на сердце.")
+
+
+def make_paragraphs(paragraphs: list[str], pages: int | None = None) -> ExtractedDocument:
+    """Документ из абзацев-сегментов (как docx; pages=1 — как PDF)."""
+    segments: list[TextSegment] = []
+    offset = 0
+    for i, text in enumerate(paragraphs):
+        segments.append(TextSegment(id=i, text=text, offset=offset, page=1 if pages else None))
+        offset += len(text) + 1
+    return ExtractedDocument(document_id="synthetic-paragraph", filename="synthetic.docx",
+                             text="\n".join(paragraphs), segments=segments, pages=pages)
+
+
+def special_found(doc: ExtractedDocument) -> list[str]:
+    return [doc.text[e.start:e.end] for e in detect_with_model(doc)
+            if e.type == EntityType.SPECIAL_CATEGORY and e.detector == "model"]
+
+
+@requires_model
+def test_person_two_sentences_above_in_same_paragraph() -> None:
+    """Человек назван в начале абзаца, сведения — через предложение: тот же субъект."""
+    assert special_found(make_paragraphs([CHARACTERISTIC])) == [
+        "В прошлом месяце перенёс операцию на сердце."]
+
+
+@requires_model
+def test_paragraph_rule_off_loses_distant_person(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Без абзацев остаётся только окно ±1 фрагмент — та же фраза не засчитывается."""
+    monkeypatch.setattr(md, "paragraph_bounds", lambda doc: [])
+    assert special_found(make_paragraphs([CHARACTERISTIC])) == []
+
+
+@requires_model
+def test_line_is_paragraph_in_plain_text_but_not_in_pdf() -> None:
+    """В .txt и docx строка — отдельный абзац; в PDF перевод строки — перенос внутри блока."""
+    lines = CHARACTERISTIC.replace(". ", ".\n")
+    assert special_found(make_paragraphs([lines])) == []
+    assert special_found(make_paragraphs([lines], pages=1)) == [
+        "В прошлом месяце перенёс операцию на сердце."]
+
+
+@requires_model
+def test_other_paragraph_person_does_not_bind_medical_phrase() -> None:
+    """Человек в соседнем, но не смежном абзаце — медицинская закупка остаётся не ПДн."""
+    doc = make_paragraphs([f"Ответственный — {EMPLOYEE}.", "Срок поставки — май.",
+                           "Склад принимает товар по будням.", MEDICAL_TEXT])
+    assert special_found(doc) == []

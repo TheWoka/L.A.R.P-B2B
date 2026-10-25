@@ -7,8 +7,9 @@
    обучении и выборе порогов), границы переводятся в исходный текст to_original_offset.
 2. Класс с p ≥ порога из thresholds.json (пороги выбраны на eval/dev, здесь не меняются);
    прошли оба класса — берётся больший p.
-3. SPECIAL_CATEGORY засчитывается, только если в этом или соседнем фрагменте есть человек
-   (has_person_context): ст. 10 152-ФЗ говорит о сведениях о конкретном субъекте.
+3. SPECIAL_CATEGORY засчитывается, только если в этом или соседнем фрагменте или в том же
+   абзаце (T-019b: TextSegment, у .txt — строка) есть человек (has_person_context):
+   ст. 10 152-ФЗ говорит о сведениях о конкретном субъекте.
    «Поставка препаратов для лечения онкологических заболеваний» без людей — не ПДн.
 4. Пересечения (иначе повторная маска упадёт): находка того же типа на этом месте → фрагмент
    отбрасывается; ПДн и другие сущности, которые остаются в отчёте, вырезаются из фрагмента
@@ -34,7 +35,11 @@ from typing import Any
 from app.schemas import Entity, EntityCategory, EntityType, ExtractedDocument, MaskResult
 from app.services.detection.detect import assign_location
 from app.services.detection.fragments import split_fragments
-from app.services.llm.special_category import has_person_context
+from app.services.llm.special_category import (
+    has_person_context,
+    paragraph_bounds,
+    paragraph_ids,
+)
 from app.services.masking.masker import MASKED_CATEGORIES, mask, mask_value, to_original_offset
 
 logger = logging.getLogger(__name__)
@@ -243,7 +248,9 @@ def detect_model(
     if not frags:
         return []
     probs = predict_proba(model, [f.masked for f in frags])
-    person = has_person_context([f.masked for f in frags], word_in_neighbors=True)
+    paragraphs = paragraph_ids(paragraph_bounds(doc), [f.start for f in frags])
+    person = has_person_context([f.masked for f in frags], word_in_neighbors=True,
+                                paragraphs=paragraphs)
     found: list[Entity] = []
     unbound = 0
     for i, (frag, p) in enumerate(zip(frags, probs, strict=True)):

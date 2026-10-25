@@ -27,6 +27,10 @@ logger = logging.getLogger(__name__)
 # Значение по умолчанию; фактический таймаут — Settings.llm_timeout_s (LLM_TIMEOUT_S, T-029b).
 REQUEST_TIMEOUT_S = DEFAULT_LLM_TIMEOUT_S
 MAX_HTTP_ATTEMPTS = 3
+# Потолок длины ответа (T-019b). Наши ответы — короткий JSON ({"verdict": …} или до ~10 цитат
+# по 3–15 слов): 400 токенов хватает с запасом. Без потолка локальная модель (T-lite, T-029b)
+# могла «зацикливаться» и генерировать до таймаута.
+MAX_ANSWER_TOKENS = 400
 RETRY_DELAYS_S: tuple[float, ...] = (1.0, 3.0)
 _MAX_MOCK_DEPTH = 20
 
@@ -204,6 +208,8 @@ def request_chat(
 
     Не больше MAX_HTTP_ATTEMPTS попыток, паузы RETRY_DELAYS_S. Другие 4xx — сразу
     LLMRequestError. Таймаут каждой попытки — settings.llm_timeout_s (LLM_TIMEOUT_S).
+    Длина ответа ограничена MAX_ANSWER_TOKENS; ответ, обрезанный по длине
+    (finish_reason="length"), — LLMResponseError без повтора (см. _parse_envelope).
     Возвращает текст ответа и usage.
     """
     url = settings.llm_base_url.rstrip("/") + "/chat/completions"
@@ -211,6 +217,7 @@ def request_chat(
         "model": settings.llm_model,
         "messages": messages,
         "temperature": 0,
+        "max_tokens": MAX_ANSWER_TOKENS,
         "response_format": {"type": "json_object"},
     }
     headers = {"Authorization": f"Bearer {settings.llm_api_key}"}
@@ -252,12 +259,21 @@ def _send_once(
 
 
 def _parse_envelope(response: httpx.Response) -> ChatResult:
-    """Достаёт choices[0].message.content и usage из ответа chat/completions."""
+    """Достаёт choices[0].message.content и usage из ответа chat/completions.
+
+    finish_reason="length" — ответ обрезан на MAX_ANSWER_TOKENS, JSON неполный: сразу
+    LLMResponseError. Повтор с просьбой исправить JSON упёрся бы в тот же потолок и только
+    потратил бы вызов; вызывающий шаг пишет в журнал verdict="unknown".
+    """
     try:
         data = response.json()
-        content = data["choices"][0]["message"]["content"]
+        choice = data["choices"][0]
+        content = choice["message"]["content"]
     except (ValueError, KeyError, IndexError, TypeError):
         raise LLMResponseError("LLM вернула ответ не в формате chat/completions") from None
+    if isinstance(choice, dict) and choice.get("finish_reason") == "length":
+        logger.warning("LLM: ответ обрезан по длине (max_tokens=%d)", MAX_ANSWER_TOKENS)
+        raise LLMResponseError("LLM: ответ обрезан по длине (max_tokens)")
     if not isinstance(content, str):
         raise LLMResponseError("LLM вернула пустой ответ")
     usage_raw = data.get("usage") or {}

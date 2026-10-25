@@ -11,6 +11,7 @@ import pytest
 
 from app.schemas import Entity, EntityCategory, EntityType, ExtractedDocument, TextSegment
 from app.services.detection.regex_detector import (
+    CONF_ACCOUNT_LABELED,
     CONF_ACCOUNT_NO_BIK,
     CONF_CHECKSUM,
     CONF_FORMAT,
@@ -159,8 +160,39 @@ def test_confidences() -> None:
 
 
 def test_account_wrong_key_with_bik_rejected() -> None:
+    """Ключ по БИК не сошёлся и слова «счёт» слева нет — не счёт (T-007)."""
     acc = break_digit(make_account("40817810", _BIK, 7), 12)
-    assert run(f"Счёт {acc}, БИК {_BIK}") == []
+    assert run(f"Номер {acc}, БИК {_BIK}") == []
+
+
+def test_account_wrong_key_with_label_is_personal() -> None:
+    """T-019b: префикс счёта физлица + слово «счёт» слева — ПДн, даже если ключ не сошёлся."""
+    acc = break_digit(make_account("40817810", _BIK, 7), 12)
+    text = f"Личный счёт в АО «Банк Пример», БИК {_BIK}: {acc}."
+    entity = assert_found(text, T.BANK_ACCOUNT, acc)
+    assert entity.confidence == CONF_ACCOUNT_LABELED < CONF_CHECKSUM
+    assert_found(f"Счёт {acc}, БИК {_BIK}", T.BANK_ACCOUNT, acc)
+
+
+def test_org_account_with_label_is_still_not_pd() -> None:
+    acc = break_digit(make_account("40702810", _BIK, 8), 12)
+    assert run(f"Расчётный счёт организации: {acc}, БИК {_BIK}") == []
+
+
+@pytest.mark.parametrize("prefix", ["9999", "1234", "7000", "8600"])
+def test_card_any_issuer_digit_with_card_word(prefix: str) -> None:
+    """T-019b: ISO/IEC 7812 — первая цифра 1, 7–9 тоже бывает у карт; рядом слово «карта»."""
+    card = make_card(prefix, 3)
+    assert_found(f"Учебная банковская карта: {card}.", T.CARD, card)
+    assert_found(f"Карта № {card.replace(' ', '-')}", T.CARD, card.replace(" ", "-"))
+
+
+def test_card_issuer_digit_9_without_card_word_or_luhn_rejected() -> None:
+    card = make_card("9999", 3)
+    assert [e for e in run(f"Номер изделия {card}.") if e.type == T.CARD] == []
+    assert [e for e in run(f"Карта {break_digit(card)}.") if e.type == T.CARD] == []
+    zero = make_card("0999", 3)
+    assert [e for e in run(f"Карта {zero}.") if e.type == T.CARD] == []
 
 
 def test_card_with_trailing_group_of_three() -> None:
@@ -420,3 +452,25 @@ def test_performance_200k_chars() -> None:
     print(f"\n{len(text)} символов, {len(entities)} сущностей, {elapsed:.2f} с")
     assert len(entities) >= 5 * (len(text) // len(chunk))
     assert elapsed < 5.0  # цель < 1 с; запас для медленного CI
+
+
+# ---------- T-019b: ящики организаций ----------
+@pytest.mark.parametrize("text", [
+    "Общий адрес лаборатории: lab@example.org.",
+    "Вопросы направлять на общий ящик tech@example.org.",
+    "Общий контакт заказчика: procurement@example.ru",
+    "Приёмная: reception.tomsk@example.ru",
+    "Отдел снабжения — snab@example.ru",
+])
+def test_org_mailbox_by_left_label_is_not_pd(text: str) -> None:
+    assert [e for e in run(text) if e.type == T.EMAIL] == []
+
+
+@pytest.mark.parametrize("text, email", [
+    ("Отдел ВЭД: Кулагин М.Ю., kulagin@example.org", "kulagin@example.org"),
+    ("Личный адрес: lab.ivanova@example.org", "lab.ivanova@example.org"),
+    ("Письмо жду на личный адрес tech.petrov@example.ru", "tech.petrov@example.ru"),
+    ("Общий ящик закрыт, пишите мне: vera.sinitsyna@example.ru", "vera.sinitsyna@example.ru"),
+])
+def test_personal_email_kept(text: str, email: str) -> None:
+    assert_found(text, T.EMAIL, email)
