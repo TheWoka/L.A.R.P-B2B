@@ -66,10 +66,15 @@ button, input, textarea { font: inherit; }
 .purpose-copy { display: grid; gap: 3px; }
 .purpose-copy strong { font-size: 15px; color: #1c1c1e; line-height: 1.25; }
 .purpose-copy span { color: #8e8e93; font-size: 12px; line-height: 1.35; }
-.form-actions { display: flex; align-items: center; gap: 18px; margin-top: 26px; }
+.form-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; margin-top: 26px; }
+.form-actions .form-error { flex-basis: 100%; border-radius: 12px; }
 .form-actions .ant-btn { min-width: 215px; height: 48px; border-radius: 12px; font-weight: 650; }
 .form-actions .ant-typography { font-size: 13px; }
 .query-input.ant-input { min-height: 210px; padding: 18px; border-radius: 18px; background: #fff; }
+.query-character-count { display: block; margin-top: 8px; text-align: right; color: #6e6e73; font-size: 13px; }
+.query-character-count.is-over { color: #b2373d; font-weight: 650; }
+.task-page .ant-steps { margin-top: 22px; }
+.task-page .ant-steps-item-title { white-space: normal; }
 .upload-notice { margin-top: 28px; border-radius: 14px; }
 .example-link { margin-top: 16px; color: #77777c; font-size: 13px; }
 .example-link a { font-weight: 650; }

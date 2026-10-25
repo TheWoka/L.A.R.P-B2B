@@ -8,9 +8,9 @@ import type { Stage, TaskInfo } from "../api/types";
 const STAGES: { stage: Stage; title: string }[] = [
   { stage: "extracting", title: "Извлечение текста" },
   { stage: "detecting", title: "Поиск данных" },
-  { stage: "masking", title: "Маскирование" },
+  { stage: "masking", title: "Скрытие персональных данных" },
   { stage: "checking", title: "Проверка по правилам" },
-  { stage: "reporting", title: "Сборка отчёта" },
+  { stage: "reporting", title: "Подготовка отчёта" },
 ];
 
 export default function TaskPage() {
@@ -66,27 +66,38 @@ export default function TaskPage() {
   }, [taskId, navigate]);
 
   if (missing || !taskId) {
-    return <Result status="404" title="Проверка не найдена" extra={<Button onClick={() => navigate("/")}>На главную</Button>} />;
+    return <div className="page-container"><Result status="404" title="Проверка не найдена" subTitle="Ссылка могла устареть или номер проверки указан неверно." extra={<Button type="primary" onClick={() => navigate("/")}>На главную</Button>} /></div>;
   }
 
   const current = task?.stage ? STAGES.findIndex((item) => item.stage === task.stage) : 0;
+  if (task?.status === "failed") {
+    return (
+      <div className="page-container task-page">
+        <div className="page-eyebrow">Гриф / Проверка документа</div>
+        <Card>
+          <Result
+            status="error"
+            title="Не удалось проверить документ"
+            subTitle={task.error ?? "Попробуйте загрузить документ ещё раз."}
+            extra={<Button type="primary" onClick={() => navigate("/")}>Загрузить другой файл</Button>}
+          />
+        </Card>
+      </div>
+    );
+  }
+
   return (
-    <div className="page-container">
+    <div className="page-container task-page">
       <div className="page-eyebrow">Гриф / Проверка документа</div>
       <header className="page-heading">
-        <h1>{task?.status === "failed" ? "Не удалось проверить документ" : "Документ проверяется"}</h1>
+        <h1>Документ проверяется</h1>
         <p>Номер проверки: {taskId}</p>
       </header>
       <Card>
-      {task?.status !== "failed" && (
-        <Typography.Paragraph>Этапы обновляются автоматически. Можно оставить эту страницу открытой до появления отчёта.</Typography.Paragraph>
-      )}
-      <Steps current={Math.max(0, current)} items={STAGES.map(({ title }) => ({ title }))} responsive />
-      <Progress percent={task?.progress ?? 0} status={task?.status === "failed" ? "exception" : "active"} style={{ marginTop: 24 }} />
-      {task?.status === "failed" && (
-        <Alert type="error" showIcon title="Проверка не завершена" description={task.error ?? "Попробуйте ещё раз."} action={<Button onClick={() => navigate("/")}>Проверить другой документ</Button>} />
-      )}
-      {errorMessage && task?.status !== "failed" && (
+      <Typography.Paragraph>Этапы обновляются автоматически. Обычно меньше минуты; большие документы — до нескольких минут.</Typography.Paragraph>
+      <Steps current={Math.max(0, current)} items={STAGES.map(({ title }) => ({ title }))} direction="vertical" size="small" />
+      <Progress percent={task?.progress ?? 0} status="active" style={{ marginTop: 24 }} />
+      {errorMessage && (
         <Alert type="warning" showIcon title={errorMessage} description={networkErrors >= 5 ? "Не удалось восстановить соединение. Обновите страницу, чтобы повторить попытку." : undefined} style={{ marginTop: 16 }} />
       )}
       {networkErrors >= 5 && <Button style={{ marginTop: 12 }} onClick={() => window.location.reload()}>Обновить страницу</Button>}
