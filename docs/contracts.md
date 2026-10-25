@@ -429,6 +429,7 @@ LLM_BASE_URL=                     # например https://<сервис>/v1 �
 LLM_API_KEY=
 LLM_MODEL=
 LLM_MAX_CALLS_PER_DOC=30
+LLM_TIMEOUT_S=30                  # таймаут одного запроса к LLM, с; float > 0; локально на CPU — 120
 
 EMBEDDING_MODEL=intfloat/multilingual-e5-small
 MAX_UPLOAD_MB=50
@@ -440,6 +441,7 @@ REPORT_TTL_DAYS=7
 | Дата | Что изменилось | Кто решил |
 |---|---|---|
 | 2026-10-24 | GET /api/metrics?corpus= — метрики других корпусов (слепой набор) | Данила (тимлид) |
+| 2026-10-24 | Раздел 5: LLM_TIMEOUT_S — таймаут запроса к LLM (T-029b) | Данила (тимлид) |
 | 2026-10-24 | LlmCall.purpose += special_category (T-013e) | Данила (тимлид) |
 | 2026-10-22 | Раздел 2: зафиксирован запрет условия `llm` внутри `not` (уже реализован в T-013b, `validate_condition`). Поведение кода не меняется. | Данила (тимлид) |
 | 2026-10-21 | T-013b: RuleContext.mask_spans для перевода цитат LLM | Данила (тимлид) |
