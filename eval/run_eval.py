@@ -1,4 +1,4 @@
-"""Оценка качества детекции на эталонном корпусе. Задача T-014a.
+"""Оценка качества детекции на эталонном корпусе. Задачи T-014a, T-036b, T-019b.
 
 Тонкая обёртка командной строки: вся логика — в backend/app/evaluation.
 
@@ -9,9 +9,18 @@
 Код выхода: 0 — успех; 1 — с --strict не выполнен критерий (recall ПДн < 0.90 или
 коммерческой тайны < 0.85); 2 — ошибка в корпусе (разметка, файлы) или --llm без ключа.
 
---llm (T-013d): к detect добавляется поиск коммерческой тайны нейросетью, как в конвейере
-(detect → mask → detect_trade_secrets_llm). Нужен LLM_PROVIDER=openai_compatible и ключ в .env;
-вызовы платные (до 3 на документ). Без флага — как раньше, без сети.
+Три режима (одинаковый порядок шагов с конвейером pipeline.run_audit):
+
+  по умолчанию  detect (regex, NER, словари) → mask → классификатор grif-cls (T-036b:
+                коммерческая тайна и особые категории ПДн «по смыслу»; data/models/grif-cls,
+                CPU, без сети и ключа). Так работает система у жюри без ключа — это число
+                показывает страница «Качество проверки».
+  --no-model    без классификатора: только regex, NER и словари (сравнение «до/после»);
+                в Metrics.corpus добавляется « (без классификатора)».
+  --llm         поверх режима по умолчанию (или --no-model) — нейросеть: сначала особые
+                категории ПДн (T-013e), затем коммерческая тайна (T-013d), как в конвейере.
+                Не «только КТ». Нужен LLM_PROVIDER=openai_compatible и ключ в .env; вызовы
+                платные. В Metrics.corpus добавляется « + LLM».
 """
 
 import argparse
@@ -35,7 +44,12 @@ def ensure_app_importable() -> None:
 
 
 def parse_args(argv: list[str] | None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Precision / recall детекции на корпусе")
+    parser = argparse.ArgumentParser(
+        description=(
+            "Precision / recall детекции на корпусе. По умолчанию — regex, NER, словари и "
+            "классификатор grif-cls, как в конвейере без ключа."
+        ),
+    )
     parser.add_argument("--corpus", type=Path, required=True, help="папка корпуса")
     parser.add_argument("--out", type=Path, required=True, help="папка для metrics.json")
     parser.add_argument(
@@ -43,7 +57,17 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--llm", action="store_true",
-        help="добавить поиск коммерческой тайны нейросетью (нужен ключ в .env, вызовы платные)",
+        help=(
+            "добавить нейросеть: особые категории ПДн, затем коммерческая тайна — как в "
+            "конвейере (нужен ключ в .env, вызовы платные)"
+        ),
+    )
+    parser.add_argument(
+        "--no-model", action="store_true",
+        help=(
+            "без классификатора grif-cls: только regex, NER и словари (для сравнения "
+            "«до/после»; с --llm — нейросеть без классификатора)"
+        ),
     )
     return parser.parse_args(argv)
 
@@ -59,9 +83,11 @@ def main(argv: list[str] | None = None) -> int:
     from app.evaluation.corpus import load_corpus
     from app.evaluation.report import (
         LLM_CORPUS_SUFFIX,
+        NO_MODEL_CORPUS_SUFFIX,
         LlmDetector,
         build_metrics,
         criteria_met,
+        detect_with_model,
         evaluate_corpus,
         format_table,
         write_results,
@@ -80,9 +106,14 @@ def main(argv: list[str] | None = None) -> int:
     except ValueError as exc:
         logger.error("Ошибка корпуса: %s", exc)
         return 2
-    llm_detector = LlmDetector() if args.llm else None
-    result = evaluate_corpus(docs, llm_detector or detect)
-    corpus = args.corpus.resolve().name + (LLM_CORPUS_SUFFIX if args.llm else "")
+    llm_detector = LlmDetector(use_model=not args.no_model) if args.llm else None
+    plain = detect if args.no_model else detect_with_model
+    result = evaluate_corpus(docs, llm_detector or plain)
+    corpus = (
+        args.corpus.resolve().name
+        + (LLM_CORPUS_SUFFIX if args.llm else "")
+        + (NO_MODEL_CORPUS_SUFFIX if args.no_model else "")
+    )
     metrics = build_metrics(result, corpus=corpus)
     write_results(metrics, result.errors, args.out)
     logger.info("%s", format_table(metrics))

@@ -11,6 +11,7 @@ from collections.abc import Callable
 from pathlib import Path
 from unittest.mock import Mock
 
+import httpx
 import pytest
 from pydantic import BaseModel
 
@@ -34,6 +35,7 @@ from app.schemas import (
 from app.services import pipeline
 from app.services.detection.detect import detect
 from app.services.llm import client as llm_client
+from app.services.llm import providers
 from app.services.llm import trade_secret as ts
 from app.services.llm.checks import LlmConditionAnswer, llm_call_log
 from app.services.llm.client import LLMRequestError, llm_call_budget
@@ -50,6 +52,10 @@ from app.services.llm.trade_secret import (
     select_candidates,
 )
 from app.services.masking.masker import mask, mask_value
+
+# T-036b: здесь проверяются LLM-шаги, классификатор grif-cls выключен (его тесты —
+# test_model_detector.py), иначе он находит те же сведения раньше фиктивной нейросети.
+pytestmark = pytest.mark.usefixtures("without_model")
 
 NAME = "Сидоров Семён Семёнович"
 PHONE = "+7 (900) 111-22-33"
@@ -378,6 +384,34 @@ def test_provider_error_gives_unknown_record_without_exception(
     assert calls[0].masked_fragment.startswith("1| ")
 
 
+def test_truncated_answer_gives_unknown_without_exception(monkeypatch: pytest.MonkeyPatch) -> None:
+    """T-019b: ответ обрезан на max_tokens (finish_reason="length") — unknown, без повтора."""
+    settings = Settings(
+        _env_file=None, llm_provider="openai_compatible",
+        llm_base_url="https://llm.invalid/v1", llm_model="synthetic-model",
+    )
+    monkeypatch.setattr(llm_client, "get_settings", lambda: settings)
+    monkeypatch.setattr(llm_client, "get_default_cache", lambda url: DictCache())
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        choice = {"message": {"content": '{"items": [{"quote": "берём у'},
+                  "finish_reason": "length"}
+        return httpx.Response(200, json={"choices": [choice]})
+
+    monkeypatch.setattr(
+        llm_client, "request_chat",
+        lambda settings, messages, transport=None, sleep=None: providers.request_chat(
+            settings, messages, transport=httpx.MockTransport(handler), sleep=lambda s: None),
+    )
+    found, calls = run()
+    assert llm_found(found) == []
+    assert [(c.verdict, c.quote) for c in calls] == [("unknown", None)]
+    assert len(requests) == 1
+    assert json.loads(requests[0].content)["max_tokens"] == providers.MAX_ANSWER_TOKENS
+
+
 def test_mock_mode_sends_nothing_and_logs_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(llm_client, "is_llm_enabled", lambda settings=None: False)
     fake = Mock(side_effect=AssertionError("в mock LLM не вызывается"))
@@ -498,3 +532,62 @@ def test_evaluate_corpus_with_llm_detector_in_mock_equals_plain(tmp_path: Path) 
     plain = evaluate_corpus(docs, detect)
     mocked = evaluate_corpus(docs, LlmDetector())
     assert plain.counts == mocked.counts
+
+
+# ------------------------------------------- T-019b: КТ без цифр ---
+
+CLIENTS = "Перечень ключевых клиентов: ООО «Альфа-Синтез», ООО «Бета-Логистик»."
+WORD_TEXT = (f"Менеджер: {NAME}, тел. {PHONE}.\n{CLIENTS}\n"
+             "Рецептура пропитки: льняное масло, воск и скипидар.\n"
+             "Срок поставки — май.\nУсловия сделки: наценка 14%.")
+
+
+def test_word_candidates_need_stem_and_no_digit() -> None:
+    got = [c.text for c in ts.select_word_candidates(WORD_TEXT, [], [])]
+    assert got == [CLIENTS, "Рецептура пропитки: льняное масло, воск и скипидар."]
+    digits = [c.text for c in select_candidates(WORD_TEXT, [], [])]
+    assert digits == ["Условия сделки: наценка 14%."]            # с цифрой — прежний отбор
+    assert ts.select_word_candidates("Работаем с клиентами.\nКлиент", [], []) == [
+        ts.Candidate(0, 21, "Работаем с клиентами.")]           # короче 8 символов — нет
+
+
+def test_word_candidates_skip_covered_trade_secret() -> None:
+    covered = plain_entity(WORD_TEXT, CLIENTS, EntityType.TRADE_SECRET)
+    got = [c.text for c in ts.select_word_candidates(WORD_TEXT, [], [covered])]
+    assert CLIENTS not in got
+
+
+def test_word_batch_only_within_total_limit() -> None:
+    words = ts.select_word_candidates(WORD_TEXT, [], [])
+    one = select_candidates(WORD_TEXT, [], [])
+    assert len(ts.plan_batches(one, words)) == 2                # 1 с цифрами + 1 без
+    many = select_candidates(long_text(400), [], [])
+    planned = ts.plan_batches(many, words)
+    assert len(planned) == MAX_TS_BATCHES                       # лимит уже занят строками с цифрой
+    assert all(CLIENTS not in b.text for b in planned)
+    lots = [ts.Candidate(i * 100, i * 100 + 90, "клиент " * 12) for i in range(100)]
+    assert len(ts.plan_batches([], lots)) == ts.MAX_WORD_BATCHES == 1
+
+
+def test_llm_finds_trade_secret_without_digits(real_llm: Callable[[FakeLlm], None]) -> None:
+    quote = "ключевых клиентов: ООО «Альфа-Синтез», ООО «Бета-Логистик»"
+    fake = items("наценка 14%", quote)
+    real_llm(fake)
+    found, calls = run(WORD_TEXT)
+    assert fake.call_count == 2 and len(calls) == 2              # пакет с цифрами + без
+    sent = fragment_of(fake.call_args_list[1].args[1])
+    assert CLIENTS in sent and NAME not in sent and "Срок поставки" not in sent
+    assert [WORD_TEXT[e.start:e.end] for e in llm_found(found)] == [quote, "наценка 14%"]
+    assert all(e.type == EntityType.TRADE_SECRET for e in llm_found(found))
+
+
+def test_word_only_text_in_mock_mode_unchanged(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(llm_client, "is_llm_enabled", lambda settings=None: False)
+    entities = base_entities(WORD_TEXT)
+    found, calls = run(WORD_TEXT, entities)
+    assert found == entities and calls == []
+
+
+def test_prompt_allows_values_without_numbers() -> None:
+    prompt = ts._system_prompt()
+    assert "без чисел" in prompt and "перечень клиентов" in prompt

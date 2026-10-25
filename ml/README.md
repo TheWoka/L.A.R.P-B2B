@@ -10,7 +10,7 @@
 
 | Файл | Что делает |
 |---|---|
-| `fragments.py` | `split_fragments(text) -> list[(start, end)]` — нарезка на предложения (только `re`; пойдёт в конвейер T-036b) |
+| `backend/app/services/detection/fragments.py` | `split_fragments(text) -> list[(start, end)]` — нарезка на предложения (только `re`); с T-036b живёт в backend, `evaluate.py` и тесты импортируют её оттуда — один код для оценки и конвейера |
 | `prompts/generate.md` | промпт генерации: классы своими словами + «трудные отрицания» |
 | `generate_data.py` | генерация `data/train/fragments.jsonl`, `stats.json`, `sample_for_review.md` |
 | `train.py` | обучение → `ml/out/best/` (лучшая эпоха по macro-F1 на 10% валидации) |

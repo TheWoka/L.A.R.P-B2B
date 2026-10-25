@@ -55,6 +55,10 @@ from app.services.redaction.redact import RedactedFile
 from app.services.rules.engine import RuleContext
 from app.worker import tasks
 
+# T-036b: здесь проверяются LLM-шаги, классификатор grif-cls выключен (его тесты —
+# test_model_detector.py), иначе он находит те же сведения раньше фиктивной нейросети.
+pytestmark = pytest.mark.usefixtures("without_model")
+
 NAME = "Сидоров Семён Семёнович"
 PHONE = "+7 (900) 111-22-33"
 FACT = "лежал в больнице с инфарктом"
@@ -564,3 +568,62 @@ def test_field_label_quote_before_placeholder_is_rejected(
 def test_prompt_excludes_medical_grounds_without_diagnosis_and_field_labels() -> None:
     prompt = sc._system_prompt()
     assert "по медицинским показаниям" in prompt and "названия полей анкеты" in prompt
+
+
+# ---------------------------------------------- T-019b: абзацы и привязка ---
+
+
+def _doc(text: str, segments: list[tuple[int, str]], pages: int | None = None) -> ExtractedDocument:
+    return ExtractedDocument(
+        document_id="paragraphs", filename="p.docx", text=text, pages=pages,
+        segments=[TextSegment(id=i, text=t, offset=o, page=1 if pages else None)
+                  for i, (o, t) in enumerate(segments)],
+    )
+
+
+def test_paragraph_bounds_by_format() -> None:
+    text = "Первая строка.\nВторая строка.\nТретий абзац."
+    one_segment = _doc(text, [(0, text)])                      # .txt / текстовый запрос
+    assert sc.paragraph_bounds(one_segment) == [(0, 14), (15, 29), (30, 43)]
+    pdf = _doc(text, [(0, "Первая строка.\nВторая строка."), (30, "Третий абзац.")], pages=1)
+    assert sc.paragraph_bounds(pdf) == [(0, 29), (30, 43)]       # блок PDF не режется
+    assert sc.paragraph_bounds(_doc("", [])) == []
+
+
+def test_paragraph_ids_and_gaps() -> None:
+    bounds = [(0, 14), (15, 29)]
+    assert sc.paragraph_ids(bounds, [0, 13, 14, 15, 29, 40]) == [0, 0, 0, 1, 1, -1]
+    assert sc.paragraph_ids([], [5]) == [-1]
+
+
+def test_has_person_context_same_paragraph() -> None:
+    texts = ["[PERSON_1] работает с 2019 года.", "Отличается аккуратностью.",
+             "Отличается пунктуальностью.", "Перенёс инфаркт.", "Поставка инсулина."]
+    paragraphs = [0, 0, 0, 0, 1]
+    without = sc.has_person_context(texts, word_in_neighbors=False)
+    assert without == [True, True, False, False, False]
+    with_paragraphs = sc.has_person_context(texts, word_in_neighbors=False, paragraphs=paragraphs)
+    assert with_paragraphs == [True, True, True, True, False]
+    with pytest.raises(ValueError):
+        sc.has_person_context(texts, word_in_neighbors=False, paragraphs=[0])
+
+
+def test_person_word_in_paragraph_only_with_word_in_neighbors() -> None:
+    texts = ["Работник отдела снабжения.", "Опыт пять лет.", "Ходит в церковь."]
+    paragraphs = [0, 0, 0]
+    strict = sc.has_person_context(texts, word_in_neighbors=False, paragraphs=paragraphs)
+    assert strict == [True, False, False]                     # слово-лицо — только в самом куске
+    near = sc.has_person_context(texts, word_in_neighbors=True, paragraphs=paragraphs)
+    assert near == [True, True, True]
+
+
+def test_candidates_use_paragraph_of_original_text() -> None:
+    """Три строки одного абзаца PDF: человек в первой, сведения — в третьей."""
+    text = ("[PERSON_1] работает с 2019 года.\nОтличается аккуратностью.\n"
+            "Ходит в церковь по воскресеньям.\nПоставка свечей для храма.")
+    last = text.rindex("\n")
+    assert [c.text for c in sc.select_candidates(text, [], [])] == [
+        "[PERSON_1] работает с 2019 года.", "Отличается аккуратностью."]
+    got = [c.text for c in sc.select_candidates(text, [], [], [(0, last), (last + 1, len(text))])]
+    assert got == ["[PERSON_1] работает с 2019 года.", "Отличается аккуратностью.",
+                   "Ходит в церковь по воскресеньям."]           # чужой абзац без человека — нет

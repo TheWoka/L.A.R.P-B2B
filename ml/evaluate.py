@@ -41,7 +41,6 @@ from common import (  # noqa: E402
     setup_logging,
     write_json,
 )
-from fragments import split_fragments  # noqa: E402
 
 ensure_app_importable()
 
@@ -51,6 +50,7 @@ from app.evaluation.matching import Counts, f1, precision, recall  # noqa: E402
 from app.evaluation.report import build_metrics, evaluate_corpus, write_results  # noqa: E402
 from app.schemas import Entity, EntityCategory, EntityType  # noqa: E402
 from app.services.detection.detect import detect  # noqa: E402
+from app.services.detection.fragments import split_fragments  # noqa: E402
 from app.services.masking.masker import (  # noqa: E402
     MASKED_CATEGORIES,
     mask,

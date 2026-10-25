@@ -32,6 +32,7 @@ CONF_CONTEXT = 0.95         # формат + обязательный конте
 CONF_FORMAT = 0.9           # только формат (телефон с кодом страны)
 CONF_PHONE_LOCAL = 0.85     # телефон без кода страны, рядом метка "тел."
 CONF_ACCOUNT_NO_BIK = 0.8   # счёт физлица, рядом нет БИК для проверки ключа
+CONF_ACCOUNT_LABELED = 0.8  # счёт физлица, ключ по БИК не сошёлся, но слева «счёт» (T-019b)
 CONF_EMAIL = 0.95
 
 # При пересечении остаётся сущность с меньшим рангом; при равенстве — более длинная.
@@ -65,6 +66,7 @@ ROLE_MAILBOXES = frozenset({
 WIN_SNILS = 40
 WIN_PASSPORT = 60
 WIN_CARD = 40
+WIN_ACCOUNT = 60            # «Личный счёт в АО «Банк …», БИК …: 40817…»
 WIN_BIRTH = 40
 WIN_BIRTH_RIGHT = 15        # "01.02.1990 г.р." — сокращение стоит после даты
 WIN_BIK = 120
@@ -114,6 +116,15 @@ ORG_PHONE_CONTEXT = re.compile(
     r"(?<!\w)(?:приемн\w*|отдел\w*|служб\w*|горяч\w*\s+лини\w*|диспетчер\w*|канцеляри\w*"
     r"|колл-?центр\w*|контакт-?центр\w*|секретариат\w*|reception|hotline|call-?cent\w*)"
 )
+# Ящик организации слева от адреса почты (T-019b): «общий ящик», «общий адрес лаборатории»,
+# «общий контакт заказчика», а также те же службы, что у телефонов («приёмная», «отдел» …).
+ORG_EMAIL_CONTEXT = re.compile(
+    r"(?<!\w)общ(?:ий|его|ему|ая|ей|ую)\s+(?:[\w-]+\s+)?(?:адрес\w*|ящик\w*|почт\w*"
+    r"|контакт\w*|e-?mail|электронн\w*)"
+    rf"|{ORG_PHONE_CONTEXT.pattern}"
+)
+# «личный», «мне» между меткой организации и адресом — почта человека.
+PERSONAL_MARK_RE = re.compile(r"личн\w*|(?<!\w)(?:мне|мой|моя|мою|мо[её]й)(?!\w)")
 # ФИО между меткой и телефоном: «Отдел ВЭД: Кулагин М.Ю., тел. …» — телефон сотрудника.
 NAME_IN_GAP_RE = re.compile(
     r"[А-ЯЁ][а-яё]+(?:-[А-ЯЁ][а-яё]+)?\s+[А-ЯЁ]\.|[А-ЯЁ]\.\s?(?:[А-ЯЁ]\.\s?)?[А-ЯЁ][а-яё]+"
@@ -145,6 +156,11 @@ KW_ISSUED = re.compile(r"выдан")
 KW_SERIES_BEFORE = re.compile(rf"сери[яи]\W{{0,{SERIES_MAX_GAP}}}$")
 PHONE_LABEL = re.compile(r"(?<!\w)(?:тел|моб|факс|phone)")
 KW_CARD = re.compile(r"карт|card")
+# Слово «счёт» слева от счёта физлица (T-019b). Префикс 40817/40820/40802/423/426 по плану
+# счетов Банка России уже говорит «счёт физлица или ИП»; ключ по БИК отсекает случайные
+# 20 цифр, слово «счёт» рядом — то же самое. Ключ не сошёлся при слове «счёт» — опечатка или
+# БИК другого банка рядом, а сведения о счёте человека остаются ПДн.
+KW_ACCOUNT = re.compile(r"(?<!\w)(?:сч[её]т\w*|сч\.|р/с|л/с|account)")
 KW_BIRTH = re.compile(r"рожд|родил(?:ся|ась)|г\.\s?р\.|д\.\s?р\.")
 KW_BIRTH_RIGHT = re.compile(r"^[\s,]*(?:г\.\s?р\.|д\.\s?р\.|года\s+рождения|г\.\s*рожд)")
 YEAR_RE = re.compile(r"\d{4}")
@@ -253,8 +269,18 @@ def _find_card(ctx: _Ctx) -> Iterator[Candidate]:
                 continue
         elif not v.is_valid_card(value) and len(value) > 19:
             end, value = start + 19, value[:19]  # 16 цифр + чужая группа из 3 цифр
-        if v.is_valid_card(value):
+        if v.is_valid_card(value) or _is_labeled_card(text, start, value):
             yield Candidate(EntityType.CARD, start, end, CONF_CHECKSUM)
+
+
+def _is_labeled_card(text: str, start: int, value: str) -> bool:
+    """Номер по ISO/IEC 7812 (16–19 цифр, алгоритм Луна) с любой первой цифрой 1–9, если слева
+    слово «карта» (T-019b). Первая цифра 2–6 — платёжные системы (Мир, Visa, Mastercard);
+    1, 7–9 — отраслевые и национальные карты, тоже номер карты физлица."""
+    digits = v.only_digits(value) or ""
+    if not 16 <= len(digits) <= 19 or digits[0] == "0" or not v.luhn_ok(digits):
+        return False
+    return KW_CARD.search(left_window(text, start, WIN_CARD)) is not None
 
 
 def _has_passport_context(text: str, start: int, end: int) -> bool:
@@ -336,11 +362,24 @@ def _find_phone_local(ctx: _Ctx) -> Iterator[Candidate]:
         yield Candidate(EntityType.PHONE, m.start(), m.end(), CONF_PHONE_LOCAL)
 
 
+def is_org_email(text: str, start: int) -> bool:
+    """Слева в той же строке — ящик организации («общий ящик», «приёмная» …) и между меткой
+    и адресом нет ФИО. «Отдел ВЭД: Кулагин М.Ю., kulagin@…» — почта сотрудника (T-019b)."""
+    raw = _raw_left(text, start, WIN_ORG_CONTEXT + 10)
+    hits = list(ORG_EMAIL_CONTEXT.finditer(_norm(raw)))  # _norm не меняет длину
+    if not hits:
+        return False
+    gap = raw[hits[-1].end():]
+    return NAME_IN_GAP_RE.search(gap) is None and PERSONAL_MARK_RE.search(_norm(gap)) is None
+
+
 def _find_email(ctx: _Ctx) -> Iterator[Candidate]:
-    """Email физлица; ролевые ящики организации (info@, sales@ …) пропускаются."""
+    """Email физлица; ролевые ящики (info@, sales@ …) и ящики с меткой организации слева
+    («общий ящик», «приёмная», T-019b) пропускаются: это не ПДн (152-ФЗ, ст. 3 п. 1)."""
     for m in EMAIL_RE.finditer(ctx.text):
-        if not is_role_mailbox(m.group().split("@", 1)[0]):
-            yield Candidate(EntityType.EMAIL, m.start(), m.end(), CONF_EMAIL)
+        if is_role_mailbox(m.group().split("@", 1)[0]) or is_org_email(ctx.text, m.start()):
+            continue
+        yield Candidate(EntityType.EMAIL, m.start(), m.end(), CONF_EMAIL)
 
 
 def _date_parts(m: re.Match[str]) -> tuple[int, int, int]:
@@ -369,7 +408,8 @@ def _find_birth_date(ctx: _Ctx) -> Iterator[Candidate]:
 
 
 def _find_accounts(ctx: _Ctx) -> tuple[list[Candidate], list[tuple[int, int]]]:
-    """Счета физлиц + «блокеры»: счета организаций и счета с неверным ключом.
+    """Счета физлиц + «блокеры»: счета организаций и счета с неверным ключом без слова
+    «счёт» слева (T-019b: со словом — счёт физлица, CONF_ACCOUNT_LABELED).
 
     Блокеры не возвращаются, но занимают свой диапазон, чтобы внутри реквизитов
     организации не нашлись «телефон» или «карта».
@@ -392,6 +432,8 @@ def _find_accounts(ctx: _Ctx) -> tuple[list[Candidate], list[tuple[int, int]]]:
             conf = CONF_ACCOUNT_NO_BIK
         elif any(v.is_valid_account_key(digits, bik) for bik in near):
             conf = CONF_CHECKSUM
+        elif KW_ACCOUNT.search(left_window(text, m.start(), WIN_ACCOUNT)):
+            conf = CONF_ACCOUNT_LABELED            # T-019b: см. KW_ACCOUNT
         else:
             blockers.append((m.start(), m.end()))
             continue

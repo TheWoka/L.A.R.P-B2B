@@ -5,7 +5,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from fragments import MAX_FRAGMENT_CHARS, split_fragments  # noqa: E402
+from common import ensure_app_importable  # noqa: E402
+
+ensure_app_importable()  # нарезка живёт в backend (T-036b): один код для оценки и конвейера
+
+from app.services.detection.fragments import MAX_FRAGMENT_CHARS, split_fragments  # noqa: E402
 
 
 def texts(text: str) -> list[str]:

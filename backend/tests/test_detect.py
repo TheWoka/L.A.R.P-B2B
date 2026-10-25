@@ -6,7 +6,12 @@ from pathlib import Path
 import pytest
 
 from app.schemas import Entity, EntityCategory, EntityType, ExtractedDocument, TextSegment
-from app.services.detection.detect import assign_location, detect, merge_entities
+from app.services.detection.detect import (
+    assign_location,
+    detect,
+    merge_entities,
+    trim_at_newline,
+)
 from tests.test_validators import make_inn12, make_snils
 
 T = EntityType
@@ -286,3 +291,55 @@ def test_disability_next_to_person_is_special_category() -> None:
     special = by_type[T.SPECIAL_CATEGORY]
     assert text[special.start:special.end].startswith("инвалид II группы")
     assert special.category == EntityCategory.pd_special
+
+
+# ---------- T-019b: спаны ПДн не переходят строку ----------
+def _span(text: str, value: str, etype: EntityType, category: EntityCategory) -> Entity:
+    start = text.index(value)
+    return Entity(type=etype, category=category, start=start, end=start + len(value),
+                  value_masked=value, confidence=0.9, detector="ner")
+
+
+def test_trim_person_at_newline_keeps_line_with_most_words() -> None:
+    text = "ФИО: Тихонов Арсений Валерьевич\nДата заполнения анкеты: 12.10.2026"
+    person = _span(text, "Тихонов Арсений Валерьевич\nДата", EntityType.PERSON, EntityCategory.pd)
+    [trimmed] = trim_at_newline([person], text)
+    assert text[trimmed.start:trimmed.end] == "Тихонов Арсений Валерьевич"
+    assert trimmed.value_masked == "Т██████ А██████ В█████████"
+    assert trimmed.type == EntityType.PERSON and trimmed.detector == "ner"
+
+
+def test_trim_keeps_address_phrases_and_one_line_spans() -> None:
+    text = "г. Томск, ул. Ленина,\nд. 5, кв. 3\nНаценка 14%\nдля\nклиента"
+    address = _span(text, "г. Томск, ул. Ленина,\nд. 5, кв. 3", EntityType.ADDRESS,
+                    EntityCategory.pd)
+    secret = _span(text, "Наценка 14%\nдля\nклиента", EntityType.TRADE_SECRET,
+                   EntityCategory.trade_secret)
+    plain = _span(text, "Наценка 14%", EntityType.PERSON, EntityCategory.pd)
+    assert trim_at_newline([address, secret, plain], text) == [address, secret, plain]
+
+
+def test_trim_initials_tail_before_next_cell() -> None:
+    """xlsx: «Павлов В. Д.\nЛичный телефон» — NER дал второй спан «В. Д.\nЛичный»."""
+    text = "Контактное лицо | Павлов В. Д.\nЛичный телефон | 8 (999) 000-00-00"
+    tail = _span(text, "В. Д.\nЛичный", EntityType.PERSON, EntityCategory.pd)
+    [trimmed] = trim_at_newline([tail], text)
+    assert text[trimmed.start:trimmed.end] == "В. Д."
+
+
+def test_trim_drops_span_without_letters() -> None:
+    text = "Иванов\n—\n"
+    edge = Entity(type=EntityType.PERSON, category=EntityCategory.pd, start=6, end=9,
+                  value_masked="\n—\n", confidence=0.9, detector="ner")
+    assert trim_at_newline([edge], text) == []
+    assert trim_at_newline([], text) == []
+
+
+def test_detect_person_does_not_swallow_next_line() -> None:
+    text = "Анкета члена комиссии\nТихонов Арсений Валерьевич\nДата рождения: 03.04.1988"
+    doc = ExtractedDocument(document_id="nl", filename="a.txt", text=text,
+                            segments=[TextSegment(id=0, text=text, offset=0)])
+    for entity in detect(doc):
+        assert "\n" not in text[entity.start:entity.end]
+    persons = [text[e.start:e.end] for e in detect(doc) if e.type == EntityType.PERSON]
+    assert persons == ["Тихонов Арсений Валерьевич"]
