@@ -1,0 +1,82 @@
+{
+  "fragments": 6136,
+  "by_label": {
+    "TRADE_SECRET": 1518,
+    "SPECIAL_CATEGORY": 1301,
+    "NONE": 3317
+  },
+  "by_kind": {
+    "contrast_sc": 606,
+    "contrast_ts": 626,
+    "hard_none": 1046,
+    "plain_none": 1658,
+    "special": 996,
+    "trade_secret": 1204
+  },
+  "by_doc_type": {
+    "certificate": 451,
+    "chat": 703,
+    "contract": 444,
+    "costing": 292,
+    "form": 360,
+    "letter": 710,
+    "memo": 851,
+    "minutes": 829,
+    "offer": 469,
+    "procurement_report": 402,
+    "reference": 625
+  },
+  "by_register": {
+    "abbrev": 2042,
+    "casual": 2009,
+    "official": 2085
+  },
+  "by_industry": {
+    "catering": 742,
+    "construction": 870,
+    "fuel": 954,
+    "furniture": 1005,
+    "it": 845,
+    "logistics": 820,
+    "medicine": 900
+  },
+  "hard_negatives": 1659,
+  "dropped": {
+    "masked_pd": 1,
+    "duplicate": 513,
+    "unknown_placeholder": 56,
+    "meta_phrase": 61,
+    "label_conflict": 1
+  },
+  "length": {
+    "NONE": {
+      "n": 3317,
+      "min": 15,
+      "median": 66,
+      "mean": 66.7,
+      "max": 139
+    },
+    "TRADE_SECRET": {
+      "n": 1518,
+      "min": 43,
+      "median": 87.0,
+      "mean": 87.7,
+      "max": 162
+    },
+    "SPECIAL_CATEGORY": {
+      "n": 1301,
+      "min": 33,
+      "median": 78,
+      "mean": 81.0,
+      "max": 153
+    }
+  },
+  "llm": {
+    "calls": 331,
+    "cache_hits": 0,
+    "prompt_tokens": 534311,
+    "completion_tokens": 187906,
+    "failed": 0,
+    "usd": 0.1929
+  }
+}
