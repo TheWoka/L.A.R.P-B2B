@@ -4,6 +4,7 @@ import { Button, Drawer, Layout } from "antd";
 import { Link, Route, Routes, useLocation } from "react-router-dom";
 
 import ReportPage from "./pages/ReportPage";
+import NotFoundPage from "./pages/NotFoundPage";
 import QualityPage from "./pages/QualityPage";
 import RulesPage from "./pages/RulesPage";
 import TaskPage from "./pages/TaskPage";
@@ -30,11 +31,12 @@ function NavSymbol({ name }: { name: NavIcon }) {
   return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">{paths[name]}</svg>;
 }
 
-function activePath(pathname: string): string {
+function activePath(pathname: string): string | null {
   if (pathname === "/reports/example") return "/reports/example";
   if (pathname.startsWith("/rules")) return "/rules";
   if (pathname.startsWith("/quality")) return "/quality";
-  return "/";
+  if (pathname === "/" || pathname.startsWith("/tasks/") || pathname.startsWith("/reports/")) return "/";
+  return null;
 }
 
 export default function App() {
@@ -59,7 +61,7 @@ export default function App() {
       <Layout className="app-main">
         <header className="mobile-header">
           <Link to="/" className="mobile-brand" aria-label="Гриф — новая проверка"><span className="brand-mark" aria-hidden="true" /><span>Гриф</span></Link>
-          <Button className="mobile-menu-button" type="text" aria-label="Открыть меню" aria-expanded={menuOpen} onClick={() => setMenuOpen(true)}>
+          <Button className="mobile-menu-button" type="text" aria-label="Меню" aria-expanded={menuOpen} onClick={() => setMenuOpen(true)}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
           </Button>
         </header>
@@ -70,6 +72,7 @@ export default function App() {
             <Route path="/reports/:reportId" element={<ReportPage />} />
             <Route path="/rules" element={<RulesPage />} />
             <Route path="/quality" element={<QualityPage />} />
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Content>
       </Layout>
