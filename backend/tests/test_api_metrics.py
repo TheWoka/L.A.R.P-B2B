@@ -134,7 +134,7 @@ def test_invalid_corpus_returns_422(
 ) -> None:
     response = client.get("/api/metrics", params={"corpus": name})
     assert response.status_code == 422
-    assert response.json()["detail"][0]["loc"] == ["query", "corpus"]
+    assert response.json() == {"detail": "Неверное имя набора данных."}
 
 
 @pytest.mark.parametrize("name", ["a", "a" * 32, "blind_2026-10"])
