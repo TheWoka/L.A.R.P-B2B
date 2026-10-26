@@ -1,12 +1,13 @@
 import { useState } from "react";
-import { Alert, Button, Input, Radio, Tabs, Typography, Upload, message } from "antd";
+import { Alert, Button, Input, Radio, Tabs, Typography, Upload } from "antd";
 import type { UploadFile, UploadProps } from "antd";
 import { Link, useNavigate } from "react-router-dom";
 
-import { submitQuery, uploadDocument } from "../api/client";
+import { ApiError, submitQuery, uploadDocument } from "../api/client";
 import type { DocPurpose } from "../api/types";
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
+const MAX_TEXT_LENGTH = 200_000;
 const ACCEPTED_EXTENSIONS = [".pdf", ".docx", ".xlsx"];
 
 const PURPOSES: { value: DocPurpose; title: string; description: string }[] = [
@@ -17,7 +18,21 @@ const PURPOSES: { value: DocPurpose; title: string; description: string }[] = [
 ];
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Не удалось выполнить проверку. Попробуйте ещё раз.";
+  if (error instanceof ApiError) {
+    if (error.status === 503) return "Сервис проверки временно недоступен. Попробуйте через минуту.";
+    return error.message;
+  }
+  if (error instanceof TypeError) return "Нет связи с сервером";
+  return "Не удалось выполнить проверку. Попробуйте ещё раз.";
+}
+
+function fileValidationError(file: File): string | null {
+  if (!ACCEPTED_EXTENSIONS.some((extension) => file.name.toLowerCase().endsWith(extension))) {
+    return "Поддерживаются PDF, DOCX и XLSX";
+  }
+  if (file.size === 0) return "Файл пустой";
+  if (file.size > MAX_FILE_SIZE) return "Файл больше 50 МБ";
+  return null;
 }
 
 function PurposePicker({ value, onChange }: { value: DocPurpose; onChange: (value: DocPurpose) => void }) {
@@ -43,49 +58,58 @@ export default function UploadPage() {
   const [queryText, setQueryText] = useState("");
   const [uploading, setUploading] = useState(false);
   const [submittingQuery, setSubmittingQuery] = useState(false);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [queryError, setQueryError] = useState<string | null>(null);
 
   const beforeUpload: UploadProps["beforeUpload"] = (file) => {
-    const supported = ACCEPTED_EXTENSIONS.some((extension) => file.name.toLowerCase().endsWith(extension));
-    if (!supported) {
-      void message.error("Поддерживаются только файлы PDF, DOCX и XLSX.");
-      return Upload.LIST_IGNORE;
-    }
-    if (file.size > MAX_FILE_SIZE) {
-      void message.error("Размер файла не должен превышать 50 МБ.");
-      return Upload.LIST_IGNORE;
-    }
+    const validationError = fileValidationError(file);
+    setFileError(validationError);
+    if (validationError) return Upload.LIST_IGNORE;
     return false;
   };
 
   async function handleUpload() {
+    if (uploading) return;
     const file = fileList[0]?.originFileObj;
     if (!file) {
-      void message.warning("Сначала выберите документ для проверки.");
+      setFileError("Сначала выберите документ для проверки.");
       return;
     }
+    const validationError = fileValidationError(file);
+    if (validationError) {
+      setFileError(validationError);
+      return;
+    }
+    setFileError(null);
     setUploading(true);
     try {
       const task = await uploadDocument(file, filePurpose);
       navigate(`/tasks/${encodeURIComponent(task.task_id)}`);
     } catch (error: unknown) {
-      void message.error(errorMessage(error));
+      setFileError(errorMessage(error));
     } finally {
       setUploading(false);
     }
   }
 
   async function handleSubmitQuery() {
+    if (submittingQuery) return;
     const text = queryText.trim();
     if (!text) {
-      void message.warning("Введите текст, который нужно проверить.");
+      setQueryError("Введите текст, который нужно проверить.");
       return;
     }
+    if (queryText.length > MAX_TEXT_LENGTH) {
+      setQueryError("Текст длиннее 200 000 символов. Сократите его и попробуйте снова.");
+      return;
+    }
+    setQueryError(null);
     setSubmittingQuery(true);
     try {
       const task = await submitQuery({ text, purpose: queryPurpose });
       navigate(`/tasks/${encodeURIComponent(task.task_id)}`);
     } catch (error: unknown) {
-      void message.error(errorMessage(error));
+      setQueryError(errorMessage(error));
     } finally {
       setSubmittingQuery(false);
     }
@@ -101,7 +125,7 @@ export default function UploadPage() {
         fileList={fileList}
         beforeUpload={beforeUpload}
         onChange={({ fileList: nextFiles }) => setFileList(nextFiles.slice(-1))}
-        onRemove={() => setFileList([])}
+        onRemove={() => { setFileList([]); setFileError(null); }}
         showUploadList={{ showPreviewIcon: false }}
       >
         <span className="upload-symbol" aria-hidden="true">
@@ -119,7 +143,8 @@ export default function UploadPage() {
         <PurposePicker value={filePurpose} onChange={setFilePurpose} />
       </section>
       <div className="form-actions">
-        <Button type="primary" size="large" loading={uploading} onClick={() => { void handleUpload(); }}>
+        {fileError && <Alert type="error" showIcon title={fileError} className="form-error" />}
+        <Button type="primary" size="large" loading={uploading} disabled={uploading} onClick={() => { void handleUpload(); }}>
           Начать проверку
         </Button>
         <Typography.Text type="secondary">Обычно занимает меньше минуты</Typography.Text>
@@ -133,19 +158,21 @@ export default function UploadPage() {
         className="query-input"
         aria-label="Текст документа"
         value={queryText}
-        onChange={(event) => setQueryText(event.target.value)}
+        onChange={(event) => { setQueryText(event.target.value); setQueryError(null); }}
         placeholder="Вставьте текст для проверки…"
         autoSize={{ minRows: 8, maxRows: 18 }}
-        showCount
-        maxLength={100_000}
       />
+      <Typography.Text className={`query-character-count${queryText.length > MAX_TEXT_LENGTH ? " is-over" : ""}`}>
+        {queryText.length.toLocaleString("ru-RU")} / {MAX_TEXT_LENGTH.toLocaleString("ru-RU")} символов
+      </Typography.Text>
       <section className="purpose-section">
         <h2>Куда пойдёт документ?</h2>
         <p>Это поможет применить нужные правила проверки.</p>
         <PurposePicker value={queryPurpose} onChange={setQueryPurpose} />
       </section>
       <div className="form-actions">
-        <Button type="primary" size="large" loading={submittingQuery} onClick={() => { void handleSubmitQuery(); }}>
+        {queryError && <Alert type="error" showIcon title={queryError} className="form-error" />}
+        <Button type="primary" size="large" loading={submittingQuery} disabled={submittingQuery} onClick={() => { void handleSubmitQuery(); }}>
           Начать проверку
         </Button>
         <Typography.Text type="secondary">Персональные сведения скрываются до анализа</Typography.Text>
