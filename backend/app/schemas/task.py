@@ -2,7 +2,7 @@
 
 from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.schemas.document import DocPurpose
 
@@ -41,5 +41,13 @@ class TaskCreated(BaseModel):
 class QueryRequest(BaseModel):
     """Тело POST /api/queries."""
 
-    text: str = Field(min_length=1)
+    text: str = Field(min_length=1, max_length=200_000)
     purpose: DocPurpose
+
+    @field_validator("text", mode="before")
+    @classmethod
+    def reject_blank_text(cls, value: object) -> object:
+        """Отклоняет пробелы, сохраняя допустимый текст и его смещения без изменений."""
+        if isinstance(value, str) and not value.strip():
+            raise ValueError("blank_text")
+        return value

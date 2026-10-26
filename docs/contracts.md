@@ -347,6 +347,7 @@ def build_report(ctx: RuleContext, violations: list[Violation], processing_ms: i
 | GET | `/api/health` | — | `HealthStatus` |
 
 Ограничения: файл до 50 МБ; форматы .pdf, .docx, .xlsx; иначе `400 {detail: "понятное сообщение"}`.
+Ошибки валидации запроса: `422 {"detail": "строка по-русски"}`; ответ не содержит введённых значений.
 Исходные файлы удаляются после обработки; отчёты хранятся `REPORT_TTL_DAYS` дней (по умолчанию 7) — система сама соблюдает сроки хранения, которые проверяет.
 Обезличенная копия создаётся в конвейере **до** удаления исходника и хранится тот же срок, что отчёт (`REPORT_TTL_DAYS`); правила копии — в разделе 4.1.
 
@@ -360,7 +361,7 @@ class TaskCreated(BaseModel):        # ответ POST /api/documents и POST /a
 
 
 class QueryRequest(BaseModel):       # тело POST /api/queries
-    text: str = Field(min_length=1)
+    text: str = Field(min_length=1, max_length=200_000)
     purpose: DocPurpose
 
 
@@ -440,6 +441,7 @@ REPORT_TTL_DAYS=7
 
 | Дата | Что изменилось | Кто решил |
 |---|---|---|
+| 2026-10-25 | 422 — {detail: строка}; QueryRequest.text ≤ 200 000 (T-052) | Данила (тимлид) |
 | 2026-10-24 | GET /api/metrics?corpus= — метрики других корпусов (слепой набор) | Данила (тимлид) |
 | 2026-10-24 | Раздел 5: LLM_TIMEOUT_S — таймаут запроса к LLM (T-029b) | Данила (тимлид) |
 | 2026-10-24 | LlmCall.purpose += special_category (T-013e) | Данила (тимлид) |

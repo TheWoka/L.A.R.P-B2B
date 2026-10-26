@@ -210,6 +210,7 @@ export interface TaskCreated {
 }
 
 export interface QueryRequest {
+  /** Не больше 200 000 символов (contracts.md, раздел 4.1). */
   text: string;
   purpose: DocPurpose;
 }

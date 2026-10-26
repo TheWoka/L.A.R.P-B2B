@@ -5,9 +5,11 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import documents, health, metrics, reports, rules, tasks
+from app.api.errors import VALIDATION_ERROR_RESPONSE, request_validation_error_handler
 from app.core.logging import setup_logging
 from app.core.version import APP_VERSION
 from app.db.session import init_db
@@ -31,7 +33,10 @@ app = FastAPI(
     description="Хакатон B2B-РТС «AI Procurement Copilot», задача 7. Контракты: docs/contracts.md",
     version=APP_VERSION,
     lifespan=lifespan,
+    responses={422: VALIDATION_ERROR_RESPONSE},
 )
+
+app.add_exception_handler(RequestValidationError, request_validation_error_handler)
 
 app.add_middleware(
     CORSMiddleware,
