@@ -63,6 +63,13 @@ def upload_document(
     signatures = {".pdf": b"%PDF", ".docx": b"PK\x03\x04", ".xlsx": b"PK\x03\x04"}
     signature = file.file.read(4)
     file.file.seek(0)
+    if not signature:
+        raise HTTPException(status_code=400, detail="Файл пустой.")
+    if extension in {".docx", ".xlsx"} and signature == b"\xd0\xcf\x11\xe0":
+        raise HTTPException(
+            status_code=400,
+            detail="Старый формат .doc/.xls не поддерживается. Сохраните файл как .docx/.xlsx.",
+        )
     if extension not in signatures or signature != signatures[extension]:
         raise HTTPException(status_code=400, detail=UNSUPPORTED_FORMAT)
     document_id = uuid4().hex

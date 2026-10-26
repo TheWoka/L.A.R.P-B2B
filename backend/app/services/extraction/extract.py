@@ -7,7 +7,8 @@ import pymupdf
 
 from app.schemas import ExtractedDocument, TextSegment
 from app.services.extraction.docx import extract_docx
-from app.services.extraction.pdf import ScannedPdfError, extract_pdf
+from app.services.extraction.errors import EMPTY_DOCUMENT, ExtractionError
+from app.services.extraction.pdf import extract_pdf
 from app.services.extraction.xlsx import extract_xlsx
 
 logger = logging.getLogger(__name__)
@@ -32,7 +33,8 @@ def extract(path: Path, filename: str, document_id: str) -> ExtractedDocument:
         if extension == ".pdf":
             with pymupdf.open(path, filetype="pdf") as pdf:
                 pages = len(pdf)
-    except ScannedPdfError:
+    except ExtractionError as exc:
+        logger.info("case=%s document_id=%s", exc.case, document_id)
         raise
     except Exception as exc:
         raise ValueError(
@@ -45,6 +47,9 @@ def extract(path: Path, filename: str, document_id: str) -> ExtractedDocument:
             continue
         normalized.append(segment.model_copy(update={"id": len(normalized), "offset": offset}))
         offset += len(segment.text) + 1
+    if not normalized:
+        logger.info("case=empty_document document_id=%s", document_id)
+        raise ExtractionError(EMPTY_DOCUMENT, case="empty_document")
     logger.info(
         "Извлечён документ %s: страниц=%s, сегментов=%s", document_id, pages, len(normalized),
     )

@@ -13,6 +13,11 @@ from openpyxl.cell.read_only import EmptyCell, ReadOnlyCell
 from openpyxl.utils import get_column_letter
 
 from app.schemas import TextSegment
+from app.services.extraction.errors import (
+    FORMULAS_WITHOUT_VALUES,
+    ExtractionError,
+    readable_file,
+)
 
 UNITS = frozenset({"руб.", "руб", "₽", "%", "шт.", "тыс. руб.", "млн руб."})
 
@@ -63,6 +68,28 @@ def _row_text(row: tuple[ReadOnlyCell | EmptyCell, ...]) -> str:
 
 
 def extract_xlsx(path: Path) -> list[TextSegment]:
+    """Переводит ошибки чтения XLSX в безопасное сообщение."""
+    with readable_file():
+        segments = _read_xlsx(path)
+        if not segments and _has_formulas(path):
+            raise ExtractionError(FORMULAS_WITHOUT_VALUES, case="formulas_without_values")
+        return segments
+
+
+def _has_formulas(path: Path) -> bool:
+    """Проверяет формулы только когда сохранённых значений для проверки нет."""
+    with path.open("rb") as source:
+        workbook = load_workbook(source, read_only=True, data_only=False)
+        try:
+            return any(
+                cell.data_type == "f"
+                for sheet in workbook for row in sheet.iter_rows() for cell in row
+            )
+        finally:
+            workbook.close()
+
+
+def _read_xlsx(path: Path) -> list[TextSegment]:
     """Читает .xlsx и возвращает сегменты текста по порядку.
 
     offset считается от начала текста этого файла при склейке сегментов через "\\n";
