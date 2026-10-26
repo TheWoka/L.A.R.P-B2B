@@ -17,10 +17,17 @@ from docx.table import Table
 from docx.text.paragraph import Paragraph
 
 from app.schemas import TextSegment
+from app.services.extraction.errors import readable_file
 from app.services.extraction.pdf import is_numbered_heading
 
 
 def extract_docx(path: Path) -> list[TextSegment]:
+    """Переводит ошибки чтения DOCX в безопасное сообщение."""
+    with readable_file():
+        return _read_docx(path)
+
+
+def _read_docx(path: Path) -> list[TextSegment]:
     """Читает .docx и возвращает сегменты текста по порядку.
 
     offset считается от начала текста этого файла при склейке сегментов через "\\n";

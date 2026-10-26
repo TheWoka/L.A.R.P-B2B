@@ -432,9 +432,9 @@ def corrupt_path(tmp_path: Path, request: pytest.FixtureRequest) -> Path:
 
 
 def test_corrupt_file(corrupt_path: Path) -> None:
-    with pytest.raises(ValueError, match="Не удалось прочитать файл") as error:
+    with pytest.raises(ValueError, match="Файл повреждён") as error:
         extract(corrupt_path, corrupt_path.name, "synthetic-id")
-    assert error.value.__cause__ is not None
+    assert error.value.__cause__ is None
 
 
 @pytest.fixture(params=["docx", "xlsx"])
@@ -455,11 +455,8 @@ def empty_path(tmp_path: Path, request: pytest.FixtureRequest) -> Path:
 
 
 def test_empty_documents(empty_path: Path) -> None:
-    extracted = extract(empty_path, empty_path.name, "synthetic-id")
-    assert extracted.text == ""
-    assert extracted.segments == []
-    assert extracted.pages is None
-    assert_offsets(extracted)
+    with pytest.raises(ValueError, match="^В документе нет текста для проверки\\.$"):
+        extract(empty_path, empty_path.name, "synthetic-id")
 
 
 @pytest.mark.parametrize("page_count", [1, 2])

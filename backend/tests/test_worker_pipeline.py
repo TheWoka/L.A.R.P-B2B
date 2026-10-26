@@ -86,7 +86,7 @@ def test_corrupt_pdf_pipeline(session: Session, tmp_path: Path) -> None:
     tasks.run_pipeline(task.id, session)
     assert task.status == "failed"
     assert task.error == (
-        "Не удалось прочитать файл. Он повреждён, недоступен или защищён паролем."
+        "Файл повреждён или сохранён не полностью. Откройте его и сохраните заново."
     )
     assert not path.exists()
     assert session.get(DocumentRow, task.document_id).stored_path is None

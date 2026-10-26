@@ -11,11 +11,12 @@ from pathlib import Path
 import pymupdf
 
 from app.schemas import TextSegment
+from app.services.extraction.errors import PASSWORD_PROTECTED, ExtractionError, readable_file
 
 logger = logging.getLogger(__name__)
 
 
-class ScannedPdfError(ValueError):
+class ScannedPdfError(ExtractionError):
     """PDF содержит страницы, но не содержит распознаваемого текста."""
 
 
@@ -38,7 +39,9 @@ def extract_pdf(path: Path) -> list[TextSegment]:
     section: str | None = None
     offset = 0
     empty_pages: list[int] = []
-    with pymupdf.open(path, filetype="pdf") as document:
+    with readable_file(), pymupdf.open(path, filetype="pdf") as document:
+        if document.needs_pass or document.is_encrypted:
+            raise ExtractionError(PASSWORD_PROTECTED, case="password_protected")
         for page in document:
             count_before = len(segments)
             for block in page.get_text("blocks", sort=True):
@@ -59,7 +62,7 @@ def extract_pdf(path: Path) -> list[TextSegment]:
         if empty_pages and len(empty_pages) == len(document):
             raise ScannedPdfError(
                 "Документ похож на скан: текст не распознаётся. "
-                "Загрузите документ с текстовым слоем."
+                "Загрузите документ с текстовым слоем.", case="scanned_pdf",
             )
     if empty_pages:
         logger.warning("PDF: страницы без текста: %s", empty_pages)
