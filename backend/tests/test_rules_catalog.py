@@ -268,3 +268,77 @@ def test_catalog_ids_match_documented_table(rules: list[Rule]) -> None:
         r"^\|\s*`([A-Z_]+)`\s*\|", path.read_text(encoding="utf-8"), re.M,
     ))
     assert {rule.id for rule in rules} == documented_ids
+
+
+def article_text(source: str, law: str, article: str) -> str | None:
+    """Повторяет поиск раздела из frontend/src/components/legalArticles.ts."""
+    number = re.search(r"[0-9]+(?:\.[0-9]+)?", article)
+    if number is None:
+        return None
+    prefix = "Article" if law == "GDPR" else "Статья"
+    sections = re.split(r"^## ", source, flags=re.M)[1:]
+    return next((
+        section.strip() for section in sections
+        if section.startswith(f"{prefix} {number[0]}. ")
+    ), None)
+
+
+def test_catalog_law_refs_open_local_articles(rules: list[Rule]) -> None:
+    paths = [Path("/data/legal"), Path(__file__).resolve().parents[2] / "data/legal"]
+    legal_dir = next((path for path in paths if path.is_dir()), None)
+    if legal_dir is None:
+        pytest.skip("data/legal недоступен (в образе api нет текстов законов)")
+    filenames = {
+        "152-ФЗ": "152-fz.md", "187-ФЗ": "187-fz.md",
+        "98-ФЗ": "98-fz.md", "GDPR": "gdpr.md",
+    }
+    errors: list[str] = []
+    for rule in rules:
+        for ref in rule.law_refs:
+            label = f"{rule.id}: {ref.law}, {ref.article}"
+            # Текст локального акта заказчика не включаем по решению T-054.
+            if (rule.id, ref.law, ref.article, ref.title, ref.url) == (
+                "CHECKLIST_NO_APPROVAL", "Внутренний регламент организации",
+                "согласование документов", "Устанавливается локальным актом заказчика", None,
+            ):
+                continue
+            filename = filenames.get(ref.law)
+            if filename is None:
+                errors.append(f"{label}: закон не поддерживается legalArticles.ts")
+                continue
+            path = legal_dir / filename
+            if not path.is_file():
+                errors.append(f"{label}: нет файла {filename}")
+                continue
+            if article_text(path.read_text(encoding="utf-8"), ref.law, ref.article) is None:
+                errors.append(f"{label}: нет точного заголовка статьи")
+    assert not errors, "\n".join(errors)
+
+
+@pytest.mark.parametrize(
+    ("law", "article", "expected"),
+    [
+        ("152-ФЗ", "ст. 10", "Статья 10. Особые категории\nТекст 10."),
+        ("152-ФЗ", "ст. 10.1", "Статья 10.1. Распространение\nТекст 10.1."),
+        ("152-ФЗ", "ст. 6 ч. 3", "Статья 6. Условия обработки\nВся статья 6."),
+        ("152-ФЗ", "ст. 18.1", "Статья 18.1. Меры оператора\nТекст 18.1."),
+        ("GDPR", "Art. 28(3)", "Article 28. Processor\nWhole article 28."),
+        ("152-ФЗ", "ст. 1", None),
+        ("152-ФЗ", "ст. 10.2", None),
+        ("152-ФЗ", "документооборот", None),
+        ("Внутренний регламент организации", "согласование документов", None),
+        ("GDPR", "Art. 10", None),
+    ],
+)
+def test_article_lookup_preserves_decimal_numbers_and_article_boundaries(
+    law: str, article: str, expected: str | None,
+) -> None:
+    source = (
+        "# Синтетические тексты\n\n"
+        "## Статья 10.1. Распространение\nТекст 10.1.\n\n"
+        "## Статья 10. Особые категории\nТекст 10.\n\n"
+        "## Статья 6. Условия обработки\nВся статья 6.\n\n"
+        "## Статья 18.1. Меры оператора\nТекст 18.1.\n\n"
+        "## Article 28. Processor\nWhole article 28.\n"
+    )
+    assert article_text(source, law, article) == expected
