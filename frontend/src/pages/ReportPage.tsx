@@ -101,6 +101,7 @@ export default function ReportPage() {
                 Скачать обезличенную копию
               </Button>
               <Button href={exportUrl(report.report_id)} block={narrow}>Скачать отчёт (JSON)</Button>
+              <Button href={exportUrl(report.report_id, "pdf")} block={narrow}>Скачать отчёт (PDF)</Button>
             </div>
             {!report.redacted_available && (
               <Typography.Paragraph type="secondary" style={{ margin: "8px 0 0" }}>

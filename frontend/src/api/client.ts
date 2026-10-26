@@ -90,9 +90,9 @@ export function redactedUrl(reportId: string): string {
   return `${BASE_URL}/reports/${encodeURIComponent(reportId)}/redacted`;
 }
 
-/** Ссылка на скачивание отчёта в JSON: файл отдаёт браузер. */
-export function exportUrl(reportId: string): string {
-  return `${BASE_URL}/reports/${encodeURIComponent(reportId)}/export?format=json`;
+/** Ссылка на скачивание отчёта: файл отдаёт браузер. */
+export function exportUrl(reportId: string, format: "json" | "pdf" = "json"): string {
+  return `${BASE_URL}/reports/${encodeURIComponent(reportId)}/export?format=${format}`;
 }
 
 export function getMetrics(corpus?: string): Promise<Metrics> {

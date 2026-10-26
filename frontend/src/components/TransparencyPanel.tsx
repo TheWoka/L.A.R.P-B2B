@@ -2,18 +2,13 @@ import { useEffect, useState } from "react";
 import { Alert, Button, Card, Collapse, Descriptions, Skeleton, Space, Tag, Typography } from "antd";
 
 import { getLlmLog } from "../api/client";
-import type { LlmCall, LlmVerdict, Report } from "../api/types";
+import type { LlmCall, Report } from "../api/types";
+import { detectorLabel, llmPurposeTitle, LLM_VERDICT_LABELS } from "./labels";
 
 interface Props {
   report: Report;
   example?: boolean;
 }
-
-const VERDICTS: Record<LlmVerdict, { color: string; label: string }> = {
-  yes: { color: "red", label: "Да, нарушение" },
-  no: { color: "green", label: "Нет" },
-  unknown: { color: "default", label: "Не удалось определить" },
-};
 
 function MarkedFragment({ text, quote }: { text: string; quote: string | null }) {
   const placeholders = [...text.matchAll(/\[[A-Z_]+_\d+\]/g)].map((match) => ({
@@ -57,9 +52,9 @@ function MarkedFragment({ text, quote }: { text: string; quote: string | null })
 }
 
 function LlmCallCard({ call, index }: { call: LlmCall; index: number }) {
-  const verdict = VERDICTS[call.verdict];
+  const verdict = LLM_VERDICT_LABELS[call.purpose][call.verdict];
   return (
-    <Card size="small" title={`Вызов ${index + 1}`} style={{ minWidth: 0 }}>
+    <Card size="small" title={llmPurposeTitle(call.purpose, call.rule_id)} extra={<Typography.Text type="secondary">Вызов {index + 1}</Typography.Text>} style={{ minWidth: 0 }}>
       <Space orientation="vertical" size="small" style={{ width: "100%", minWidth: 0 }}>
         <Typography.Text strong style={{ overflowWrap: "anywhere" }}>{call.question}</Typography.Text>
         <Space wrap>
@@ -109,7 +104,15 @@ export default function TransparencyPanel({ report, example = false }: Props) {
     { key: "rules", label: "Версия правил", children: audit.ruleset_version },
     { key: "dictionaries", label: "Версия словарей", children: audit.dictionaries_version },
     { key: "app", label: "Версия программы", children: audit.app_version },
-    { key: "detectors", label: "Детекторы", children: audit.detectors.length ? audit.detectors.map((name) => <Tag key={name} style={{ whiteSpace: "normal", overflowWrap: "anywhere" }}>{name}</Tag>) : "Не указаны" },
+    {
+      key: "detectors", label: "Детекторы",
+      children: audit.detectors.length ? audit.detectors.map((name) => (
+        <Tag key={name} style={{ whiteSpace: "normal", overflowWrap: "anywhere" }}>
+          {detectorLabel(name)}
+          {detectorLabel(name) !== name && <Typography.Text type="secondary" style={{ fontSize: 11 }}> ({name})</Typography.Text>}
+        </Tag>
+      )) : "Не указаны",
+    },
     { key: "llm", label: "Нейросеть", children: audit.llm_provider === "mock" ? "Не использовалась" : audit.llm_model ?? "Модель не указана" },
     { key: "calls", label: "Вызовов нейросети", children: audit.llm_calls },
   ];
