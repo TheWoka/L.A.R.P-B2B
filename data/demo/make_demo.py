@@ -1,4 +1,4 @@
-"""T-017a: шесть выдуманных документов; ключ ответов не зависит от детектора.
+"""T-017a / T-046: восемь выдуманных документов; ключ не зависит от детектора.
 
 Запуск в api: python /data_rw/demo/make_demo.py --out /data_rw/demo
 Проверки: python /data_rw/demo/make_demo.py --self-test
@@ -165,6 +165,66 @@ def scenarios() -> dict[str, Pages]:
             ("body", "Вопросы по закупке направляются через электронную площадку. "
              "Техническое задание описывает требования к ассортименту и логистике поставки."),
         ),),
+        "07_international_dpa.docx": ((
+            ("title", "Договор на предоставление сервиса аналитики закупок"),
+            ("body", "Проект договора № 07 от 26.10.2026. "
+             "Назначение: международный контракт."),
+            ("heading", "Стороны и предмет договора"),
+            ("body", "Заказчик ООО «Пример Аналитика» приобретает у вымышленной компании "
+             "Example Analytics GmbH, учреждённой в Германии, доступ к сервису аналитики "
+             "закупок на 12 месяцев. Исполнитель формирует отчёты о сроках рассмотрения "
+             "заявок работников и загрузке закупочного отдела."),
+            ("heading", "Передача сведений работников"),
+            ("body", "Заказчик ежемесячно передаёт исполнителю реестр заявок с ФИО, "
+             "индивидуальными адресами электронной почты и личными телефонами работников. "
+             "Данные загружаются через https://analytics.example.org. "
+             "Предусмотрена передача персональных данных за рубеж: основная база "
+             "и резервные копии размещаются на серверах в США. Германское подразделение "
+             "исполнителя получает доступ к этим сведениям для подготовки отчётов."),
+            ("heading", "Пилотный реестр работников"),
+            ("body", "Орлов Матвей Ильич; e-mail: matvey.orlov@example.ru; "
+             "личный телефон: +7 (999) 046-07-01."),
+            ("body", "Белова Дарья Антоновна; e-mail: darya.belova@example.org; "
+             "личный телефон: +7 (999) 046-07-02."),
+            ("body", "Зайцев Павел Миронович; e-mail: pavel.zaytsev@example.com; "
+             "личный телефон: +7 (999) 046-07-03."),
+            ("heading", "Оказание услуг и приёмка"),
+            ("body", "Исполнитель открывает доступ в течение пяти рабочих дней после "
+             "заключения договора и ежемесячно предоставляет отчёт в личном кабинете. "
+             "Заказчик проверяет полноту отчёта в течение пяти рабочих дней. "
+             "Ошибки расчёта устраняются исполнителем в течение трёх рабочих дней. "
+             "Состав услуг изменяется дополнительным соглашением сторон."),
+        ),),
+        "08_kii_publication.docx": ((
+            ("title", "Техническое задание на обслуживание диспетчерской системы"),
+            ("body", "Заказчик: ООО «Пример Энергосеть». "
+             "Назначение: для публикации в ЕИС."),
+            ("heading", "Предмет закупки"),
+            ("body", "Требуется техническое обслуживание системы «Пример Диспетчер» "
+             "для контроля режима учебного энергетического комплекса. "
+             "Период оказания услуг составляет 12 месяцев с даты заключения контракта."),
+            ("heading", "Сведения об обслуживаемом объекте"),
+            ("body", "Система «Пример Диспетчер» — значимый объект КИИ заказчика, "
+             "отнесённый ко II категории значимости и включённый в учебный реестр. "
+             "Состав и параметры объекта приведены для подготовки предложения "
+             "на обслуживание критической информационной инфраструктуры по 187-ФЗ."),
+            ("heading", "Состав оборудования и сетевые параметры"),
+            ("body", "Основной сервер диспетчеризации: 192.0.2.10; резервный сервер: "
+             "192.0.2.11. Каждый сервер оснащён двумя процессорами и 64 ГБ памяти. "
+             "Дисковый массив содержит четыре накопителя по 2 ТБ."),
+            ("body", "В состав объекта входят два управляемых коммутатора по 24 порта "
+             "с адресами 192.0.2.20 и 192.0.2.21, а также шлюз защиты 192.0.2.1. "
+             "Серверы подключены к обоим коммутаторам, выход из сегмента проходит "
+             "через шлюз. Все адреса взяты из документационного диапазона 192.0.2.0/24 "
+             "и не обозначают действующую сеть."),
+            ("heading", "Требования к обслуживанию и приёмке"),
+            ("body", "Подрядчик ежемесячно проверяет состояние оборудования, "
+             "обновляет программное обеспечение в технологическое окно и проверяет "
+             "восстановление базы из резервной копии. Доступ к системе предоставляется "
+             "через указанный шлюз по заявке в службу эксплуатации. Работы принимаются "
+             "по акту с перечнем выполненных операций и результатами проверки "
+             "переключения на резервный сервер."),
+        ),),
     }
 
 
@@ -279,7 +339,7 @@ def write_estimate(path: Path) -> None:
 
 
 def generate(out: Path) -> None:
-    """Перезаписывает только шесть известных имён, не меняет answers.yaml и README."""
+    """Перезаписывает восемь известных имён, не меняет answers.yaml и README."""
     if out.exists() and not out.is_dir():
         raise ValueError("--out должен указывать на каталог")
     out.mkdir(parents=True, exist_ok=True)
@@ -287,7 +347,7 @@ def generate(out: Path) -> None:
         writer = write_pdf if filename.endswith(".pdf") else write_docx
         writer(out / filename, pages)
     write_estimate(out / "04_estimate.xlsx")
-    LOG.info("T-017a: создано 6 синтетических документов")
+    LOG.info("T-017a / T-046: создано 8 синтетических документов")
 
 
 class DemoTests(unittest.TestCase):
@@ -339,7 +399,7 @@ class DemoTests(unittest.TestCase):
             key.write_text("unchanged", encoding="utf-8")
             generate(out)
             generate(out)
-            self.assertEqual(len(list(out.iterdir())), 7)
+            self.assertEqual(len(list(out.iterdir())), 9)
             self.assertEqual(key.read_text(encoding="utf-8"), "unchanged")
 
     def test_generate_rejects_file_as_output(self) -> None:
@@ -354,6 +414,34 @@ class DemoTests(unittest.TestCase):
         self.assertIn("онкологических заболеваний", text)
         self.assertNotIn("СНИЛС", text)
         self.assertNotIn("Работник:", text)
+
+    def test_international_contacts_and_no_assignment(self) -> None:
+        pages = scenarios()["07_international_dpa.docx"]
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "07.docx"
+            write_docx(path, pages)
+            text = "\n".join(paragraph.text for paragraph in Document(path).paragraphs)
+        self.assertIn("Example Analytics GmbH", text)
+        self.assertIn("на серверах в США", text)
+        self.assertEqual(text.count("e-mail:"), 3)
+        self.assertEqual(text.count("личный телефон:"), 3)
+        self.assertIn("example.com", text)
+        self.assertNotIn("поручает обработку", text)
+        self.assertNotIn("Паспорт", text)
+
+    def test_kii_technical_details_without_personal_contacts(self) -> None:
+        pages = scenarios()["08_kii_publication.docx"]
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "08.docx"
+            write_docx(path, pages)
+            text = "\n".join(paragraph.text for paragraph in Document(path).paragraphs)
+        self.assertIn("значимый объект КИИ", text)
+        self.assertIn("II категории значимости", text)
+        self.assertIn("192.0.2.0/24", text)
+        self.assertIn("192.0.2.21", text)
+        self.assertNotIn("@", text)
+        self.assertNotIn("+7", text)
+        self.assertNotIn("ФИО", text)
 
 
 def main() -> None:
