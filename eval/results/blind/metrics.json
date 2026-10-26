@@ -1,0 +1,101 @@
+{
+  "corpus": "blind",
+  "documents": 12,
+  "created_at": "2026-10-26T12:42:40.229868Z",
+  "by_type": [
+    {
+      "type": "PERSON",
+      "precision": 1.0,
+      "recall": 0.9143,
+      "f1": 0.9552,
+      "support": 35
+    },
+    {
+      "type": "PASSPORT",
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "support": 8
+    },
+    {
+      "type": "SNILS",
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "support": 6
+    },
+    {
+      "type": "INN",
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "support": 4
+    },
+    {
+      "type": "PHONE",
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "support": 12
+    },
+    {
+      "type": "EMAIL",
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "support": 12
+    },
+    {
+      "type": "ADDRESS",
+      "precision": 1.0,
+      "recall": 0.9,
+      "f1": 0.9474,
+      "support": 10
+    },
+    {
+      "type": "BIRTH_DATE",
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "support": 8
+    },
+    {
+      "type": "CARD",
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "support": 3
+    },
+    {
+      "type": "BANK_ACCOUNT",
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "support": 4
+    },
+    {
+      "type": "SPECIAL_CATEGORY",
+      "precision": 1.0,
+      "recall": 0.5556,
+      "f1": 0.7143,
+      "support": 9
+    },
+    {
+      "type": "TRADE_SECRET",
+      "precision": 0.7333,
+      "recall": 0.9167,
+      "f1": 0.8148,
+      "support": 24
+    },
+    {
+      "type": "FINANCIAL",
+      "precision": 1.0,
+      "recall": 0.4,
+      "f1": 0.5714,
+      "support": 15
+    }
+  ],
+  "pd_recall": 0.9279,
+  "trade_secret_recall": 0.9167,
+  "matching": "тот же type и пересечение ≥ 50% длины эталонной сущности; один к одному, жадно по убыванию пересечения"
+}
