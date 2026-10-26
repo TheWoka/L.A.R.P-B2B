@@ -7,8 +7,8 @@
   description: Документ предназначен для открытого доступа, но содержит персональные данные физлиц.
   severity: red
   law_refs:
-    - {law: 152-ФЗ, article: ст. 7}
-    - {law: 152-ФЗ, article: ст. 10.1}
+    - {law: 152-ФЗ, article: ст. 7, title: Конфиденциальность персональных данных, url: 'https://www.consultant.ru/document/cons_doc_LAW_61801/'}
+    - {law: 152-ФЗ, article: ст. 10.1, title: Согласие на распространение персональных данных, url: 'https://www.consultant.ru/document/cons_doc_LAW_61801/'}
   applies_to: [publication]
   condition: {type: entity_present, categories: [pd, pd_special], min_count: 1}
   recommendation: Удалите или обезличьте ПДн перед публикацией либо получите согласие субъекта на распространение.
@@ -17,7 +17,7 @@
   title: Платёжные реквизиты физлиц в документе для публикации
   description: Документ для публикации содержит номера банковских карт или счетов физлиц.
   severity: red
-  law_refs: [{law: 152-ФЗ, article: ст. 7}]
+  law_refs: [{law: 152-ФЗ, article: ст. 7, title: Конфиденциальность персональных данных, url: 'https://www.consultant.ru/document/cons_doc_LAW_61801/'}]
   applies_to: [publication]
   condition: {type: entity_present, categories: [pd], types: [CARD, BANK_ACCOUNT]}
   recommendation: Удалите номера карт и счетов физлиц перед выгрузкой в ЕИС — воспользуйтесь обезличенной копией документа.
@@ -26,7 +26,7 @@
   title: Коммерческая тайна без грифа
   description: В документе есть сведения, составляющие коммерческую тайну, но нет грифа.
   severity: red
-  law_refs: [{law: 98-ФЗ, article: ст. 10}]
+  law_refs: [{law: 98-ФЗ, article: ст. 10 ч. 1 п. 5, title: Гриф «Коммерческая тайна» с указанием обладателя информации, url: 'https://www.consultant.ru/document/cons_doc_LAW_48699/'}]
   applies_to: [internal, contract, international]
   condition:
     all:
@@ -38,7 +38,7 @@
   title: Коммерческая тайна в документе для публикации
   description: Документ для публикации содержит сведения, составляющие коммерческую тайну.
   severity: red
-  law_refs: [{law: 98-ФЗ, article: ст. 10}]
+  law_refs: [{law: 98-ФЗ, article: ст. 10 ч. 5 п. 1, title: Исключение доступа к коммерческой тайне без согласия обладателя, url: 'https://www.consultant.ru/document/cons_doc_LAW_48699/'}]
   applies_to: [publication]
   condition: {type: entity_present, categories: [trade_secret]}
   recommendation: Исключите сведения о себестоимости, наценке, условиях скидок из документа, который будет опубликован.
@@ -47,7 +47,7 @@
   title: По опубликованным данным можно вычислить коммерческую тайну
   description: Числа в документе для публикации позволяют восстановить себестоимость товара или маржу поставщика.
   severity: yellow
-  law_refs: [{law: 98-ФЗ, article: ст. 10}]
+  law_refs: [{law: 98-ФЗ, article: ст. 10 ч. 5 п. 1, title: Исключение доступа к коммерческой тайне без согласия обладателя, url: 'https://www.consultant.ru/document/cons_doc_LAW_48699/'}]
   applies_to: [publication]
   condition:
     type: llm
@@ -58,7 +58,7 @@
   title: Нет условий поручения обработки ПДн контрагенту
   description: Договор содержит паспортные данные, СНИЛС, ИНН, адрес или дату рождения без условий поручения обработки ПДн.
   severity: red
-  law_refs: [{law: 152-ФЗ, article: ст. 6 ч. 3}]
+  law_refs: [{law: 152-ФЗ, article: ст. 6 ч. 3, title: 'Условия обработки ПДн, ч. 3 — поручение обработки', url: 'https://www.consultant.ru/document/cons_doc_LAW_61801/'}]
   applies_to: [contract]
   condition:
     all:
@@ -70,7 +70,7 @@
   title: Паспортные данные без согласия на обработку
   description: Договор содержит паспортные данные, СНИЛС или ИНН без согласия на обработку ПДн.
   severity: yellow
-  law_refs: [{law: 152-ФЗ, article: ст. 9}]
+  law_refs: [{law: 152-ФЗ, article: ст. 9, title: Согласие субъекта персональных данных на обработку, url: 'https://www.consultant.ru/document/cons_doc_LAW_61801/'}]
   applies_to: [contract]
   condition:
     all:
@@ -83,8 +83,8 @@
   description: Документ содержит особые категории ПДн без согласия на обработку.
   severity: red
   law_refs:
-    - {law: 152-ФЗ, article: ст. 10}
-    - {law: GDPR, article: Art. 9}
+    - {law: 152-ФЗ, article: ст. 10, title: Специальные категории персональных данных, url: 'https://www.consultant.ru/document/cons_doc_LAW_61801/'}
+    - {law: GDPR, article: Art. 9, title: Обработка особых категорий персональных данных, url: 'https://eur-lex.europa.eu/eli/reg/2016/679/oj'}
   condition:
     all:
       - {type: entity_present, categories: [pd_special]}
@@ -96,8 +96,8 @@
   description: Договор с условиями поручения обработки ПДн описывает меры защиты только общими фразами.
   severity: yellow
   law_refs:
-    - {law: 152-ФЗ, article: ст. 19}
-    - {law: GDPR, article: Art. 32}
+    - {law: 152-ФЗ, article: ст. 19, title: Меры по обеспечению безопасности персональных данных, url: 'https://www.consultant.ru/document/cons_doc_LAW_61801/'}
+    - {law: GDPR, article: Art. 32, title: Безопасность обработки персональных данных, url: 'https://eur-lex.europa.eu/eli/reg/2016/679/oj'}
   applies_to: [contract]
   condition:
     all:
@@ -110,7 +110,7 @@
   title: Сведения об объектах КИИ в документе для публикации
   description: Документ для публикации содержит упоминание объектов КИИ.
   severity: red
-  law_refs: [{law: 187-ФЗ, article: ст. 2}]
+  law_refs: [{law: 187-ФЗ, article: ст. 10 ч. 2 п. 1, title: Защита обрабатываемой значимым объектом КИИ информации от неправомерного распространения, url: 'https://www.consultant.ru/document/cons_doc_LAW_220885/'}]
   applies_to: [publication]
   condition: {type: marker_present, marker: kii_mention}
   recommendation: "Уберите из документа для ЕИС сведения о значимых объектах КИИ: схемы, адреса, средства защиты."
@@ -119,7 +119,7 @@
   title: Контрагент с доступом к КИИ без обязанности сообщать об инцидентах
   description: Договор даёт контрагенту доступ к объектам КИИ, но не обязывает его уведомлять заказчика о компьютерных инцидентах.
   severity: yellow
-  law_refs: [{law: 187-ФЗ, article: ст. 9}]
+  law_refs: [{law: 187-ФЗ, article: ст. 9 ч. 2 п. 1, title: Обязанность субъекта КИИ информировать уполномоченный орган об атаках и инцидентах, url: 'https://www.consultant.ru/document/cons_doc_LAW_220885/'}]
   applies_to: [contract]
   condition:
     all:
@@ -134,8 +134,8 @@
   description: Международный контракт содержит персональные данные.
   severity: yellow
   law_refs:
-    - {law: GDPR, article: Art. 44}
-    - {law: GDPR, article: Art. 46}
+    - {law: GDPR, article: Art. 44, title: Общий принцип передачи данных в третьи страны и международные организации, url: 'https://eur-lex.europa.eu/eli/reg/2016/679/oj'}
+    - {law: GDPR, article: Art. 46, title: Передача данных при наличии надлежащих гарантий, url: 'https://eur-lex.europa.eu/eli/reg/2016/679/oj'}
   applies_to: [international]
   condition: {type: entity_present, categories: [pd, pd_special]}
   recommendation: "Проверьте основание передачи: решение о достаточности или стандартные договорные условия (SCC)."
@@ -144,7 +144,7 @@
   title: Нет условий обработки ПДн по поручению (DPA)
   description: Международный контракт содержит ПДн без условий их обработки по поручению.
   severity: red
-  law_refs: [{law: GDPR, article: Art. 28}]
+  law_refs: [{law: GDPR, article: Art. 28(3), title: Обработчик — договор об обработке персональных данных (DPA), url: 'https://eur-lex.europa.eu/eli/reg/2016/679/oj'}]
   applies_to: [international]
   condition:
     all:
@@ -156,7 +156,7 @@
   title: Нет листа согласования
   description: Внутренний документ или договор с контрагентом не содержит листа согласования.
   severity: yellow
-  law_refs: [{law: Политика ИБ компании, article: документооборот}]
+  law_refs: [{law: Внутренний регламент организации, article: согласование документов, title: Устанавливается локальным актом заказчика}]
   applies_to: [internal, contract]
   condition: {type: marker_absent, marker: approval_sheet}
   recommendation: Пройдите внутреннее согласование и приложите лист согласования с визами.
@@ -166,8 +166,8 @@
   description: Внутренний документ содержит паспортные данные, СНИЛС, ИНН, дату рождения или особые категории ПДн без грифа конфиденциальности.
   severity: yellow
   law_refs:
-    - {law: 152-ФЗ, article: ст. 7}
-    - {law: 152-ФЗ, article: ст. 18.1}
+    - {law: 152-ФЗ, article: ст. 7, title: Конфиденциальность персональных данных, url: 'https://www.consultant.ru/document/cons_doc_LAW_61801/'}
+    - {law: 152-ФЗ, article: ст. 18.1, title: Меры оператора и локальные акты об обработке персональных данных, url: 'https://www.consultant.ru/document/cons_doc_LAW_61801/'}
   applies_to: [internal]
   condition:
     all:
@@ -180,8 +180,8 @@
   description: Документ содержит паспортные данные, СНИЛС, ИНН, дату рождения или особые категории ПДн без срока хранения ПДн.
   severity: yellow
   law_refs:
-    - {law: 152-ФЗ, article: ст. 5 ч. 7}
-    - {law: GDPR, article: Art. 5}
+    - {law: 152-ФЗ, article: ст. 5 ч. 7, title: Ограничение срока хранения и уничтожение или обезличивание ПДн, url: 'https://www.consultant.ru/document/cons_doc_LAW_61801/'}
+    - {law: GDPR, article: Art. 5(1)(e), title: Принципы обработки — ограничение срока хранения, url: 'https://eur-lex.europa.eu/eli/reg/2016/679/oj'}
   condition:
     all:
       - {type: entity_present, categories: [pd, pd_special], types: [PASSPORT, SNILS, INN, BIRTH_DATE, SPECIAL_CATEGORY]}
