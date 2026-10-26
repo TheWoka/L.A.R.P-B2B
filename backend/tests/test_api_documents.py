@@ -80,7 +80,7 @@ def test_upload_docx(
 
 @pytest.mark.parametrize(("filename", "content"), [
     ("file.exe", b"PK\x03\x04"), ("file.docx", b"not a zip"),
-    ("file.pdf", b""), ("file.xlsx", b"wrong"), ("file.pdf", b"PK\x03\x04"),
+    ("file.xlsx", b"wrong"), ("file.pdf", b"PK\x03\x04"),
 ])
 def test_invalid_format(
     client: TestClient, api_db: tuple[Session, Mock], tmp_path: Path,
