@@ -91,7 +91,7 @@ export function redactedUrl(reportId: string): string {
 }
 
 /** Ссылка на скачивание отчёта: файл отдаёт браузер. */
-export function exportUrl(reportId: string, format: "json" | "pdf" = "json"): string {
+export function exportUrl(reportId: string, format: "json" | "pdf" | "md" = "json"): string {
   return `${BASE_URL}/reports/${encodeURIComponent(reportId)}/export?format=${format}`;
 }
 

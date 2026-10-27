@@ -336,7 +336,7 @@ def build_report(ctx: RuleContext, violations: list[Violation], processing_ms: i
 | GET | `/api/tasks/{task_id}` | — | `TaskInfo` |
 | GET | `/api/reports/{report_id}` | — | `Report` |
 | GET | `/api/reports/{report_id}/text` | — | `ReportText` — текст с **замаскированными** ПДн для подсветки |
-| GET | `/api/reports/{report_id}/export?format=json\|pdf` | — | файл отчёта |
+| GET | `/api/reports/{report_id}/export?format=json\|pdf\|md` | — | файл отчёта |
 | GET | `/api/reports/{report_id}/llm-log` | — | `list[LlmCall]` — «что видела нейросеть»; в режиме mock — `[]` или mock-вызовы с `verdict: "unknown"` |
 | GET | `/api/reports/{report_id}/redacted` | — | обезличенная копия в формате исходника (`.pdf` / `.docx` / `.xlsx`, для текстового запроса — `.txt`), `Content-Disposition: attachment; filename="<имя>_обезличено.<ext>"`; копии нет → `404 {detail: "Обезличенная копия недоступна"}` |
 | GET | `/api/metrics?corpus=<имя>` | `corpus` необязателен, только `^[a-z0-9_-]{1,32}$`, иначе `422` | `Metrics` из `eval/results/<имя>/metrics.json`; без параметра — `eval/results/metrics.json` (пишет `eval/run_eval.py`); файла нет → `404 {detail: "Метрики ещё не посчитаны"}` |
@@ -441,6 +441,7 @@ REPORT_TTL_DAYS=7
 
 | Дата | Что изменилось | Кто решил |
 |---|---|---|
+| 2026-10-27 | export?format=md (T-060) | Данила (тимлид) |
 | 2026-10-25 | 422 — {detail: строка}; QueryRequest.text ≤ 200 000 (T-052) | Данила (тимлид) |
 | 2026-10-24 | GET /api/metrics?corpus= — метрики других корпусов (слепой набор) | Данила (тимлид) |
 | 2026-10-24 | Раздел 5: LLM_TIMEOUT_S — таймаут запроса к LLM (T-029b) | Данила (тимлид) |
