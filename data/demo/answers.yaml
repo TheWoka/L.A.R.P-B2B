@@ -42,3 +42,26 @@
   overall: green
   entities: {}
   violations: []
+
+# T-046: ожидания записаны ДО прогона из docs/rules.md и data/rules/rules.yaml.
+# Три работника: по одному упоминанию ФИО, личного телефона и личного e-mail.
+# international + ПДн -> GDPR_CROSS_BORDER (yellow); нет processing_assignment
+# -> GDPR_NO_DPA (red). Само правило CROSS_BORDER не ищет страну или фразу о передаче.
+# CHECKLIST_NO_APPROVAL действует только для internal/contract, NO_MARK — internal;
+# NO_RETENTION требует PASSPORT/SNILS/INN/BIRTH_DATE/SPECIAL_CATEGORY, которых здесь нет.
+- file: 07_international_dpa.docx
+  purpose: international
+  overall: red
+  entities: {PERSON: 3, EMAIL: 3, PHONE: 3}
+  violations: [GDPR_CROSS_BORDER, GDPR_NO_DPA]
+
+# publication + маркер kii_mention (значимый объект КИИ, 187-ФЗ) -> red.
+# ПДн и коммерческой тайны нет: ожидаем 0 сущностей, маркер КИИ не является сущностью.
+# CHECKLIST_* неприменимы по назначению и составу данных.
+# KII_INCIDENTS_NOT_REGULATED: applies_to=[contract], а здесь publication;
+# кроме того, условие llm в mock даёт unknown и не создаёт нарушения.
+- file: 08_kii_publication.docx
+  purpose: publication
+  overall: red
+  entities: {}
+  violations: [KII_IN_PUBLICATION]
