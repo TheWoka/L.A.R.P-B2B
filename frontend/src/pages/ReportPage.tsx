@@ -13,6 +13,7 @@ import ViolationsTable from "../components/ViolationsTable";
 import { PURPOSE_LABELS } from "../components/labels";
 import TrafficLight, { OVERALL } from "../components/TrafficLight";
 import mockReport from "../mocks/report.example.json";
+import { addToHistory } from "../lib/history";
 
 export default function ReportPage() {
   const screens = Grid.useBreakpoint();
@@ -30,7 +31,7 @@ export default function ReportPage() {
     if (!reportId || reportId === "example") return;
     let active = true;
     void getReport(reportId).then(
-      (result) => { if (active) setLiveReport(result); },
+      (result) => { if (active) { setLiveReport(result); addToHistory(result); } },
       (reason: unknown) => { if (active) setError(reason); },
     );
     void getReportText(reportId).then(
