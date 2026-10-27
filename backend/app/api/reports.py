@@ -63,11 +63,21 @@ def get_report_text(report_id: str, session: DbSession) -> ReportText:
     "/reports/{report_id}/export",
     response_class=Response,
     summary="Скачать отчёт файлом",
-    responses={200: {"content": {"application/json": {}, "application/pdf": {}}}},
+    responses={200: {"content": {
+        "application/json": {}, "application/pdf": {}, "text/markdown": {},
+    }}},
 )
 def export_report(
-    report_id: str, session: DbSession, format: Literal["json", "pdf"] = "json",
+    report_id: str, session: DbSession, format: Literal["json", "pdf", "md"] = "json",
 ) -> Response:
+    if format == "md":
+        from app.services.report.md_export import render_report_md
+
+        report = get_report(report_id, session)
+        return Response(
+            content=render_report_md(report), media_type="text/markdown",
+            headers={"Content-Disposition": f'attachment; filename="report_{report_id}.md"'},
+        )
     if format == "pdf":
         from app.services.report.pdf_export import render_report_pdf
 
