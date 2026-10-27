@@ -1,11 +1,28 @@
 # Контекст сборки frontend — корень репозитория (docker-compose.yml).
 # backend собирается из своей папки и этот файл не читает.
 **/node_modules
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.ruff_cache
 **/dist
 **/.env
+**/.venv
+**/venv
 .git
+.claude
+**/claude_outputs
+**/claude-outputs
+**/Claude outputs
+**/Claude Outputs
+**/Claude-Session*
 backend
 eval
+eval/results
 docs
+docs/planning
 data/uploads
 data/demo
+**/*.md
+# Тексты законов импортируются frontend/src/components/legalArticles.ts.
+!data/legal/**/*.md

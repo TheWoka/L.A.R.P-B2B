@@ -11,7 +11,7 @@ WORKDIR /app
 # requirements-dev (pytest, ruff) ставим тоже, чтобы работала команда
 # `docker-compose exec api pytest` из AGENTS.md.
 COPY requirements.txt requirements-dev.txt ./
-RUN pip install -r requirements.txt -r requirements-dev.txt
+RUN pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt
 
 # Непривилегированный пользователь. Папку /data/uploads создаём заранее,
 # чтобы именованный том унаследовал владельца appuser.
@@ -19,7 +19,10 @@ RUN useradd --create-home --uid 1000 appuser \
     && mkdir -p /data/uploads \
     && chown -R appuser:appuser /data /app
 
-COPY --chown=appuser:appuser . .
+# Тесты остаются в образе для `docker-compose run --rm --no-deps api pytest -q`.
+COPY --chown=appuser:appuser app ./app
+COPY --chown=appuser:appuser tests ./tests
+COPY --chown=appuser:appuser pyproject.toml ./
 
 USER appuser
 EXPOSE 8000
