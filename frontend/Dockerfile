@@ -4,7 +4,7 @@
 FROM node:20-slim AS build
 WORKDIR /app
 COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci --no-audit --no-fund
+RUN npm ci --include=dev --no-audit --no-fund
 COPY frontend/ .
 # legalArticles.ts импортирует ../../../data/legal/*.md → из /app/src/components это /data/legal
 COPY data/legal /data/legal

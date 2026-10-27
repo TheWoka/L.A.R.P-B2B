@@ -54,6 +54,12 @@ services:
   api:
     build: ./backend
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys, urllib.request; response = urllib.request.urlopen('http://localhost:8000/api/health', timeout=4); sys.exit(0 if response.status == 200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
     env_file: .env
     ports:
       - "8000:8000"
@@ -74,6 +80,12 @@ services:
     # Тот же Dockerfile, что у api: второй build берёт слои из кэша.
     build: ./backend
     command: celery -A app.worker.celery_app worker -B --loglevel=info
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.worker.celery_app inspect ping -d celery@$$HOSTNAME --timeout=5"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     env_file: .env
     volumes:
       - uploads:/data/uploads
@@ -94,8 +106,15 @@ services:
     env_file: .env
     ports:
       - "3000:80"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "--timeout=4", "http://127.0.0.1:80/"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:
