@@ -16,9 +16,13 @@ import mockReport from "../mocks/report.example.json";
 import { addToHistory } from "../lib/history";
 
 export default function ReportPage() {
+  const { reportId } = useParams<{ reportId: string }>();
+  return <ReportView key={reportId} reportId={reportId} />;
+}
+
+export function ReportView({ reportId }: { reportId: string | undefined }) {
   const screens = Grid.useBreakpoint();
   const narrow = !screens.md;
-  const { reportId } = useParams<{ reportId: string }>();
   const navigate = useNavigate();
   const [liveReport, setLiveReport] = useState<Report | null>(null);
   const [error, setError] = useState<unknown>(null);
