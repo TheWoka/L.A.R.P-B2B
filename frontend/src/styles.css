@@ -144,6 +144,20 @@ button, input, textarea { font: inherit; }
 .not-found-page h1 { margin: 0 0 10px; font-size: clamp(32px, 4vw, 46px); letter-spacing: -.04em; }
 .not-found-page p { margin: 0 0 28px; color: #6e6e73; font-size: 16px; }
 
+@media (min-width: 1600px) {
+  .sidebar-link { font-size: 16px; }
+  .brand-subtitle, .sidebar-foot { font-size: 13px; }
+  .page-heading h1, .page-title { font-size: 44px; }
+  .page-heading p, .page-subtitle { font-size: 18px; }
+  .upload-layout { grid-template-columns: minmax(0, 1fr) 300px; }
+  .document-dropzone .ant-upload strong { font-size: 19px; }
+  .dropzone-hint, .purpose-section > p, .form-actions .ant-typography, .example-link { font-size: 15px; }
+  .purpose-copy strong, .feature-card strong { font-size: 16px; }
+  .purpose-copy span, .feature-card p, .privacy-note p { font-size: 14px; }
+  .privacy-note strong { font-size: 15px; }
+  .feature-card { min-height: 122px; }
+}
+
 @media (max-width: 1100px) {
   .upload-layout { grid-template-columns: minmax(0, 1fr); }
   .upload-aside { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding-top: 0; }
