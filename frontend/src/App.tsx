@@ -4,6 +4,7 @@ import { Button, Drawer, Layout } from "antd";
 import { Link, Route, Routes, useLocation } from "react-router-dom";
 
 import ReportPage from "./pages/ReportPage";
+import BatchPage from "./pages/BatchPage";
 import HistoryPage from "./pages/HistoryPage";
 import NotFoundPage from "./pages/NotFoundPage";
 import QualityPage from "./pages/QualityPage";
@@ -39,7 +40,7 @@ function activePath(pathname: string): string | null {
   if (pathname === "/history") return "/history";
   if (pathname.startsWith("/rules")) return "/rules";
   if (pathname.startsWith("/quality")) return "/quality";
-  if (pathname === "/" || pathname.startsWith("/tasks/") || pathname.startsWith("/reports/")) return "/";
+  if (pathname === "/" || pathname.startsWith("/tasks/") || pathname.startsWith("/reports/") || pathname === "/batch") return "/";
   return null;
 }
 
@@ -74,6 +75,7 @@ export default function App() {
             <Route path="/" element={<UploadPage />} />
             <Route path="/history" element={<HistoryPage />} />
             <Route path="/tasks/:taskId" element={<TaskPage />} />
+            <Route path="/batch" element={<BatchPage />} />
             <Route path="/reports/:reportId" element={<ReportPage />} />
             <Route path="/rules" element={<RulesPage />} />
             <Route path="/quality" element={<QualityPage />} />

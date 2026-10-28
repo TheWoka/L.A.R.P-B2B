@@ -5,8 +5,8 @@ import { Link, useNavigate } from "react-router-dom";
 
 import { ApiError, submitQuery, uploadDocument } from "../api/client";
 import type { DocPurpose } from "../api/types";
+import { MAX_BATCH_FILES, submitBatchFiles, validateBatchFile } from "../lib/batch";
 
-const MAX_FILE_SIZE = 50 * 1024 * 1024;
 const MAX_TEXT_LENGTH = 200_000;
 const ACCEPTED_EXTENSIONS = [".pdf", ".docx", ".xlsx"];
 
@@ -24,15 +24,6 @@ function errorMessage(error: unknown): string {
   }
   if (error instanceof TypeError) return "Нет связи с сервером";
   return "Не удалось выполнить проверку. Попробуйте ещё раз.";
-}
-
-function fileValidationError(file: File): string | null {
-  if (!ACCEPTED_EXTENSIONS.some((extension) => file.name.toLowerCase().endsWith(extension))) {
-    return "Поддерживаются PDF, DOCX и XLSX";
-  }
-  if (file.size === 0) return "Файл пустой";
-  if (file.size > MAX_FILE_SIZE) return "Файл больше 50 МБ";
-  return null;
 }
 
 function PurposePicker({ value, onChange }: { value: DocPurpose; onChange: (value: DocPurpose) => void }) {
@@ -59,32 +50,45 @@ export default function UploadPage() {
   const [uploading, setUploading] = useState(false);
   const [submittingQuery, setSubmittingQuery] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
+  const [rejectedFiles, setRejectedFiles] = useState<{ name: string; reason: string }[]>([]);
   const [queryError, setQueryError] = useState<string | null>(null);
 
   const beforeUpload: UploadProps["beforeUpload"] = (file) => {
-    const validationError = fileValidationError(file);
-    setFileError(validationError);
-    if (validationError) return Upload.LIST_IGNORE;
+    const validationError = validateBatchFile(file);
+    if (validationError) {
+      setRejectedFiles((current) => [...current, { name: file.name, reason: validationError }]);
+      return Upload.LIST_IGNORE;
+    }
+    setFileError(null);
     return false;
   };
 
   async function handleUpload() {
     if (uploading) return;
-    const file = fileList[0]?.originFileObj;
-    if (!file) {
-      setFileError("Сначала выберите документ для проверки.");
-      return;
-    }
-    const validationError = fileValidationError(file);
-    if (validationError) {
-      setFileError(validationError);
+    const files = fileList.map((entry) => entry.originFileObj).filter((file): file is NonNullable<typeof file> => Boolean(file));
+    if (files.length === 0) {
+      setFileError("Сначала выберите документы для проверки.");
       return;
     }
     setFileError(null);
     setUploading(true);
     try {
-      const task = await uploadDocument(file, filePurpose);
-      navigate(`/tasks/${encodeURIComponent(task.task_id)}`);
+      if (files.length === 1) {
+        const task = await uploadDocument(files[0], filePurpose);
+        navigate(`/tasks/${encodeURIComponent(task.task_id)}`);
+      } else {
+        const { created, failed } = await submitBatchFiles(files, filePurpose, uploadDocument);
+        if (failed.length > 0) setRejectedFiles((current) => [...current, ...failed]);
+        if (created.length === 0) {
+          setFileError("Не удалось отправить документы. Проверьте список ошибок и повторите попытку.");
+          return;
+        }
+        try {
+          const batchKey = created.map(({ id }) => id).join(",");
+          sessionStorage.setItem(`grif-batch-${batchKey}`, JSON.stringify({ names: Object.fromEntries(created.map(({ id, name }) => [id, name])), failed }));
+        } catch { /* Проверка продолжится и без подписей файлов. */ }
+        navigate(`/batch?tasks=${created.map(({ id }) => encodeURIComponent(id)).join(",")}`);
+      }
     } catch (error: unknown) {
       setFileError(errorMessage(error));
     } finally {
@@ -120,12 +124,16 @@ export default function UploadPage() {
       <Upload.Dragger
         className="document-dropzone"
         accept={ACCEPTED_EXTENSIONS.join(",")}
-        multiple={false}
-        maxCount={1}
+        multiple
         fileList={fileList}
         beforeUpload={beforeUpload}
-        onChange={({ fileList: nextFiles }) => setFileList(nextFiles.slice(-1))}
-        onRemove={() => { setFileList([]); setFileError(null); }}
+        onChange={({ fileList: nextFiles }) => {
+          if (nextFiles.length > MAX_BATCH_FILES) {
+            setFileError(`Можно выбрать не больше ${MAX_BATCH_FILES} файлов за один раз.`);
+          }
+          setFileList(nextFiles.slice(0, MAX_BATCH_FILES));
+        }}
+        onRemove={() => { setFileError(null); }}
         showUploadList={{ showPreviewIcon: false }}
       >
         <span className="upload-symbol" aria-hidden="true">
@@ -133,10 +141,12 @@ export default function UploadPage() {
             <path d="M42 52V20M26 36L42 20L58 36M19 61H65" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </span>
-        <strong>Перетащите документ сюда</strong>
-        <span className="dropzone-hint">PDF, DOCX или XLSX · до 50 МБ</span>
-        <span className="choose-file">Выбрать файл</span>
+        <strong>Перетащите документы сюда</strong>
+        <span className="dropzone-hint">До 10 файлов PDF, DOCX или XLSX · каждый до 50 МБ</span>
+        <span className="choose-file">Выбрать файлы</span>
       </Upload.Dragger>
+      {fileList.length > 0 && <p className="selected-file-count">Выбрано: {fileList.length} из {MAX_BATCH_FILES}</p>}
+      {rejectedFiles.length > 0 && <Alert className="rejected-files" type="warning" showIcon title="Некоторые файлы не добавлены" description={<ul>{rejectedFiles.map((entry, index) => <li key={`${entry.name}-${index}`}>{entry.name}: {entry.reason}</li>)}</ul>} closable onClose={() => setRejectedFiles([])} />}
       <section className="purpose-section">
         <h2>Куда пойдёт документ?</h2>
         <p>Это поможет применить нужные правила проверки.</p>
@@ -145,7 +155,7 @@ export default function UploadPage() {
       <div className="form-actions">
         {fileError && <Alert type="error" showIcon title={fileError} className="form-error" />}
         <Button type="primary" size="large" loading={uploading} disabled={uploading} onClick={() => { void handleUpload(); }}>
-          Начать проверку
+          {fileList.length > 1 ? "Проверить выбранные документы" : "Начать проверку"}
         </Button>
         <Typography.Text type="secondary">Обычно занимает меньше минуты</Typography.Text>
       </div>
