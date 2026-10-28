@@ -57,10 +57,10 @@ export default function App() {
   return (
     <Layout className="app-shell">
       <Sider width={252} theme="light" className="app-sidebar">
-        <Link to="/" className="brand" aria-label="Гриф — новая проверка"><span className="brand-mark" aria-hidden="true" /><span>Гриф</span></Link>
+        <div className="brand-block"><Link to="/" className="brand" aria-label="Гриф — новая проверка"><span className="brand-mark" aria-hidden="true" /><span>Гриф</span></Link><span className="brand-subtitle">ИИ-аудитор документов</span></div>
         <div className="sidebar-caption">РАБОЧЕЕ ПРОСТРАНСТВО</div>
         <nav className="sidebar-nav" aria-label="Основная навигация">{links}</nav>
-        <div className="sidebar-foot">ИИ-аудитор документов</div>
+        <div className="sidebar-foot">Техподдержка: <a href="mailto:dnl9@tpu.ru">dnl9@tpu.ru</a></div>
       </Sider>
       <Layout className="app-main">
         <header className="mobile-header">

@@ -193,7 +193,6 @@ function MetricsContent({ loaded, corpus }: { loaded: LoadedMetrics; corpus: Cor
 export default function QualityPage() {
   return (
     <div className="page-container quality-page">
-      <div className="page-eyebrow">Гриф / Качество проверки</div>
       <header className="page-heading">
         <h1>Качество проверки</h1>
         <p>Сколько важных сведений находит система и как мы это проверяем.</p>

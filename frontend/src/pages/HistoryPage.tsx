@@ -12,7 +12,6 @@ export default function HistoryPage() {
 
   return (
     <div className="page-container history-page">
-      <div className="page-eyebrow">Гриф / История</div>
       <header className="page-heading">
         <h1>История проверок</h1>
         <p>История хранится только в этом браузере. Сами отчёты сервер удаляет через срок хранения (по умолчанию 7 дней) — после этого запись останется, но открыть отчёт будет нельзя.</p>
