@@ -114,12 +114,15 @@ button, input, textarea { font: inherit; }
 .batch-tab-label { display: flex; align-items: center; gap: 9px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .batch-status { display: inline-block; width: 9px; height: 9px; flex: none; border-radius: 50%; background: #8e8e93; }
 .batch-status.is-processing { background: #087ff5; }
-.batch-status.is-done { background: #46a86e; }
+.batch-status.is-green { background: #46a86e; }
+.batch-status.is-yellow { background: #d48806; }
+.batch-status.is-red { background: #cf1322; }
 .batch-status.is-failed { background: #d1464f; }
 .batch-progress { text-align: center; }
 .batch-progress h2 { margin: 16px 0 4px; }
 .batch-progress p { color: #6e6e73; }
 .batch-progress .ant-progress { max-width: 520px; margin: 14px auto; }
+.batch-progress .batch-stages { max-width: 360px; margin: 18px auto; text-align: left; }
 .batch-report .report-page { width: 100%; }
 .batch-new-check { margin-top: 24px; }
 .ant-card { border-color: #e8e8ec; border-radius: 18px; box-shadow: none; }

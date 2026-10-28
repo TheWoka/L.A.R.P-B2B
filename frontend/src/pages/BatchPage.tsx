@@ -1,12 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Button, Card, Progress, Spin, Tabs, Tag } from "antd";
+import { Alert, Button, Card, Progress, Result, Spin, Steps, Tabs, Tag } from "antd";
 import { Link, useLocation } from "react-router-dom";
 
 import { ApiError, getReport, getTask } from "../api/client";
-import type { Report, TaskInfo } from "../api/types";
+import type { Report, Stage, TaskInfo } from "../api/types";
 import { addToHistory } from "../lib/history";
-import { parseBatchTasks } from "../lib/batch";
-import { ReportView } from "./ReportPage";
+import { documentCountLabel, parseBatchTasks } from "../lib/batch";
+import ReportView from "../components/ReportView";
+
+const STAGES: { stage: Stage; title: string }[] = [
+  { stage: "extracting", title: "Извлечение текста" },
+  { stage: "detecting", title: "Поиск данных" },
+  { stage: "masking", title: "Скрытие персональных данных" },
+  { stage: "checking", title: "Проверка по правилам" },
+  { stage: "reporting", title: "Подготовка отчёта" },
+];
 
 export default function BatchPage() {
   const { search } = useLocation();
@@ -85,24 +93,26 @@ export default function BatchPage() {
 
   const ready = ids.filter((id) => tasks[id]?.status === "done").length;
   const failed = ids.filter((id) => tasks[id]?.status === "failed").length;
-  const serious = Object.values(reports).reduce((sum, report) => sum + report.violations.filter((item) => item.severity === "red").length, 0);
+  const serious = Object.values(reports).filter((report) => report.overall === "red").length;
 
   return <div className="page-container batch-page">
-    <header className="page-heading"><h1>Проверка документов</h1><p>{complete ? "Проверка завершена. Выберите файл, чтобы увидеть подробный отчёт." : "Файлы проверяются по очереди. Результаты появляются здесь автоматически."}</p></header>
+    <header className="page-heading"><h1>Проверка пакета: {documentCountLabel(ids.length)}</h1><p>{complete ? "Проверка завершена. Выберите файл, чтобы увидеть подробный отчёт." : "Файлы проверяются по очереди. Результаты появляются здесь автоматически."}</p></header>
     <div className="batch-summary">
       <Card><strong>{ready} из {ids.length}</strong><span>Отчётов готово</span></Card>
-      <Card><strong>{serious}</strong><span>Серьёзных нарушений</span></Card>
+      <Card><strong>{serious}</strong><span>Документов с серьёзными нарушениями</span></Card>
       <Card><strong>{failed + failedUploads.length}</strong><span>Файлов с ошибкой</span></Card>
     </div>
     {failedUploads.length > 0 && <Alert className="batch-alert" type="warning" showIcon title="Не все файлы удалось отправить" description={<ul>{failedUploads.map((entry, index) => <li key={`${entry.name}-${index}`}>{entry.name}: {entry.reason}</li>)}</ul>} />}
     {pollError && <Alert className="batch-alert" type="warning" showIcon title={pollError} action={pollError.startsWith("Нет связи") ? <Button onClick={() => window.location.reload()}>Обновить</Button> : undefined} />}
     <Tabs className="batch-tabs" activeKey={activeId} onChange={setActiveId} items={ids.map((id, index) => {
       const task = tasks[id];
-      const label = <span className="batch-tab-label"><span className={`batch-status is-${task?.status ?? "queued"}`} aria-hidden="true" />{names[id] ?? `Файл ${index + 1}`}</span>;
+      const label = <span className="batch-tab-label">{task?.status === "done" && reports[id]
+        ? <span className={`batch-status is-${reports[id].overall}`} aria-label={`Результат: ${reports[id].overall === "red" ? "серьёзные нарушения" : reports[id].overall === "yellow" ? "замечания" : "нарушений не найдено"}`} role="img" />
+        : task?.status === "failed" ? <span className="batch-status is-failed" aria-label="Ошибка проверки" role="img" /> : <Spin size="small" aria-label="Проверка идёт" />}{names[id] ?? `Документ ${index + 1}`}</span>;
       let children;
-      if (task?.status === "failed") children = <Alert type="error" showIcon title="Не удалось проверить файл" description={task.error ?? "Попробуйте загрузить его снова."} />;
-      else if (task?.status === "done" && task.report_id) children = <div className="batch-report"><ReportView key={task.report_id} reportId={task.report_id} /></div>;
-      else children = <Card className="batch-progress"><Spin size="large" /><h2>{task?.stage === "reporting" ? "Подготавливаем отчёт" : "Документ проверяется"}</h2><p>Обычно это занимает меньше минуты. Большие документы могут обрабатываться дольше.</p><Progress percent={task?.progress ?? 0} status="active" /><Tag>{task?.status === "queued" || !task ? "В очереди" : "Проверяется"}</Tag></Card>;
+      if (task?.status === "failed") children = <Result status="error" title="Не удалось проверить файл" subTitle={task.error ?? "Попробуйте загрузить его снова."} extra={<Link to="/">Загрузить другой документ</Link>} />;
+      else if (task?.status === "done" && task.report_id) children = <div className="batch-report"><ReportView key={task.report_id} reportId={task.report_id} embedded /></div>;
+      else children = <Card className="batch-progress"><Spin size="large" /><h2>{task?.stage === "reporting" ? "Подготавливаем отчёт" : "Документ проверяется"}</h2><p>Обычно это занимает меньше минуты. Большие документы могут обрабатываться дольше.</p><Steps className="batch-stages" current={Math.max(0, STAGES.findIndex(({ stage }) => stage === task?.stage))} items={STAGES.map(({ title }) => ({ title }))} direction="vertical" size="small" /><Progress percent={task?.progress ?? 0} status="active" /><Tag>{task?.status === "queued" || !task ? "В очереди" : "Проверяется"}</Tag></Card>;
       return { key: id, label, children };
     })} />
     <Button type="primary" className="batch-new-check" onClick={() => { window.location.href = "/"; }}>Проверить другие документы</Button>

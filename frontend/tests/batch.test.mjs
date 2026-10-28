@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { parseBatchTasks, submitBatchFiles, validateBatchFile } from "../src/lib/batch.ts";
+import { documentCountLabel, parseBatchTasks, submitBatchFiles, validateBatchFile } from "../src/lib/batch.ts";
+
+test("uses natural Russian forms for document count", () => {
+  assert.equal(documentCountLabel(1), "1 документ");
+  assert.equal(documentCountLabel(4), "4 документа");
+  assert.equal(documentCountLabel(10), "10 документов");
+  assert.equal(documentCountLabel(11), "11 документов");
+  assert.equal(documentCountLabel(21), "21 документ");
+});
 
 test("accepts supported files and rejects empty, oversized and unsupported files", () => {
   assert.equal(validateBatchFile({ name: "report.PDF", size: 120 }), null);

@@ -4,6 +4,13 @@ export const MAX_BATCH_FILES = 10;
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
 const EXTENSIONS = [".pdf", ".docx", ".xlsx"];
 
+export function documentCountLabel(count: number): string {
+  const lastTwo = count % 100;
+  const last = count % 10;
+  const noun = lastTwo >= 11 && lastTwo <= 14 ? "документов" : last === 1 ? "документ" : last >= 2 && last <= 4 ? "документа" : "документов";
+  return `${count} ${noun}`;
+}
+
 export function validateBatchFile(file: Pick<File, "name" | "size">): string | null {
   if (!EXTENSIONS.some((extension) => file.name.toLowerCase().endsWith(extension))) return "Поддерживаются PDF, DOCX и XLSX";
   if (file.size === 0) return "Файл пустой";

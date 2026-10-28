@@ -155,7 +155,7 @@ export default function UploadPage() {
       <div className="form-actions">
         {fileError && <Alert type="error" showIcon title={fileError} className="form-error" />}
         <Button type="primary" size="large" loading={uploading} disabled={uploading} onClick={() => { void handleUpload(); }}>
-          {fileList.length > 1 ? `Проверить ${fileList.length} файлов` : "Начать проверку"}
+          {fileList.length > 1 ? "Проверить выбранные документы" : "Начать проверку"}
         </Button>
         <Typography.Text type="secondary">Обычно занимает меньше минуты</Typography.Text>
       </div>
