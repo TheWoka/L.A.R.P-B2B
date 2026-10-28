@@ -73,7 +73,6 @@ export default function TaskPage() {
   if (task?.status === "failed") {
     return (
       <div className="page-container task-page">
-        <div className="page-eyebrow">Гриф / Проверка документа</div>
         <Card>
           <Result
             status="error"
@@ -88,7 +87,6 @@ export default function TaskPage() {
 
   return (
     <div className="page-container task-page">
-      <div className="page-eyebrow">Гриф / Проверка документа</div>
       <header className="page-heading">
         <h1>Документ проверяется</h1>
         <p>Номер проверки: {taskId}</p>

@@ -26,7 +26,9 @@ button, input, textarea { font: inherit; }
   background: #fff !important;
 }
 .app-sidebar .ant-layout-sider-children { position: sticky; top: 0; display: flex; flex-direction: column; height: 100vh; padding: 36px 18px 24px; }
-.brand { display: flex; align-items: center; gap: 14px; margin: 0 12px 58px; color: #1c1c1e; font-size: 23px; font-weight: 750; letter-spacing: -.04em; text-decoration: none; }
+.brand-block { margin: 0 12px 46px; }
+.brand { display: flex; align-items: center; gap: 14px; color: #1c1c1e; font-size: 23px; font-weight: 750; letter-spacing: -.04em; text-decoration: none; }
+.brand-subtitle { display: block; margin-top: 13px; color: #6e6e73; font-size: 12px; }
 .brand-mark { position: relative; width: 42px; height: 42px; border-radius: 12px; background: #087ff5; flex: none; }
 .brand-mark::before, .brand-mark::after { content: ""; position: absolute; top: 50%; left: 50%; width: 22px; height: 2px; border-radius: 2px; background: #fff; transform: translate(-50%, -50%); }
 .brand-mark::after { transform: translate(-50%, -50%) rotate(90deg); }
@@ -38,10 +40,11 @@ button, input, textarea { font: inherit; }
 .sidebar-link svg { flex: none; opacity: .8; }
 .sidebar-link.is-active svg { opacity: 1; }
 .sidebar-foot { margin: auto 14px 0; color: #6e6e73; font-size: 12px; }
+.sidebar-foot a { color: #087ff5; text-decoration: none; }
 .mobile-header, .mobile-upload-title, .mobile-upload-subtitle { display: none; }
 .mobile-nav-drawer .sidebar-nav { gap: 6px; }
 .app-content { padding: 42px clamp(24px, 4.5vw, 72px) 80px; }
-.page-container { width: min(100%, 1200px); margin: 0 auto; }
+.page-container { width: min(100%, 1440px); margin: 0 auto; }
 .page-eyebrow { color: #6e6e73; font-size: 13px; margin-bottom: 22px; }
 .page-heading { margin-bottom: 28px; }
 .page-heading h1, .page-title { margin: 0 0 8px; font-size: clamp(30px, 3.2vw, 40px); line-height: 1.18; letter-spacing: -.035em; font-weight: 760; }
@@ -85,7 +88,7 @@ button, input, textarea { font: inherit; }
 .upload-notice { margin-top: 28px; border-radius: 14px; }
 .example-link { margin-top: 16px; color: #6e6e73; font-size: 13px; }
 .example-link a { font-weight: 650; }
-.upload-aside { padding-top: 72px; }
+.upload-aside { padding-top: 9px; }
 .upload-aside h2 { margin-bottom: 15px; }
 .feature-card { position: relative; min-height: 112px; margin-bottom: 12px; padding: 18px 18px 18px 58px; border: 1px solid #ebebee; border-radius: 18px; background: #fff; }
 .feature-card strong { font-size: 14px; }
@@ -94,7 +97,7 @@ button, input, textarea { font: inherit; }
 .feature-icon-blue { color: #087ff5; background: #eaf3ff; }
 .feature-icon-amber { color: #db932b; background: #fff4e4; }
 .feature-icon-green { color: #4aab72; background: #e9f7ed; }
-.privacy-note { display: flex; align-items: flex-start; gap: 12px; padding: 16px; border-radius: 18px; background: #eaf3ff; }
+.privacy-note { display: flex; align-items: flex-start; gap: 12px; margin-top: 24px; padding: 16px; border-radius: 18px; background: #eaf3ff; }
 .privacy-note strong { font-size: 13px; }
 .privacy-note p { margin: 4px 0 0; color: #596471; font-size: 12px; line-height: 1.4; }
 .privacy-mark { width: 23px; height: 23px; color: #087ff5; flex: none; }
@@ -140,6 +143,20 @@ button, input, textarea { font: inherit; }
 .not-found-symbol { display: grid; place-items: center; width: 88px; height: 88px; margin-bottom: 25px; border-radius: 24px; background: #eaf3ff; color: #087ff5; font-size: 30px; font-weight: 760; letter-spacing: -.04em; }
 .not-found-page h1 { margin: 0 0 10px; font-size: clamp(32px, 4vw, 46px); letter-spacing: -.04em; }
 .not-found-page p { margin: 0 0 28px; color: #6e6e73; font-size: 16px; }
+
+@media (min-width: 1600px) {
+  .sidebar-link { font-size: 16px; }
+  .brand-subtitle, .sidebar-foot { font-size: 13px; }
+  .page-heading h1, .page-title { font-size: 44px; }
+  .page-heading p, .page-subtitle { font-size: 18px; }
+  .upload-layout { grid-template-columns: minmax(0, 1fr) 300px; }
+  .document-dropzone .ant-upload strong { font-size: 19px; }
+  .dropzone-hint, .purpose-section > p, .form-actions .ant-typography, .example-link { font-size: 15px; }
+  .purpose-copy strong, .feature-card strong { font-size: 16px; }
+  .purpose-copy span, .feature-card p, .privacy-note p { font-size: 14px; }
+  .privacy-note strong { font-size: 15px; }
+  .feature-card { min-height: 122px; }
+}
 
 @media (max-width: 1100px) {
   .upload-layout { grid-template-columns: minmax(0, 1fr); }

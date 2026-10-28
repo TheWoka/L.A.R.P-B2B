@@ -109,7 +109,6 @@ export default function RulesPage() {
   return (
     <div className="page-container rules-page">
       {messageContext}
-      <div className="page-eyebrow">Гриф / Правила проверки</div>
       <header className="page-heading">
         <h1>Правила проверки</h1>
         <p>Выключенные правила не применяются к новым проверкам.</p>

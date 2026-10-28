@@ -64,7 +64,6 @@ export default function ReportPage() {
 
   return (
     <div className="page-container report-page">
-      <div className="page-eyebrow">Гриф / Отчёт</div>
       <Link className="report-back" to="/">← Новая проверка</Link>
       <header className="page-heading">
         <h1>Результат проверки</h1>

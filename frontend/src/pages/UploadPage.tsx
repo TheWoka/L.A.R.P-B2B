@@ -130,7 +130,7 @@ export default function UploadPage() {
       >
         <span className="upload-symbol" aria-hidden="true">
           <svg viewBox="0 0 84 84" fill="none" focusable="false">
-            <path d="M42 55V15M22 35L42 15L62 35M11 69H73" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M42 52V20M26 36L42 20L58 36M19 61H65" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </span>
         <strong>Перетащите документ сюда</strong>
@@ -182,7 +182,6 @@ export default function UploadPage() {
 
   return (
     <div className="page-container upload-page">
-      <div className="page-eyebrow">Гриф / Проверка документа</div>
       <header className="page-heading">
         <h1>Проверка документа</h1>
         <p>Загрузите файл, а мы покажем риски и объясним каждый результат.</p>
@@ -224,11 +223,11 @@ export default function UploadPage() {
             <strong>Чек-лист документа</strong>
             <p>Гриф, согласования, срок хранения</p>
           </div>
-          <div className="privacy-note">
-            <svg className="privacy-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 2 20 5v6c0 5-3 8.5-8 11-5-2.5-8-6-8-11V5l8-3Z" /><path d="m9 12 2 2 4-4" /></svg>
-            <div><strong>Данные под защитой</strong><p>Персональные сведения скрываются до обращения к нейросети.</p></div>
-          </div>
         </aside>
+      </div>
+      <div className="privacy-note">
+        <svg className="privacy-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 2 20 5v6c0 5-3 8.5-8 11-5-2.5-8-6-8-11V5l8-3Z" /><path d="m9 12 2 2 4-4" /></svg>
+        <div><strong>Данные под защитой</strong><p>Персональные сведения скрываются до обращения к нейросети.</p></div>
       </div>
     </div>
   );
