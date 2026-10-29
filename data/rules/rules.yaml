@@ -9,9 +9,11 @@
   law_refs:
     - {law: 152-ФЗ, article: ст. 7, title: Конфиденциальность персональных данных, url: 'https://www.consultant.ru/document/cons_doc_LAW_61801/'}
     - {law: 152-ФЗ, article: ст. 10.1, title: Согласие на распространение персональных данных, url: 'https://www.consultant.ru/document/cons_doc_LAW_61801/'}
+    - {law: 44-ФЗ, article: ст. 4 ч. 4, title: Общедоступность и безвозмездность информации на официальном сайте ЕИС, url: 'https://www.consultant.ru/document/cons_doc_LAW_144624/2f348a222a65dde36e5d9cdfd5656c3eea6f1cc7/'}
+    - {law: 223-ФЗ, article: ст. 4 ч. 14, title: Доступ к опубликованной информации о закупке без взимания платы, url: 'https://www.consultant.ru/document/cons_doc_LAW_116964/441d00be62e3224cdc0514cffaf2a26b5b40a1c7/'}
   applies_to: [publication]
   condition: {type: entity_present, categories: [pd, pd_special], min_count: 1}
-  recommendation: Удалите или обезличьте ПДн перед публикацией либо получите согласие субъекта на распространение.
+  recommendation: Удалите или обезличьте ПДн перед публикацией либо получите согласие субъекта на распространение. Контакты ответственного лица заказчика в извещении указываются по закону (44-ФЗ, ст. 42 ч. 1 п. 1) — их можно оставить; остальные персональные данные уберите.
 
 - id: BANK_DATA_IN_PUBLICATION
   title: Платёжные реквизиты физлиц в документе для публикации
@@ -38,7 +40,10 @@
   title: Коммерческая тайна в документе для публикации
   description: Документ для публикации содержит сведения, составляющие коммерческую тайну.
   severity: red
-  law_refs: [{law: 98-ФЗ, article: ст. 10 ч. 5 п. 1, title: Исключение доступа к коммерческой тайне без согласия обладателя, url: 'https://www.consultant.ru/document/cons_doc_LAW_48699/'}]
+  law_refs:
+    - {law: 98-ФЗ, article: ст. 10 ч. 5 п. 1, title: Исключение доступа к коммерческой тайне без согласия обладателя, url: 'https://www.consultant.ru/document/cons_doc_LAW_48699/'}
+    - {law: 44-ФЗ, article: ст. 4 ч. 4, title: Общедоступность и безвозмездность информации на официальном сайте ЕИС, url: 'https://www.consultant.ru/document/cons_doc_LAW_144624/2f348a222a65dde36e5d9cdfd5656c3eea6f1cc7/'}
+    - {law: 223-ФЗ, article: ст. 4 ч. 14, title: Доступ к опубликованной информации о закупке без взимания платы, url: 'https://www.consultant.ru/document/cons_doc_LAW_116964/441d00be62e3224cdc0514cffaf2a26b5b40a1c7/'}
   applies_to: [publication]
   condition: {type: entity_present, categories: [trade_secret]}
   recommendation: Исключите сведения о себестоимости, наценке, условиях скидок из документа, который будет опубликован.

@@ -291,6 +291,7 @@ def test_catalog_law_refs_open_local_articles(rules: list[Rule]) -> None:
     filenames = {
         "152-ФЗ": "152-fz.md", "187-ФЗ": "187-fz.md",
         "98-ФЗ": "98-fz.md", "GDPR": "gdpr.md",
+        "44-ФЗ": "44-fz.md", "223-ФЗ": "223-fz.md",
     }
     errors: list[str] = []
     for rule in rules:
