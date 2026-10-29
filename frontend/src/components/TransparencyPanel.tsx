@@ -113,8 +113,8 @@ export default function TransparencyPanel({ report, example = false }: Props) {
         </Tag>
       )) : "Не указаны",
     },
-    { key: "llm", label: "Нейросеть", children: audit.llm_provider === "mock" ? "Не использовалась" : audit.llm_model ?? "Модель не указана" },
-    { key: "calls", label: "Вызовов нейросети", children: audit.llm_calls },
+    { key: "llm", label: "Генеративная нейросеть (LLM)", children: audit.llm_provider === "mock" ? "Не использовалась" : audit.llm_model ?? "Модель не указана" },
+    { key: "calls", label: "Вызовов генеративной нейросети", children: audit.llm_calls },
   ];
 
   let llmContent;
