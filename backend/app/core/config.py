@@ -7,7 +7,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Таймаут одного запроса к LLM по умолчанию, секунды (LLM_TIMEOUT_S, T-029b).
@@ -43,6 +43,18 @@ class Settings(BaseSettings):
     # Таймаут одного HTTP-запроса к LLM, секунды; > 0, конечное число.
     # Для локальной модели на CPU — 120 (docs/local-llm.md).
     llm_timeout_s: float = Field(default=DEFAULT_LLM_TIMEOUT_S, gt=0, allow_inf_nan=False)
+    # Поле reasoning_effort в запросе к LLM (T-066), например "none" — выключить рассуждения
+    # у Qwen3.5 / Gemma 4. Только для Ollama и других серверов, принимающих reasoning_effort;
+    # облачной gpt-4o-mini не задавать. None (по умолчанию) — поля в запросе нет.
+    llm_reasoning_effort: str | None = None
+
+    @field_validator("llm_reasoning_effort", mode="before")
+    @classmethod
+    def _blank_reasoning_effort_is_none(cls, value: object) -> object:
+        """Пустая строка или пробелы (LLM_REASONING_EFFORT= в .env) — как «не задано»."""
+        if isinstance(value, str):
+            return value.strip() or None
+        return value
 
     # --- Прочее ---
     embedding_model: str = "intfloat/multilingual-e5-small"

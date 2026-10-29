@@ -213,13 +213,7 @@ def request_chat(
     Возвращает текст ответа и usage.
     """
     url = settings.llm_base_url.rstrip("/") + "/chat/completions"
-    body = {
-        "model": settings.llm_model,
-        "messages": messages,
-        "temperature": 0,
-        "max_tokens": MAX_ANSWER_TOKENS,
-        "response_format": {"type": "json_object"},
-    }
+    body = build_request_body(settings, messages)
     headers = {"Authorization": f"Bearer {settings.llm_api_key}"}
     with httpx.Client(transport=transport, timeout=settings.llm_timeout_s) as http:
         for attempt in range(1, MAX_HTTP_ATTEMPTS + 1):
@@ -231,6 +225,26 @@ def request_chat(
     raise LLMRequestError(
         f"LLM недоступна: {MAX_HTTP_ATTEMPTS} попытки не удались (последняя причина: {status})"
     )
+
+
+def build_request_body(settings: Settings, messages: list[dict[str, str]]) -> dict[str, Any]:
+    """Тело запроса chat/completions.
+
+    reasoning_effort (T-066) добавляется, только если задан LLM_REASONING_EFFORT: модели
+    с рассуждениями (Qwen3.5, Gemma 4 в Ollama) иначе тратят весь MAX_ANSWER_TOKENS на
+    рассуждения и получают finish_reason="length". Без настройки тело прежнее — облачные
+    провайдеры не получают незнакомого поля.
+    """
+    body: dict[str, Any] = {
+        "model": settings.llm_model,
+        "messages": messages,
+        "temperature": 0,
+        "max_tokens": MAX_ANSWER_TOKENS,
+        "response_format": {"type": "json_object"},
+    }
+    if settings.llm_reasoning_effort is not None:
+        body["reasoning_effort"] = settings.llm_reasoning_effort
+    return body
 
 
 def _send_once(
