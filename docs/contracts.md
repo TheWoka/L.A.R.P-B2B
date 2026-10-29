@@ -431,6 +431,7 @@ LLM_API_KEY=
 LLM_MODEL=
 LLM_MAX_CALLS_PER_DOC=30
 LLM_TIMEOUT_S=30                  # таймаут одного запроса к LLM, с; float > 0; локально на CPU — 120
+LLM_REASONING_EFFORT=             # необязательно; "none" — выключить рассуждения локальной модели (Ollama: Qwen3.5, Gemma 4); облаку не задавать
 
 EMBEDDING_MODEL=intfloat/multilingual-e5-small
 MAX_UPLOAD_MB=50
@@ -441,6 +442,7 @@ REPORT_TTL_DAYS=7
 
 | Дата | Что изменилось | Кто решил |
 |---|---|---|
+| 2026-10-29 | Раздел 5: LLM_REASONING_EFFORT — режим рассуждений локальных моделей (T-066) | Данила (тимлид) |
 | 2026-10-27 | export?format=md (T-060) | Данила (тимлид) |
 | 2026-10-25 | 422 — {detail: строка}; QueryRequest.text ≤ 200 000 (T-052) | Данила (тимлид) |
 | 2026-10-24 | GET /api/metrics?corpus= — метрики других корпусов (слепой набор) | Данила (тимлид) |

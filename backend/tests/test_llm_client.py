@@ -563,3 +563,67 @@ def test_finish_reason_stop_is_parsed_as_usual(no_sleep: list[float]) -> None:
                          "finish_reason": "stop"}]}
     fake = FakeLLM([httpx.Response(200, json=data)])
     assert call(fake, MemoryCache(), no_sleep) == Verdict(answer=True, quote="x")
+
+
+# ------------------------------- T-066: reasoning_effort для моделей с рассуждениями ---
+
+
+def test_reasoning_effort_absent_by_default(
+    monkeypatch: pytest.MonkeyPatch, no_sleep: list[float],
+) -> None:
+    monkeypatch.delenv("LLM_REASONING_EFFORT", raising=False)
+    settings = real_settings()
+    assert settings.llm_reasoning_effort is None
+    fake = FakeLLM([ok({"answer": True, "quote": "x"})])
+    call(fake, MemoryCache(), no_sleep, settings=settings)
+    assert "reasoning_effort" not in fake.body()      # облако получает прежнее тело
+
+
+def test_reasoning_effort_from_env_reaches_request(
+    monkeypatch: pytest.MonkeyPatch, no_sleep: list[float],
+) -> None:
+    monkeypatch.setenv("LLM_REASONING_EFFORT", "none")
+    settings = real_settings()  # значение только из окружения, как в docker-compose
+    assert settings.llm_reasoning_effort == "none"
+    fake = FakeLLM([ok({"answer": True, "quote": "x"})])
+    call(fake, MemoryCache(), no_sleep, settings=settings)
+    body = fake.body()
+    assert body["reasoning_effort"] == "none"
+    assert body["max_tokens"] == MAX_ANSWER_TOKENS     # потолок ответа не меняется
+
+
+@pytest.mark.parametrize("value", ["", "   ", "\t"])
+def test_reasoning_effort_blank_is_not_sent(
+    monkeypatch: pytest.MonkeyPatch, no_sleep: list[float], value: str,
+) -> None:
+    monkeypatch.setenv("LLM_REASONING_EFFORT", value)  # строка LLM_REASONING_EFFORT= в .env
+    settings = real_settings()
+    assert settings.llm_reasoning_effort is None
+    fake = FakeLLM([ok({"answer": True, "quote": "x"})])
+    call(fake, MemoryCache(), no_sleep, settings=settings)
+    assert "reasoning_effort" not in fake.body()
+
+
+def test_reasoning_effort_is_stripped(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LLM_REASONING_EFFORT", "  low ")
+    assert real_settings().llm_reasoning_effort == "low"
+
+
+def test_reasoning_effort_sent_on_json_repair_too(no_sleep: list[float]) -> None:
+    fake = FakeLLM([ok("не json"), ok({"answer": True, "quote": "x"})])
+    call(fake, MemoryCache(), no_sleep, settings=real_settings(llm_reasoning_effort="none"))
+    assert len(fake.requests) == 2
+    assert [fake.body(i)["reasoning_effort"] for i in range(2)] == ["none", "none"]
+
+
+def test_reasoning_effort_mock_makes_no_http_requests() -> None:
+    settings = Settings(
+        _env_file=None, llm_provider="mock", llm_reasoning_effort="none",
+        redis_url="redis://localhost:1/0",
+    )  # type: ignore[call-arg]
+    fake = FakeLLM()
+    result = run_complete_json(
+        SYSTEM, USER_TEXT, Verdict, settings=settings, transport=fake.transport
+    )
+    assert result == Verdict(answer=False, quote="")
+    assert fake.requests == []

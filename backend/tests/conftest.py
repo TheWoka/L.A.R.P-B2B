@@ -10,7 +10,10 @@ import pytest
 # Присваивание, а не setdefault: docker-compose run подставляет .env с реальным провайдером,
 # и тесты не должны уходить во внешний API (деньги, лимиты, данные наружу).
 os.environ["LLM_PROVIDER"] = "mock"
-for _name in ("LLM_BASE_URL", "LLM_API_KEY", "LLM_MODEL"):
+# LLM_TIMEOUT_S тоже: тесты проверяют значение по умолчанию (30 с), а в .env может стоять 60/120.
+for _name in (
+    "LLM_BASE_URL", "LLM_API_KEY", "LLM_MODEL", "LLM_TIMEOUT_S", "LLM_REASONING_EFFORT",
+):
     os.environ.pop(_name, None)
 
 from fastapi.testclient import TestClient  # noqa: E402
