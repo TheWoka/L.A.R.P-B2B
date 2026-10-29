@@ -119,13 +119,13 @@ export default function TransparencyPanel({ report, example = false }: Props) {
 
   let llmContent;
   if (example) {
-    llmContent = <Typography.Paragraph>Нейросеть не использовалась: проверка выполнена без неё, в режиме без LLM. Документ никуда не отправлялся.</Typography.Paragraph>;
+    llmContent = <Typography.Paragraph>Генеративная нейросеть (LLM) не использовалась: документ никуда не отправлялся. Локальный классификатор grif-cls работал — см. «Детекторы» в следе проверки.</Typography.Paragraph>;
   } else if (loading || (calls === null && error === null)) {
     llmContent = <Skeleton active paragraph={{ rows: 3 }} />;
   } else if (error) {
     llmContent = <Alert type="error" showIcon title="Не удалось загрузить журнал нейросети" description={error} action={<Button size="small" onClick={() => setAttempt((value) => value + 1)}>Повторить</Button>} />;
   } else if (calls?.length === 0) {
-    llmContent = <Typography.Paragraph>{report.llm_used ? "Вызовов нейросети для этого документа не потребовалось." : "Нейросеть не использовалась: проверка выполнена без неё, в режиме без LLM. Документ никуда не отправлялся."}</Typography.Paragraph>;
+    llmContent = <Typography.Paragraph>{report.llm_used ? "Вызовов нейросети для этого документа не потребовалось." : "Генеративная нейросеть (LLM) не использовалась: документ никуда не отправлялся. Локальный классификатор grif-cls работал — см. «Детекторы» в следе проверки."}</Typography.Paragraph>;
   } else {
     llmContent = <Space orientation="vertical" size="middle" style={{ width: "100%" }}>{calls?.map((call, index) => <LlmCallCard key={`${call.rule_id ?? call.purpose}-${index}`} call={call} index={index} />)}</Space>;
   }

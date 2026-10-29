@@ -86,7 +86,7 @@ export default function ReportView({ reportId, embedded = false }: { reportId: s
         <Typography.Paragraph type="secondary" style={{ marginTop: 12 }}>
           {overall.description}
         </Typography.Paragraph>
-        {!report.llm_used && <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>Смысловые проверки нейросетью не выполнялись (режим без LLM).</Typography.Paragraph>}
+        {!report.llm_used && <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>Смысловые проверки генеративной нейросетью не выполнялись (режим без LLM); локальный классификатор grif-cls работал.</Typography.Paragraph>}
         <Descriptions column={{ xs: 1, sm: 2, md: 2 }} items={details} />
         {reportId !== "example" && (
           <div style={{ marginTop: 20 }}>

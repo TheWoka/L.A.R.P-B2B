@@ -70,7 +70,7 @@ export function detectorLabel(name: string): string {
   if (name === "regex") return "Шаблоны и контрольные суммы";
   if (name.startsWith("ner:")) return "Распознавание имён Natasha";
   if (name === "dict") return "Словари";
-  if (name.startsWith("llm:")) return `Нейросеть ${name.slice(4) || "(модель не указана)"}`;
-  if (name.startsWith("model:")) return "Классификатор";
+  if (name.startsWith("llm:")) return `Генеративная нейросеть ${name.slice(4) || "(модель не указана)"}`;
+  if (name.startsWith("model:")) return "Классификатор grif-cls (нейросеть, локально)";
   return name;
 }
