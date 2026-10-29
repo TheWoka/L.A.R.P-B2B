@@ -257,8 +257,7 @@ docker-compose exec ollama ollama pull hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:
 По умолчанию модель работает на CPU. Если на компьютере есть видеокарта NVIDIA с актуальным
 драйвером и Docker Desktop работает на WSL2:
 
-1. В `docker-compose.yml` у сервиса `ollama` раскомментируйте блок `deploy.resources.reservations.devices`
-   (`driver: nvidia`, `count: all`, `capabilities: [gpu]`).
+1. подключите docker-compose.gpu.yml (см. комментарий в файле)
 2. Пересоздайте сервис: `docker-compose --profile local-llm up -d --force-recreate ollama`.
 3. Сделайте один запрос (прогрев выше) и выполните `docker-compose exec ollama ollama ps`:
    в столбце `PROCESSOR` должно быть `100% GPU` (или доля GPU/CPU, если модель не поместилась).
