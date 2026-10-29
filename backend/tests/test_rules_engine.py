@@ -21,6 +21,8 @@ from app.schemas import (
     Severity,
     TextSegment,
 )
+from app.services.llm import client as llm_client
+from app.services.llm.checks import LlmConditionAnswer
 from app.services.rules.engine import evaluate, validate_condition
 from app.services.rules.loader import load_rules
 
@@ -271,6 +273,49 @@ def test_llm_in_mock_returns_no_violation_and_logs_no_document(
     assert rule_context.doc.text not in caplog.text
     assert rule_context.masked_text not in caplog.text
     assert "Тестов Тест" not in caplog.text
+
+
+def _llm_answers_yes(monkeypatch: pytest.MonkeyPatch, quote: str) -> None:
+    """Включает «реальный» режим LLM и подменяет ответ на yes с цитатой (сети нет)."""
+    monkeypatch.setattr(llm_client, "is_llm_enabled", lambda settings=None: True)
+    monkeypatch.setattr(
+        llm_client, "complete_json",
+        lambda *args, **kwargs: LlmConditionAnswer(verdict="yes", quote=quote),
+    )
+
+
+def test_violation_without_llm_has_rule_source(rule_context: RuleContext) -> None:
+    violation, = evaluate([_rule(PERSON)], rule_context)
+    assert violation.source == "rule"
+
+
+@pytest.mark.parametrize(
+    "condition",
+    [
+        {"all": [APPROVAL, {"type": "llm", "question": "Есть ли данные о марже?"}]},
+        {"any": [CLASSIFICATION, {"all": [
+            APPROVAL, {"type": "llm", "question": "Есть ли данные о марже?"},
+        ]}]},
+    ],
+)
+def test_violation_with_llm_condition_has_llm_source(
+    rule_context: RuleContext, monkeypatch: pytest.MonkeyPatch, condition: dict[str, object],
+) -> None:
+    _llm_answers_yes(monkeypatch, "маржа 17%")
+    violation, = evaluate([_rule(condition)], rule_context)
+    assert violation.source == "llm"
+
+
+def test_llm_and_plain_rules_keep_own_sources(
+    rule_context: RuleContext, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _llm_answers_yes(monkeypatch, "маржа 17%")
+    llm_rule = _rule(
+        {"all": [APPROVAL, {"type": "llm", "question": "Есть ли данные о марже?"}]}, "LLM_RULE",
+    )
+    violations = evaluate([_rule(PERSON), llm_rule], rule_context)
+    sources = {item.rule_id: item.source for item in violations}
+    assert sources == {"SYNTHETIC_RULE": "rule", "LLM_RULE": "llm"}
 
 
 @pytest.mark.parametrize(

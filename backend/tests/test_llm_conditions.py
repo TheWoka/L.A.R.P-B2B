@@ -153,7 +153,7 @@ def test_yes_with_found_quote_creates_violation_in_original_coordinates(
     assert evidence.quote == report_text[evidence.start:evidence.end]
     assert ctx.doc.text[evidence.start:evidence.end] == f"Меры защиты: {CLAUSE}"
     assert (evidence.page, evidence.section) == (2, "Раздел 9")
-    assert violations[0].source == "rule"
+    assert violations[0].source == "llm"
     assert calls == [LlmCall(
         purpose="rule_condition", rule_id="SYNTHETIC_LLM", question=QUESTION,
         masked_fragment=ctx.masked_text, verdict="yes", quote=f"Меры защиты: {CLAUSE}",
