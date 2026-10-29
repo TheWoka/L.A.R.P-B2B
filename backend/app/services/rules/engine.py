@@ -7,7 +7,7 @@ LLM получает только ctx.masked_text (плейсхолдеры [PER
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TypeAlias
+from typing import Literal, TypeAlias
 
 from app.schemas import (
     DocPurpose,
@@ -117,7 +117,7 @@ def evaluate(rules: list[Rule], ctx: RuleContext) -> list[Violation]:
                     law_refs=rule.law_refs,
                     evidence=_prepare_evidence(evidence),
                     recommendation=rule.recommendation,
-                    source="rule",
+                    source=_violation_source(rule.condition),
                 )
             )
     return sorted(violations, key=lambda violation: violation.severity != Severity.red)
@@ -190,6 +190,11 @@ def _check_logical(
     if not matched:
         return False, []
     return True, [item for truth, items in results if truth for item in items]
+
+
+def _violation_source(condition: object) -> Literal["rule", "llm"]:
+    """Источник нарушения: llm, если в дереве условия правила есть узел llm на любой глубине."""
+    return "llm" if _contains_llm(condition) else "rule"
 
 
 def _contains_llm(condition: object) -> bool:

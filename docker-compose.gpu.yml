@@ -1,6 +1,9 @@
+# GPU NVIDIA для сервиса ollama (T-067). Образ задаётся только в docker-compose.yml.
+# Подключать явно: $env:COMPOSE_FILE = 'docker-compose.yml;docker-compose.gpu.yml'
+# Без NVIDIA не использовать: контейнер ollama с этим блоком не запустится.
+# Инструкция и проверка — docs/local-llm.md, раздел «Как включить GPU (NVIDIA)».
 services:
   ollama:
-    image: ollama/ollama:0.31.2
     deploy:
       resources:
         reservations:
