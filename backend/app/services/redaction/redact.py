@@ -14,19 +14,21 @@ from app.services.redaction.docx import redact_docx
 from app.services.redaction.pdf import redact_pdf
 from app.services.redaction.values import DEFAULT_LABEL, LABELS, PdValue, pd_values, replace_values
 from app.services.redaction.xlsx import redact_xlsx
+from app.services.redaction.xml import redact_xml
 
 MEDIA_TYPES: dict[str, str] = {
     "pdf": "application/pdf",
     "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "txt": "text/plain; charset=utf-8",
+    "xml": "application/xml",
 }
 
 
 @dataclass(frozen=True)
 class RedactedFile:
     content: bytes
-    ext: str          # без точки: "docx", "xlsx", "pdf", "txt"
+    ext: str          # без точки: "docx", "xlsx", "pdf", "txt", "xml"
 
 
 def redact(source: Path, doc: ExtractedDocument, entities: list[Entity]) -> RedactedFile:
@@ -46,6 +48,8 @@ def redact(source: Path, doc: ExtractedDocument, entities: list[Entity]) -> Reda
         content = redact_xlsx(source, values)
     elif ext == "pdf":
         content = redact_pdf(source, values)
+    elif ext == "xml":
+        content = redact_xml(source, values)
     else:
         raise ValueError(f"Обезличивание формата .{ext} не поддерживается")
     return RedactedFile(content=content, ext=ext)

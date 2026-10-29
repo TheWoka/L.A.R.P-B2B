@@ -117,13 +117,15 @@ def get_llm_log(report_id: str, session: DbSession) -> list[LlmCall]:
     summary="Скачать обезличенную копию документа",
     responses={
         200: {
-            "description": "Файл в формате исходника (.pdf / .docx / .xlsx; для запроса — .txt). "
+            "description": "Файл в формате исходника (.pdf / .docx / .xlsx / .xml; "
+            "для запроса — .txt). "
             'Content-Disposition: attachment; filename="<имя>_обезличено.<ext>"',
             "content": {
                 "application/pdf": {},
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document": {},
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {},
                 "text/plain": {},
+                "application/xml": {},
             },
         },
         404: {"description": "Обезличенная копия недоступна"},
