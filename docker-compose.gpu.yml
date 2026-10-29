@@ -3,6 +3,7 @@
 # Без NVIDIA этот файл не использовать. Инструкция — docs/local-llm.md, «Как включить GPU».
 services:
   ollama:
+    image: ollama/ollama:0.31.2   # если такого тега нет — последний 0.3x с hub.docker.com/r/ollama/ollama/tags
     deploy:
       resources:
         reservations:
