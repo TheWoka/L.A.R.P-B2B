@@ -6,6 +6,7 @@ import type { TableColumnsType } from "antd";
 import { ApiError, getMetrics } from "../api/client";
 import type { EntityType, Metrics, TypeMetrics } from "../api/types";
 import { ENTITY_TYPE_LABELS } from "../components/labels";
+import { roundPercentage } from "../lib/metrics";
 import exampleMetrics from "../mocks/metrics.example.json";
 
 type LoadedMetrics = { data: Metrics; example: boolean };
@@ -26,7 +27,7 @@ function MetricCard({ title, value, target }: { title: string; value: number; ta
     <Card className="quality-metric" style={{ height: "100%", borderColor: passed ? undefined : "#b2373d" }}>
       <Typography.Text strong>{title}</Typography.Text>
       <Statistic
-        value={value * 100}
+        value={roundPercentage(value)}
         precision={1}
         suffix="%"
         styles={{ content: { color: passed ? "#1c1c1e" : "#b2373d" } }}
