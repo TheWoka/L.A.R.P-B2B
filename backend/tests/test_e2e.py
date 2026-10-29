@@ -161,3 +161,41 @@ def test_missing_report(client: TestClient, api_db: tuple[Session, Mock]) -> Non
     response = client.get(f"/api/reports/{uuid4().hex}")
     assert response.status_code == 404
     assert response.json() == {"detail": "Отчёт не найден"}
+
+
+XML_FIXTURE = Path(__file__).resolve().parent / "fixtures" / "synthetic_notice_44fz.xml"
+XML_PRIVATE_VALUES = ("Петров", "Петрович", "petrov@example.ru", "+7 (900) 000-00-01")
+
+
+def test_publication_xml(
+    client: TestClient, api_db: tuple[Session, Mock], caplog: pytest.LogCaptureFixture,
+) -> None:
+    """XML-выгрузка ЕИС (T-064a): красный отчёт, ФИО целиком, копии пока нет (T-064b)."""
+    session, delay = api_db
+    with caplog.at_level(logging.INFO):
+        response = client.post(
+            "/api/documents", files={"file": (XML_FIXTURE.name, XML_FIXTURE.read_bytes())},
+            data={"purpose": "publication"},
+        )
+        assert response.status_code == 202
+        task_id = response.json()["task_id"]
+        delay.assert_called_once_with(task_id)
+        report, text = finish_audit(client, session, task_id)
+    assert report.filename == XML_FIXTURE.name and report.overall == "red"
+    assert "PD_IN_PUBLICATION" in {violation.rule_id for violation in report.violations}
+    assert report.redacted_available is False
+    persons = [entity for entity in report.entities if entity.type == EntityType.PERSON]
+    assert len(persons) == 1
+    assert persons[0].end - persons[0].start == len("Петров Пётр Петрович")
+    assert persons[0].section == "purchaseResponsibleInfo/responsibleInfo/contactPersonInfo"
+    assert {entity.type for entity in report.entities} >= {EntityType.PHONE, EntityType.EMAIL}
+    row = session.get(ReportRow, report.report_id)
+    assert row is not None and row.redacted is None
+    payloads = (
+        report.model_dump_json(), text.model_dump_json(), caplog.text,
+        json.dumps(row.data, ensure_ascii=False), json.dumps(row.text, ensure_ascii=False),
+    )
+    for value in XML_PRIVATE_VALUES:
+        for payload in payloads:
+            assert value not in payload
+    assert not list(storage.UPLOAD_DIR.iterdir())

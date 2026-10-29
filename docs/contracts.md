@@ -327,11 +327,13 @@ def evaluate(rules: list[Rule], ctx: RuleContext) -> list[Violation]: ...
 def build_report(ctx: RuleContext, violations: list[Violation], processing_ms: int, llm_used: bool, audit: AuditInfo) -> Report: ...
 ```
 
+XML (выгрузки ЕИС, T-064a): сегмент = одно поле (лист или ФИО из lastName/firstName/middleName), section = путь элементов; атрибуты не читаются. Подробнее: лист — элемент без дочерних элементов с непустым текстом; ≥ 2 листа ФИО у одного родителя склеиваются в «Фамилия Имя Отчество»; `section` — локальные имена (без пространств имён) от корня (без него) до родителя поля через `/`, не длиннее 120 символов; `page = None`. Разбор только через defusedxml, DTD и сущности запрещены. Обезличенной копии для .xml пока нет (`redacted_available = false`, T-064b).
+
 ## 4. REST API
 
 | Метод | Путь | Тело / параметры | Ответ |
 |---|---|---|---|
-| POST | `/api/documents` | multipart: `file`, `purpose` | `202 TaskCreated` |
+| POST | `/api/documents` | multipart: `file` (.pdf / .docx / .xlsx / .xml), `purpose` | `202 TaskCreated` |
 | POST | `/api/queries` | JSON `QueryRequest` | `202 TaskCreated` |
 | GET | `/api/tasks/{task_id}` | — | `TaskInfo` |
 | GET | `/api/reports/{report_id}` | — | `Report` |
@@ -346,7 +348,7 @@ def build_report(ctx: RuleContext, violations: list[Violation], processing_ms: i
 | DELETE | `/api/rules/{id}` | — | `204` |
 | GET | `/api/health` | — | `HealthStatus` |
 
-Ограничения: файл до 50 МБ; форматы .pdf, .docx, .xlsx; иначе `400 {detail: "понятное сообщение"}`.
+Ограничения: файл до 50 МБ; форматы .pdf, .docx, .xlsx, .xml (у .xml после UTF-8 BOM и пробелов первым должен идти `<`); иначе `400 {detail: "понятное сообщение"}`.
 Ошибки валидации запроса: `422 {"detail": "строка по-русски"}`; ответ не содержит введённых значений.
 Исходные файлы удаляются после обработки; отчёты хранятся `REPORT_TTL_DAYS` дней (по умолчанию 7) — система сама соблюдает сроки хранения, которые проверяет.
 Обезличенная копия создаётся в конвейере **до** удаления исходника и хранится тот же срок, что отчёт (`REPORT_TTL_DAYS`); правила копии — в разделе 4.1.
@@ -442,6 +444,7 @@ REPORT_TTL_DAYS=7
 
 | Дата | Что изменилось | Кто решил |
 |---|---|---|
+| 2026-10-29 | .xml (выгрузки ЕИС) в POST /api/documents; обезличенная копия .xml — T-064b | Данила (тимлид) |
 | 2026-10-29 | Раздел 5: LLM_REASONING_EFFORT — режим рассуждений локальных моделей (T-066) | Данила (тимлид) |
 | 2026-10-27 | export?format=md (T-060) | Данила (тимлид) |
 | 2026-10-25 | 422 — {detail: строка}; QueryRequest.text ≤ 200 000 (T-052) | Данила (тимлид) |

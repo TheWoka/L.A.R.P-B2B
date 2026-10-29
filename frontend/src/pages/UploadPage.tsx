@@ -8,7 +8,7 @@ import type { DocPurpose } from "../api/types";
 import { MAX_BATCH_FILES, submitBatchFiles, validateBatchFile } from "../lib/batch";
 
 const MAX_TEXT_LENGTH = 200_000;
-const ACCEPTED_EXTENSIONS = [".pdf", ".docx", ".xlsx"];
+const ACCEPTED_EXTENSIONS = [".pdf", ".docx", ".xlsx", ".xml"];
 
 const PURPOSES: { value: DocPurpose; title: string; description: string }[] = [
   { value: "publication", title: "Для публикации", description: "Сайт, ЕИС или открытый доступ" },
@@ -142,7 +142,7 @@ export default function UploadPage() {
           </svg>
         </span>
         <strong>Перетащите документы сюда</strong>
-        <span className="dropzone-hint">До 10 файлов PDF, DOCX или XLSX · каждый до 50 МБ</span>
+        <span className="dropzone-hint">До 10 файлов PDF, DOCX, XLSX или XML · каждый до 50 МБ</span>
         <span className="choose-file">Выбрать файлы</span>
       </Upload.Dragger>
       {fileList.length > 0 && <p className="selected-file-count">Выбрано: {fileList.length} из {MAX_BATCH_FILES}</p>}

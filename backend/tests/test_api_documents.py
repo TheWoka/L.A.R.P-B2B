@@ -202,3 +202,51 @@ def test_database_failure_cleans_file(
         client.post("/api/queries", json={"text": "Запрос", "purpose": "internal"})
     assert not list(tmp_path.iterdir())
     api_db[1].assert_not_called()
+
+
+XML_NOTICE = '<?xml version="1.0" encoding="UTF-8"?>\n<notice><v>1</v></notice>'.encode()
+
+
+@pytest.mark.parametrize("content", [
+    XML_NOTICE,
+    b"\xef\xbb\xbf" + XML_NOTICE,                  # UTF-8 BOM (выгрузки ЕИС из Windows)
+    b"\xef\xbb\xbf \r\n\t" + XML_NOTICE,           # BOM и пробелы перед прологом
+])
+def test_upload_xml(
+    client: TestClient, api_db: tuple[Session, Mock], content: bytes,
+) -> None:
+    response = client.post(
+        "/api/documents", files={"file": ("notice.XML", content)},
+        data={"purpose": "publication"},
+    )
+    assert response.status_code == 202
+    document = api_db[0].get(DocumentRow, response.json()["document_id"])
+    assert Path(document.stored_path).suffix == ".xml"
+    assert Path(document.stored_path).read_bytes() == content
+    api_db[1].assert_called_once_with(response.json()["task_id"])
+
+
+@pytest.mark.parametrize("content", [
+    b"%PDF-1.7 synthetic",                         # PDF, переименованный в .xml
+    b"PK\x03\x04synthetic",                        # zip (.docx/.xlsx)
+    b"\xef\xbb\xbf   ",                            # только BOM и пробелы
+    b"\xff\xfe<\x00r\x00>\x00",                    # UTF-16 — выгрузки ЕИС в UTF-8
+    b" " * 64 + b"<r/>",                           # «<» дальше первых 64 байт
+])
+def test_invalid_xml_upload(
+    client: TestClient, api_db: tuple[Session, Mock], tmp_path: Path, content: bytes,
+) -> None:
+    response = client.post(
+        "/api/documents", files={"file": ("notice.xml", content)}, data={"purpose": "internal"},
+    )
+    assert response.status_code == 400
+    assert response.json()["detail"] == documents.UNSUPPORTED_FORMAT
+    assert not list(tmp_path.iterdir())
+    assert api_db[0].scalar(select(TaskRow)) is None
+    api_db[1].assert_not_called()
+
+
+def test_looks_like_xml_rewinds_stream() -> None:
+    stream = BytesIO(b"\xef\xbb\xbf\n<r/>")
+    assert documents.looks_like_xml(stream)
+    assert stream.tell() == 0

@@ -100,7 +100,7 @@ def test_file_failure_via_api_and_worker(
     ("private.docx", b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1", None),
     ("private.xlsx", b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1", None),
     ("renamed.pdf", b"Synthetic text file", "Формат файла не поддерживается. "
-     "Загрузите .pdf, .docx или .xlsx"),
+     "Загрузите .pdf, .docx, .xlsx или .xml"),
 ])
 def test_rejected_upload(
     client: TestClient, api_db: tuple[Session, Mock], tmp_path: Path,

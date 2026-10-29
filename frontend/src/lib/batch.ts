@@ -2,7 +2,7 @@ import type { DocPurpose, TaskCreated } from "../api/types";
 
 export const MAX_BATCH_FILES = 10;
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
-const EXTENSIONS = [".pdf", ".docx", ".xlsx"];
+const EXTENSIONS = [".pdf", ".docx", ".xlsx", ".xml"];
 
 export function documentCountLabel(count: number): string {
   const lastTwo = count % 100;
@@ -12,7 +12,7 @@ export function documentCountLabel(count: number): string {
 }
 
 export function validateBatchFile(file: Pick<File, "name" | "size">): string | null {
-  if (!EXTENSIONS.some((extension) => file.name.toLowerCase().endsWith(extension))) return "Поддерживаются PDF, DOCX и XLSX";
+  if (!EXTENSIONS.some((extension) => file.name.toLowerCase().endsWith(extension))) return "Поддерживаются PDF, DOCX, XLSX или XML";
   if (file.size === 0) return "Файл пустой";
   if (file.size > MAX_FILE_SIZE) return "Файл больше 50 МБ";
   return null;

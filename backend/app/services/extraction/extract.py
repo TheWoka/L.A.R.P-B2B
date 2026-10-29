@@ -10,23 +10,26 @@ from app.services.extraction.docx import extract_docx
 from app.services.extraction.errors import EMPTY_DOCUMENT, ExtractionError
 from app.services.extraction.pdf import extract_pdf
 from app.services.extraction.xlsx import extract_xlsx
+from app.services.extraction.xml import extract_xml
 
 logger = logging.getLogger(__name__)
 
 
 def extract(path: Path, filename: str, document_id: str) -> ExtractedDocument:
-    """Извлекает текст из .pdf / .docx / .xlsx с привязкой к страницам и разделам.
+    """Извлекает текст из .pdf / .docx / .xlsx / .xml с привязкой к страницам и разделам.
 
-    Выбирает парсер по расширению (pdf.py, docx.py, xlsx.py), склеивает сегменты
+    Выбирает парсер по расширению (pdf.py, docx.py, xlsx.py, xml.py), склеивает сегменты
     через "\\n" в ExtractedDocument.text и проставляет каждому сегменту offset
     в этом полном тексте. Неподдерживаемый формат — ValueError с понятным текстом.
 
     Контракт: docs/contracts.md, раздел 3. Задача T-003.
     """
     extension = Path(filename).suffix.lower()
-    parsers = {".pdf": extract_pdf, ".docx": extract_docx, ".xlsx": extract_xlsx}
+    parsers = {
+        ".pdf": extract_pdf, ".docx": extract_docx, ".xlsx": extract_xlsx, ".xml": extract_xml,
+    }
     if extension not in parsers:
-        raise ValueError("Формат файла не поддерживается. Загрузите .pdf, .docx или .xlsx")
+        raise ValueError("Формат файла не поддерживается. Загрузите .pdf, .docx, .xlsx или .xml")
     pages: int | None = None
     try:
         segments = parsers[extension](path)
