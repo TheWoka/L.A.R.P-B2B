@@ -5,6 +5,7 @@ import logging
 from collections.abc import Iterator
 from pathlib import Path
 from unittest.mock import Mock
+from urllib.parse import quote
 from uuid import uuid4
 
 import pytest
@@ -170,7 +171,7 @@ XML_PRIVATE_VALUES = ("Петров", "Петрович", "petrov@example.ru", "
 def test_publication_xml(
     client: TestClient, api_db: tuple[Session, Mock], caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """XML-выгрузка ЕИС (T-064a): красный отчёт, ФИО целиком, копии пока нет (T-064b)."""
+    """XML-выгрузка ЕИС (T-064a/b): красный отчёт, ФИО целиком, обезличенная копия .xml."""
     session, delay = api_db
     with caplog.at_level(logging.INFO):
         response = client.post(
@@ -183,14 +184,22 @@ def test_publication_xml(
         report, text = finish_audit(client, session, task_id)
     assert report.filename == XML_FIXTURE.name and report.overall == "red"
     assert "PD_IN_PUBLICATION" in {violation.rule_id for violation in report.violations}
-    assert report.redacted_available is False
+    assert report.redacted_available is True
     persons = [entity for entity in report.entities if entity.type == EntityType.PERSON]
     assert len(persons) == 1
     assert persons[0].end - persons[0].start == len("Петров Пётр Петрович")
     assert persons[0].section == "purchaseResponsibleInfo/responsibleInfo/contactPersonInfo"
     assert {entity.type for entity in report.entities} >= {EntityType.PHONE, EntityType.EMAIL}
     row = session.get(ReportRow, report.report_id)
-    assert row is not None and row.redacted is None
+    assert row is not None and row.redacted_ext == "xml"
+    download = client.get(f"/api/reports/{report.report_id}/redacted")
+    assert download.status_code == 200
+    assert download.headers["content-type"] == "application/xml"
+    assert download.headers["content-disposition"] == (
+        "attachment; filename=\"redacted.xml\"; filename*=UTF-8''"
+        + quote("synthetic_notice_44fz_обезличено.xml", safe="")
+    )
+    assert download.content.startswith(b"<?xml") and "[ФИО]".encode() in download.content
     payloads = (
         report.model_dump_json(), text.model_dump_json(), caplog.text,
         json.dumps(row.data, ensure_ascii=False), json.dumps(row.text, ensure_ascii=False),
@@ -198,4 +207,5 @@ def test_publication_xml(
     for value in XML_PRIVATE_VALUES:
         for payload in payloads:
             assert value not in payload
+        assert value.encode() not in download.content
     assert not list(storage.UPLOAD_DIR.iterdir())
