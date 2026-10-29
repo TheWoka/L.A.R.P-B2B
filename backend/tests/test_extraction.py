@@ -419,7 +419,7 @@ def test_unsupported_extension(tmp_path: Path) -> None:
     with pytest.raises(ValueError) as error:
         extract(tmp_path / "missing", "sample.txt", "synthetic-id")
     assert str(error.value) == (
-        "Формат файла не поддерживается. Загрузите .pdf, .docx или .xlsx"
+        "Формат файла не поддерживается. Загрузите .pdf, .docx, .xlsx или .xml"
     )
 
 

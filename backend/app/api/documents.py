@@ -1,7 +1,7 @@
 """Приём документов и текстовых запросов без извлечения текста в HTTP."""
 
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, BinaryIO
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
@@ -15,8 +15,22 @@ from app.services.storage import delete_file, save_text, save_upload
 from app.worker.tasks import process_document
 
 router = APIRouter(tags=["documents"])
-UNSUPPORTED_FORMAT = "Формат файла не поддерживается. Загрузите .pdf, .docx или .xlsx"
+UNSUPPORTED_FORMAT = "Формат файла не поддерживается. Загрузите .pdf, .docx, .xlsx или .xml"
 DbSession = Annotated[Session, Depends(get_db)]
+UTF8_BOM = b"\xef\xbb\xbf"
+XML_HEAD_BYTES = 64
+
+
+def looks_like_xml(stream: BinaryIO) -> bool:
+    """Первые 64 байта без UTF-8 BOM и пробелов начинаются с «<» (T-064a).
+
+    Отсекает PDF, zip-архивы и прочие файлы, переименованные в .xml, до постановки в очередь.
+    Указатель потока возвращается в начало.
+    """
+    head = stream.read(XML_HEAD_BYTES)
+    stream.seek(0)
+    head = head.removeprefix(UTF8_BOM).lstrip()
+    return head.startswith(b"<")
 
 
 def enqueue_document(
@@ -54,7 +68,7 @@ def enqueue_document(
     summary="Загрузить документ на проверку",
 )
 def upload_document(
-    file: Annotated[UploadFile, File(description=".pdf, .docx или .xlsx, до 50 МБ")],
+    file: Annotated[UploadFile, File(description=".pdf, .docx, .xlsx или .xml, до 50 МБ")],
     purpose: Annotated[DocPurpose, Form(description="Назначение документа")],
     session: DbSession,
 ) -> TaskCreated:
@@ -70,7 +84,10 @@ def upload_document(
             status_code=400,
             detail="Старый формат .doc/.xls не поддерживается. Сохраните файл как .docx/.xlsx.",
         )
-    if extension not in signatures or signature != signatures[extension]:
+    if extension == ".xml":
+        if not looks_like_xml(file.file):
+            raise HTTPException(status_code=400, detail=UNSUPPORTED_FORMAT)
+    elif extension not in signatures or signature != signatures[extension]:
         raise HTTPException(status_code=400, detail=UNSUPPORTED_FORMAT)
     document_id = uuid4().hex
     try:

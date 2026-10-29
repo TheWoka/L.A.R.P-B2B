@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Синтетическое извещение «по мотивам» выгрузки ЕИС (44-ФЗ) для тестов T-064a.
+     Все данные выдуманы: организация, ФИО, почта на example.ru, телефон +7 (900) 000-00-xx. -->
+<ns2:epNotificationEF2020 xmlns="http://zakupki.gov.ru/oos/types/1" xmlns:ns2="http://zakupki.gov.ru/oos/EPtypes/1" xmlns:ns3="http://zakupki.gov.ru/oos/common/1" schemeVersion="13.2">
+    <ns2:id>100000001</ns2:id>
+    <ns2:commonInfo>
+        <ns2:purchaseNumber>0000000000000000001</ns2:purchaseNumber>
+        <ns2:docNumber>№0000000000000000001</ns2:docNumber>
+        <ns2:publishDTInEIS>2026-10-29T10:00:00+07:00</ns2:publishDTInEIS>
+        <ns2:href>https://zakupki.example.ru/epz/order/notice/0000000000000000001</ns2:href>
+        <ns2:placingWay>
+            <ns3:code>EAP20</ns3:code>
+            <ns3:name>Электронный аукцион</ns3:name>
+        </ns2:placingWay>
+        <ns2:purchaseObjectInfo>Поставка офисной бумаги для нужд АО «Банк Пример»</ns2:purchaseObjectInfo>
+    </ns2:commonInfo>
+    <ns2:purchaseResponsibleInfo>
+        <ns2:responsibleOrgInfo>
+            <ns3:regNum>00000000001</ns3:regNum>
+            <ns3:fullName>Акционерное общество «Банк Пример»</ns3:fullName>
+            <ns3:shortName>АО «Банк Пример»</ns3:shortName>
+            <ns3:postAddress>Российская Федерация, г. Примерск, ул. Тестовая, д. 1</ns3:postAddress>
+        </ns2:responsibleOrgInfo>
+        <ns2:responsibleRole>CU</ns2:responsibleRole>
+        <ns2:responsibleInfo>
+            <ns3:orgPostAddress>Российская Федерация, г. Примерск, ул. Тестовая, д. 1</ns3:orgPostAddress>
+            <ns3:contactPersonInfo>
+                <ns3:lastName>Петров</ns3:lastName>
+                <ns3:firstName>Пётр</ns3:firstName>
+                <ns3:middleName>Петрович</ns3:middleName>
+            </ns3:contactPersonInfo>
+            <ns3:contactEMail>petrov@example.ru</ns3:contactEMail>
+            <ns3:contactPhone>+7 (900) 000-00-01</ns3:contactPhone>
+            <ns3:contactFax></ns3:contactFax>
+            <ns3:addInfo>   </ns3:addInfo>
+        </ns2:responsibleInfo>
+    </ns2:purchaseResponsibleInfo>
+    <ns2:notificationInfo>
+        <ns2:procedureInfo>
+            <ns2:collectingInfo>
+                <ns2:startDT>2026-10-29T10:00:00+07:00</ns2:startDT>
+                <ns2:endDT>2026-11-06T09:00:00+07:00</ns2:endDT>
+            </ns2:collectingInfo>
+        </ns2:procedureInfo>
+        <ns2:contractConditionsInfo>
+            <ns2:maxPriceInfo>
+                <ns2:maxPrice>150000.00</ns2:maxPrice>
+                <ns2:currency>
+                    <ns3:code>RUB</ns3:code>
+                    <ns3:name>Российский рубль</ns3:name>
+                </ns2:currency>
+            </ns2:maxPriceInfo>
+            <ns2:deliveryPlacesInfo>
+                <ns2:deliveryPlace>г. Примерск, ул. Тестовая, д. 1, склад № 2</ns2:deliveryPlace>
+            </ns2:deliveryPlacesInfo>
+        </ns2:contractConditionsInfo>
+    </ns2:notificationInfo>
+</ns2:epNotificationEF2020>
