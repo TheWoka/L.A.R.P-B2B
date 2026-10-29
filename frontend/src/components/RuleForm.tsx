@@ -46,8 +46,8 @@ export default function RuleForm({ rule, onCancel, onSaved }: RuleFormProps) {
     let condition: unknown;
     try {
       condition = JSON.parse(values.condition);
-    } catch (error) {
-      fieldError("condition", `Условие — не JSON: ${error instanceof Error ? error.message : "проверьте запись"}`);
+    } catch {
+      fieldError("condition", "Условие — не JSON: проверьте скобки, кавычки и запятые.");
       return;
     }
     if (typeof condition !== "object" || condition === null || Array.isArray(condition)) {
