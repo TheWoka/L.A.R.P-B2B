@@ -1,0 +1,12 @@
+# Видеокарта NVIDIA для Ollama (профиль local-llm). Подключается только явно:
+#   $env:COMPOSE_FILE = 'docker-compose.yml;docker-compose.gpu.yml'
+# Без NVIDIA этот файл не использовать. Инструкция — docs/local-llm.md, «Как включить GPU».
+services:
+  ollama:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
