@@ -20,15 +20,15 @@ function evidenceLocation(evidence: Evidence): string | null {
 
 function LawReference({ law, onShow }: { law: LawRef; onShow?: (law: LawRef) => void }) {
   const label = `${law.law}, ${law.article}`;
-  if (onShow) return <Button type="link" style={{ padding: 0 }} onClick={() => onShow(law)}>{label}</Button>;
+  if (onShow) return <Button type="link" className="law-reference" onClick={() => onShow(law)}>{label}</Button>;
   if (law.url) {
     return (
-      <Typography.Link href={law.url} target="_blank" rel="noreferrer">
+      <Typography.Link className="law-reference" href={law.url} target="_blank" rel="noreferrer">
         {label}
       </Typography.Link>
     );
   }
-  return <Typography.Text>{label}</Typography.Text>;
+  return <Typography.Text className="law-reference">{label}</Typography.Text>;
 }
 
 function EvidenceItems({ evidence, onSelectEvidence }: { evidence: Evidence[]; onSelectEvidence?: (item: Evidence) => void }) {
@@ -65,7 +65,7 @@ function ViolationCard({ violation, onSelectEvidence, onShowLaw }: { violation: 
           {SEVERITY_LABELS[violation.severity]}
         </Tag>
         <Typography.Text strong style={{ display: "block", fontSize: 16, overflowWrap: "anywhere" }}>{violation.title}</Typography.Text>
-        <Space wrap size={[4, 4]}>
+        <Space wrap size={[4, 4]} className="law-references">
           {violation.law_refs.map((law, index) => <LawReference key={`${law.law}-${law.article}-${index}`} law={law} onShow={onShowLaw} />)}
         </Space>
         <Button type="link" onClick={() => setExpanded((value) => !value)} aria-expanded={expanded} style={{ padding: 0, alignSelf: "flex-start" }}>

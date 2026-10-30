@@ -14,7 +14,7 @@ test("accepts supported files and rejects empty, oversized and unsupported files
   assert.equal(validateBatchFile({ name: "report.PDF", size: 120 }), null);
   assert.equal(validateBatchFile({ name: "report.pdf", size: 0 }), "Файл пустой");
   assert.equal(validateBatchFile({ name: "report.docx", size: 50 * 1024 * 1024 + 1 }), "Файл больше 50 МБ");
-  assert.equal(validateBatchFile({ name: "report.exe", size: 12 }), "Поддерживаются PDF, DOCX и XLSX");
+  assert.equal(validateBatchFile({ name: "report.exe", size: 12 }), "Поддерживаются PDF, DOCX, XLSX или XML");
 });
 
 test("reads unique task ids and ignores malformed links", () => {
