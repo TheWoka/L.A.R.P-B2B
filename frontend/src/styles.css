@@ -1,5 +1,5 @@
 :root {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #1c1c1e;
   background: #f5f5f7;
   font-synthesis: none;
@@ -47,26 +47,50 @@ button, input, textarea { font: inherit; }
 .page-heading { margin-bottom: 28px; }
 .page-heading h1, .page-title { margin: 0 0 8px; font-size: clamp(30px, 3.2vw, 40px); line-height: 1.18; letter-spacing: -.035em; font-weight: 760; }
 .page-heading p, .page-subtitle { margin: 0; color: #6e6e73; font-size: 16px; line-height: 1.45; }
-.upload-layout { display: grid; grid-template-columns: minmax(0, 1fr) 270px; gap: 24px; align-items: start; }
+.upload-layout { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 28px; align-items: start; }
 .upload-primary, .upload-aside { min-width: 0; }
+.upload-page, .upload-layout { max-width: 100%; }
 .upload-tabs .ant-tabs-nav { margin-bottom: 22px; padding: 4px; border-radius: 13px; background: #e9e9ee; }
 .upload-tabs .ant-tabs-nav::before, .upload-tabs .ant-tabs-ink-bar { display: none; }
 .upload-tabs .ant-tabs-nav-list { width: 100%; }
 .upload-tabs .ant-tabs-tab { display: flex; justify-content: center; width: 50%; margin: 0 !important; padding: 10px 12px; border-radius: 10px; color: #717178; font-weight: 600; }
 .upload-tabs .ant-tabs-tab-active { background: #fff; box-shadow: 0 1px 4px #25252a18; }
 .upload-tabs .ant-tabs-tab-btn { color: inherit !important; }
-.document-dropzone .ant-upload-drag { min-height: 248px; border: 1px solid #e2e2e7 !important; border-radius: 20px !important; background: #fff !important; }
+.document-dropzone .ant-upload-drag { min-height: 244px; border: 1px solid #e8e8ec !important; border-radius: 20px !important; background: #fff !important; }
 .document-dropzone .ant-upload-drag:hover { border-color: #087ff5 !important; }
 .document-dropzone .ant-upload-btn { padding: 26px !important; text-align: center; }
-.document-dropzone .ant-upload-drag-container { display: flex; flex-direction: column; align-items: center; justify-content: center; }
-.document-dropzone .ant-upload strong { display: block; margin: 0 0 5px; color: #1c1c1e; font-size: 18px; }
-.upload-symbol { display: grid; place-items: center; width: 86px; height: 72px; margin: 0 auto 16px; border-radius: 22px; background: #eaf3ff; color: #087ff5; }
+.document-dropzone .ant-upload-drag-container { display: block; }
+.upload-drop-content { display: flex; width: 100%; flex-direction: column; align-items: center; justify-content: center; gap: 0; text-align: center; }
+.upload-drop-content.is-compact { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; align-items: center; gap: 18px; text-align: left; }
+.upload-drop-copy { display: block; min-width: 0; }
+.document-dropzone .ant-upload strong { display: block; margin: 0 0 6px; color: #1c1c1e; font-size: 18px; line-height: 1.35; }
+.upload-symbol { display: grid; place-items: center; width: 82px; height: 82px; margin: 0 auto 12px; border-radius: 20px; background: #eaf3ff; color: #087ff5; }
 .upload-symbol svg { width: 60px; height: 60px; }
-.dropzone-hint { display: block; color: #6e6e73; font-size: 13px; }
+.upload-drop-content.is-compact .upload-symbol { width: 64px; height: 64px; margin: 0; border-radius: 17px; }
+.upload-drop-content.is-compact .upload-symbol svg { width: 48px; height: 48px; }
+.dropzone-hint { display: block; color: #6e6e73; font-size: 13px; line-height: 1.45; }
 .selected-file-count { margin: 12px 0 0; color: #6e6e73; font-size: 13px; }
+.document-dropzone.has-files .ant-upload-drag { min-height: 112px; }
+.document-dropzone.has-files .ant-upload-btn { padding: 20px 24px !important; }
+.choose-file { display: inline-flex; align-items: center; justify-content: center; min-width: 154px; min-height: 30px; margin: 14px auto 0; padding: 7px 18px; border-radius: 999px; background: #eaf3ff; color: #087ff5; font-size: 12px; font-weight: 700; }
+.upload-drop-content.is-compact .choose-file { min-width: 132px; margin: 0; white-space: nowrap; }
+.file-list-section { margin-top: 26px; }
+.file-list-heading { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.file-list-heading h2 { margin: 0; color: #1c1c1e; font-size: 22px; line-height: 1.25; letter-spacing: -.02em; }
+.file-list-heading > span { display: inline-flex; align-items: center; min-height: 26px; padding: 5px 10px; border-radius: 999px; background: #eaf3ff; color: #087ff5; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.selected-file-list { display: grid; gap: 10px; min-width: 0; }
+.selected-file-row { display: grid; grid-template-columns: 48px minmax(0, 1fr) 32px; align-items: center; gap: 14px; min-width: 0; min-height: 70px; padding: 12px 16px; border: 1px solid #e8e8ec; border-radius: 14px; background: #fff; }
+.file-type-badge { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 10px; background: #eaf3ff; color: #087ff5; font-size: 12px; font-weight: 700; }
+.file-type-badge.is-error { background: #fff1f0; color: #cf1322; font-size: 16px; }
+.selected-file-copy { display: grid; gap: 4px; min-width: 0; }
+.selected-file-copy strong { overflow-wrap: anywhere; color: #1c1c1e; font-size: 14px; line-height: 1.35; }
+.selected-file-copy > span { overflow-wrap: anywhere; color: #6e6e73; font-size: 12px; line-height: 1.4; }
+.selected-file-copy > .file-error-reason { color: #cf1322; }
+.selected-file-row.is-rejected { border-color: #f1d3d3; }
+.selected-file-remove { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: #6e6e73; font-size: 22px; line-height: 1; cursor: pointer; }
+.selected-file-remove:hover { background: #f5f5f7; color: #1c1c1e; }
 .rejected-files { margin-top: 14px; }
 .rejected-files ul, .batch-alert ul { margin: 8px 0 0; padding-left: 18px; overflow-wrap: anywhere; }
-.choose-file { display: table; min-width: 150px; margin: 17px auto 0; padding: 8px 18px; border-radius: 10px; background: #eaf3ff; color: #087ff5; font-weight: 650; }
 .purpose-section { margin-top: 27px; }
 .purpose-section h2, .upload-aside h2 { margin: 0 0 3px; font-size: 21px; letter-spacing: -.02em; }
 .purpose-section > p { margin: 0 0 18px; color: #6e6e73; font-size: 14px; }
@@ -169,9 +193,9 @@ button, input, textarea { font: inherit; }
 @media (min-width: 1600px) {
   .sidebar-link { font-size: 16px; }
   .brand-subtitle, .sidebar-foot { font-size: 13px; }
-  .page-heading h1, .page-title { font-size: 44px; }
+  .page-heading h1, .page-title { font-size: 48px; }
   .page-heading p, .page-subtitle { font-size: 18px; }
-  .upload-layout { grid-template-columns: minmax(0, 1fr) 300px; }
+  .upload-layout { grid-template-columns: minmax(0, 1fr) 360px; gap: 30px; }
   .document-dropzone .ant-upload strong { font-size: 19px; }
   .dropzone-hint, .purpose-section > p, .form-actions .ant-typography, .example-link { font-size: 15px; }
   .purpose-copy strong, .feature-card strong { font-size: 16px; }
@@ -247,6 +271,17 @@ button, input, textarea { font: inherit; }
   .rules-add-button { width: 100%; }
 }
 
+@media (max-width: 767px) {
+  .upload-drop-content.is-compact { grid-template-columns: 56px minmax(0, 1fr); gap: 12px; }
+  .upload-drop-content.is-compact .upload-symbol { width: 56px; height: 56px; }
+  .upload-drop-content.is-compact .upload-symbol svg { width: 42px; height: 42px; }
+  .upload-drop-content.is-compact .choose-file { grid-column: 2; justify-self: start; margin-top: 2px; }
+  .file-list-heading { align-items: flex-start; flex-wrap: wrap; }
+  .selected-file-row { grid-template-columns: 42px minmax(0, 1fr) 32px; gap: 10px; padding: 12px; }
+  .file-type-badge { width: 40px; height: 40px; }
+  .file-list-section { margin-top: 20px; }
+}
+
 /* Long references must wrap inside both mobile cards and report tables. */
 .law-reference, .law-reference.ant-btn-link {
   display: inline-block;
@@ -264,5 +299,9 @@ button, input, textarea { font: inherit; }
 .quality-page .upload-tabs .ant-tabs-tab { min-width: 0; flex: 1 1 0; }
 .quality-page .upload-tabs .ant-tabs-tab-btn { white-space: normal; overflow-wrap: anywhere; text-align: center; line-height: 1.4; }
 @media (max-width: 1100px) {
+  .upload-layout { grid-template-columns: minmax(0, 1fr); }
+  .upload-aside { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: stretch; }
+  .upload-aside .privacy-note, .upload-aside h2 { grid-column: 1 / -1; }
   .upload-aside .privacy-note { margin-bottom: 0; }
+  .upload-aside .feature-card { min-height: 100px; margin-bottom: 0; }
 }

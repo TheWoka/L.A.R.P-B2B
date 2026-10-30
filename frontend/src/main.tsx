@@ -23,7 +23,7 @@ createRoot(root).render(
         colorTextSecondary: "#77777c",
         colorBgLayout: "#f5f5f7",
         borderRadius: 12,
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       },
     }}>
       <BrowserRouter>
