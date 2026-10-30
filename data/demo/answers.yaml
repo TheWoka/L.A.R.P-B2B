@@ -65,3 +65,20 @@
   overall: red
   entities: {}
   violations: [KII_IN_PUBLICATION]
+
+# T-065: независимый ключ записан до прогона. ФИО из трёх XML-полей — одно упоминание.
+# Контакты ответственного лица — ПДн; ИНН организации (10 цифр) — не ПДн.
+# Паспорт и СНИЛС члена комиссии без срока хранения -> CHECKLIST_NO_RETENTION.
+- file: 09_eis_notice_44fz.xml
+  purpose: publication
+  overall: red
+  entities: {PERSON: 1, EMAIL: 1, PHONE: 1, PASSPORT: 1, SNILS: 1}
+  violations: [PD_IN_PUBLICATION, CHECKLIST_NO_RETENTION]
+
+# Контакты и один внутренний расчёт себестоимости; НМЦД сама по себе не тайна.
+# CHECKLIST_* неприменимы по назначению и составу данных.
+- file: 10_eis_notice_223fz.xml
+  purpose: publication
+  overall: red
+  entities: {PERSON: 1, EMAIL: 1, PHONE: 1, TRADE_SECRET: 1}
+  violations: [PD_IN_PUBLICATION, TRADE_SECRET_IN_PUBLICATION]
