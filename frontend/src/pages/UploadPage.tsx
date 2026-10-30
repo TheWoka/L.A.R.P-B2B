@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { Alert, Button, Input, Radio, Tabs, Typography, Upload } from "antd";
 import type { UploadFile, UploadProps } from "antd";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import { ApiError, submitQuery, uploadDocument } from "../api/client";
 import type { DocPurpose } from "../api/types";
-import { MAX_BATCH_FILES, submitBatchFiles, validateBatchFile } from "../lib/batch";
+import { documentCountLabel, MAX_BATCH_FILES, submitBatchFiles, validateBatchFile } from "../lib/batch";
 
 const MAX_TEXT_LENGTH = 200_000;
 
@@ -215,7 +215,7 @@ export default function UploadPage() {
       <div className="form-actions">
         {fileError && <Alert type="error" showIcon title={fileError} className="form-error" />}
         <Button type="primary" size="large" loading={uploading} disabled={uploading} onClick={() => { void handleUpload(); }}>
-          {fileList.length > 1 ? `Начать проверку ${fileList.length} файлов` : "Начать проверку"}
+          {fileList.length > 1 ? `Проверить ${documentCountLabel(fileList.length)}` : "Начать проверку"}
         </Button>
         <Typography.Text type="secondary">
           {fileList.length > 1 ? "Проверки пойдут по очереди" : "Обычно занимает меньше минуты"}
@@ -270,6 +270,10 @@ export default function UploadPage() {
               { key: "text", label: "Вставить текст", children: textTab },
             ]}
           />
+          <p className="example-link">
+            Используйте только документы, которые вы вправе передавать на проверку.
+            Посмотреть результат заранее: <Link to="/reports/example">пример отчёта</Link>
+          </p>
         </section>
         <aside className="upload-aside" aria-label="Что проверит система">
           <div className="privacy-note">
