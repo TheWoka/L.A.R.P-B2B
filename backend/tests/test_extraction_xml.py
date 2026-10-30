@@ -8,6 +8,7 @@ from defusedxml.ElementTree import fromstring
 
 from app.schemas import EntityType, ExtractedDocument
 from app.services.detection.detect import detect
+from app.services.extraction import xml as xml_parser
 from app.services.extraction.errors import EMPTY_DOCUMENT, ExtractionError
 from app.services.extraction.extract import extract
 from app.services.extraction.xml import MAX_SECTION, extract_xml, iter_xml_fields
@@ -161,3 +162,25 @@ def test_logs_without_values(caplog: pytest.LogCaptureFixture) -> None:
         detect(extract(FIXTURE, FIXTURE.name, "synthetic-xml"))
     for value in ("Петров", "Петрович", EMAIL, PHONE, "000-00-01"):
         assert value not in caplog.text
+
+
+@pytest.mark.parametrize("size", [30, 31])
+def test_xml_text_limit_includes_segment_separator(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, size: int,
+) -> None:
+    monkeypatch.setattr(xml_parser, "MAX_XML_TEXT_CHARS", 32, raising=False)
+    path = write(tmp_path, f"<r><a>{'x' * size}</a><b>y</b></r>".encode())
+    if size == 30:
+        document = extract(path, path.name, "bounded-xml")
+        assert len(document.text) == 32
+        assert_offsets(document)
+    else:
+        with pytest.raises(ExtractionError, match="Разделите выгрузку") as error:
+            extract(path, path.name, "bounded-xml")
+        assert error.value.case == "xml_text_too_large"
+
+
+def test_xml_oversized_single_field_is_rejected(tmp_path: Path) -> None:
+    path = write(tmp_path, b"<root><field>" + b"x" * 1_000_001 + b"</field></root>")
+    with pytest.raises(ExtractionError, match="Разделите выгрузку"):
+        extract(path, path.name, "large-xml")

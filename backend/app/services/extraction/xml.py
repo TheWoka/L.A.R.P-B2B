@@ -16,12 +16,19 @@ from typing import TYPE_CHECKING
 from defusedxml.ElementTree import parse
 
 from app.schemas import TextSegment
+from app.services.extraction.errors import ExtractionError
 
 if TYPE_CHECKING:  # только аннотация типа; разбирает XML исключительно defusedxml
     from xml.etree.ElementTree import Element
 
 FIO_PARTS: tuple[str, ...] = ("lastName", "firstName", "middleName")
 MAX_SECTION = 120
+# Ограничиваем текст до NER: допустимый по размеру XML может исчерпать память процесса.
+MAX_XML_TEXT_CHARS = 1_000_000
+XML_TEXT_TOO_LARGE = (
+    "XML содержит слишком большой объём текста для проверки. "
+    "Разделите выгрузку на несколько файлов."
+)
 
 
 @dataclass(frozen=True)
@@ -132,7 +139,13 @@ def extract_xml(path: Path) -> list[TextSegment]:
     EntitiesForbidden…) не перехватываются — их переводит в ValueError extract().
     """
     root = parse(path, forbid_dtd=True).getroot()
-    return [
-        TextSegment(id=0, text=field.text, offset=0, page=None, section=field.section or None)
-        for field in iter_xml_fields(root)
-    ]
+    segments: list[TextSegment] = []
+    text_size = 0
+    for field in iter_xml_fields(root):
+        text_size += len(field.text) + bool(segments)
+        if text_size > MAX_XML_TEXT_CHARS:
+            raise ExtractionError(XML_TEXT_TOO_LARGE, case="xml_text_too_large")
+        segments.append(TextSegment(
+            id=0, text=field.text, offset=0, page=None, section=field.section or None,
+        ))
+    return segments
