@@ -36,6 +36,7 @@ function EvidenceItems({ evidence, onSelectEvidence }: { evidence: Evidence[]; o
   return (
     <List
       size="small"
+      header={<Typography.Text type="secondary">Где найдено — фрагменты, из-за которых сработало правило. Нажмите, чтобы показать место в тексте.</Typography.Text>}
       dataSource={evidence}
       renderItem={(item, index) => {
         const location = evidenceLocation(item);
@@ -74,7 +75,6 @@ function ViolationCard({ violation, onSelectEvidence, onShowLaw }: { violation: 
         {expanded && (
           <div style={{ minWidth: 0, overflowWrap: "anywhere" }}>
             <Typography.Paragraph type="secondary">Источник проверки: {violation.source === "llm" ? "нейросеть" : "правило"}.</Typography.Paragraph>
-            <Typography.Text strong>Цитаты</Typography.Text>
             <EvidenceItems evidence={violation.evidence} onSelectEvidence={onSelectEvidence} />
             <Typography.Paragraph style={{ marginBottom: 0 }}><strong>Рекомендация:</strong> {violation.recommendation}</Typography.Paragraph>
           </div>

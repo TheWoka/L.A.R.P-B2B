@@ -106,12 +106,11 @@ export default function TransparencyPanel({ report, example = false }: Props) {
     { key: "app", label: "Версия программы", children: audit.app_version },
     {
       key: "detectors", label: "Детекторы",
-      children: audit.detectors.length ? audit.detectors.map((name) => (
-        <Tag key={name} style={{ whiteSpace: "normal", overflowWrap: "anywhere" }}>
-          {detectorLabel(name)}
-          {detectorLabel(name) !== name && <Typography.Text type="secondary" style={{ fontSize: 11 }}> ({name})</Typography.Text>}
-        </Tag>
-      )) : "Не указаны",
+      children: audit.detectors.length ? (
+        <Typography.Text title={audit.detectors.join(", ")}>
+          {audit.detectors.map((name) => detectorLabel(name)).join(" · ")}
+        </Typography.Text>
+      ) : "Не указаны",
     },
     { key: "llm", label: "Генеративная нейросеть (LLM)", children: audit.llm_provider === "mock" ? "Не использовалась" : audit.llm_model ?? "Модель не указана" },
     { key: "calls", label: "Вызовов генеративной нейросети", children: audit.llm_calls },
@@ -152,7 +151,7 @@ export default function TransparencyPanel({ report, example = false }: Props) {
             label: "След проверки",
             children: (
               <>
-                <Descriptions column={{ xs: 1, sm: 1, md: 2 }} items={auditItems} />
+                <Descriptions column={1} items={auditItems} />
                 <Typography.Paragraph type="secondary" style={{ margin: "12px 0 0" }}>
                   По этим данным проверку можно повторить: тот же документ и те же версии правил дают тот же результат.
                 </Typography.Paragraph>

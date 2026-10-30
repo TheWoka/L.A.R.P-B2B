@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Alert, Button, Input, Radio, Tabs, Typography, Upload } from "antd";
+import { Alert, Button, Input, Radio, Select, Tabs, Typography, Upload } from "antd";
 import type { UploadFile, UploadProps } from "antd";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -10,6 +10,13 @@ import { documentCountLabel, MAX_BATCH_FILES, submitBatchFiles, validateBatchFil
 const MAX_TEXT_LENGTH = 200_000;
 
 type RejectedFile = { uid: string; name: string; reason: string };
+
+const PURPOSE_SHORT: { value: DocPurpose; label: string }[] = [
+  { value: "publication", label: "Для публикации" },
+  { value: "contract", label: "Договор" },
+  { value: "internal", label: "Внутренний документ" },
+  { value: "international", label: "Международный контракт" },
+];
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} КБ`;
@@ -52,6 +59,8 @@ export default function UploadPage() {
   const navigate = useNavigate();
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [filePurpose, setFilePurpose] = useState<DocPurpose>("publication");
+  // Своё назначение у отдельного файла пакета; нет записи — действует общее filePurpose.
+  const [purposeByFile, setPurposeByFile] = useState<Record<string, DocPurpose>>({});
   const [queryPurpose, setQueryPurpose] = useState<DocPurpose>("publication");
   const [queryText, setQueryText] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -72,7 +81,9 @@ export default function UploadPage() {
 
   async function handleUpload() {
     if (uploading) return;
-    const files = fileList.map((entry) => entry.originFileObj).filter((file): file is NonNullable<typeof file> => Boolean(file));
+    const entries = fileList.filter((entry) => Boolean(entry.originFileObj));
+    const files = entries.map((entry) => entry.originFileObj as NonNullable<UploadFile["originFileObj"]>);
+    const purposeAt = (_file: File, index: number): DocPurpose => purposeByFile[entries[index].uid] ?? filePurpose;
     if (files.length === 0) {
       setFileError("Сначала выберите документы для проверки.");
       return;
@@ -81,10 +92,10 @@ export default function UploadPage() {
     setUploading(true);
     try {
       if (files.length === 1) {
-        const task = await uploadDocument(files[0], filePurpose);
+        const task = await uploadDocument(files[0], purposeAt(files[0], 0));
         navigate(`/tasks/${encodeURIComponent(task.task_id)}`);
       } else {
-        const { created, failed } = await submitBatchFiles(files, filePurpose, uploadDocument);
+        const { created, failed } = await submitBatchFiles(files, purposeAt, uploadDocument);
         if (failed.length > 0) setRejectedFiles((current) => [...current, ...failed.map((entry, index) => ({ ...entry, uid: `upload-failed-${index}-${entry.name}` }))]);
         if (created.length === 0) {
           setFileError("Не удалось отправить документы. Проверьте список ошибок и повторите попытку.");
@@ -178,6 +189,16 @@ export default function UploadPage() {
                   <span className="selected-file-copy">
                     <strong>{file.name}</strong>
                     <span>{formatFileSize(size)}</span>
+                    {fileList.length > 1 && (
+                      <Select
+                        size="small"
+                        className="file-purpose-select"
+                        aria-label={`Назначение файла ${file.name}`}
+                        value={purposeByFile[file.uid] ?? filePurpose}
+                        options={PURPOSE_SHORT}
+                        onChange={(value: DocPurpose) => setPurposeByFile((current) => ({ ...current, [file.uid]: value }))}
+                      />
+                    )}
                   </span>
                   <button
                     type="button"
@@ -209,8 +230,10 @@ export default function UploadPage() {
 
       <section className="purpose-section">
         <h2>Куда пойдут документы?</h2>
-        <p>Одно назначение для всех файлов в пакете.</p>
-        <PurposePicker value={filePurpose} onChange={setFilePurpose} />
+        <p>{fileList.length > 1
+          ? "Назначение для всех файлов пакета. Для отдельного файла его можно поменять в списке выше."
+          : "Это поможет применить нужные правила проверки."}</p>
+        <PurposePicker value={filePurpose} onChange={(value) => { setFilePurpose(value); setPurposeByFile({}); }} />
       </section>
       <div className="form-actions">
         {fileError && <Alert type="error" showIcon title={fileError} className="form-error" />}

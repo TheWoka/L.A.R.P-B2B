@@ -23,16 +23,17 @@ export function parseBatchTasks(search: string): string[] {
   return [...new Set(raw.split(",").filter((id) => /^[a-zA-Z0-9_-]{1,128}$/.test(id)))].slice(0, MAX_BATCH_FILES);
 }
 
+/** purpose — одно назначение для всех файлов или функция «файл → назначение» (своё у каждого файла). */
 export async function submitBatchFiles(
   files: File[],
-  purpose: DocPurpose,
+  purpose: DocPurpose | ((file: File, index: number) => DocPurpose),
   upload: (file: File, purpose: DocPurpose) => Promise<TaskCreated>,
 ): Promise<{ created: { id: string; name: string }[]; failed: { name: string; reason: string }[] }> {
   const created: { id: string; name: string }[] = [];
   const failed: { name: string; reason: string }[] = [];
-  for (const file of files) {
+  for (const [index, file] of files.entries()) {
     try {
-      const task = await upload(file, purpose);
+      const task = await upload(file, typeof purpose === "function" ? purpose(file, index) : purpose);
       created.push({ id: task.task_id, name: file.name });
     } catch (error: unknown) {
       failed.push({ name: file.name, reason: error instanceof Error ? error.message : "Не удалось отправить файл" });
