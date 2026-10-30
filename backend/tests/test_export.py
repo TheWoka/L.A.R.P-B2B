@@ -1,5 +1,6 @@
 """Экспорт настоящего отчёта на синтетическом текстовом документе."""
 
+import html
 import json
 from time import perf_counter
 from unittest.mock import Mock
@@ -55,6 +56,35 @@ def test_export_missing_report(
     response = client.get(f"/api/reports/nonexistent/export?format={format}")
     assert response.status_code == 404
     assert response.json() == {"detail": "Отчёт не найден"}
+
+
+@pytest.mark.parametrize("format", ["json", "pdf", "md"])
+@pytest.mark.parametrize("filename,expected", [
+    ("Иванов_Иван_заявка.docx", "документ.docx"),
+    ("Учебная заявка (поставка).docx", "Учебная заявка (поставка).docx"),
+    (None, None),
+])
+def test_export_filename_privacy(
+    client: TestClient, api_db: tuple[Session, Mock], pipeline_report: Report,
+    format: str, filename: str | None, expected: str | None,
+) -> None:
+    session, _ = api_db
+    row = session.get(ReportRow, pipeline_report.report_id)
+    row.data = {**row.data, "filename": filename}
+    session.commit()
+    response = client.get(f"/api/reports/{row.id}/export?format={format}")
+    assert response.status_code == 200
+    if format == "pdf":
+        with pymupdf.open(stream=response.content, filetype="pdf") as pdf:
+            text = "".join(page.get_text() for page in pdf)
+    else:
+        text = response.text
+    assert "Иванов" not in text and "Иван" not in text
+    if format == "json":
+        assert response.json()["filename"] == expected
+    elif expected:
+        assert expected in html.unescape(text)
+    assert session.get(ReportRow, row.id).data["filename"] == filename
 
 
 @pytest.fixture
