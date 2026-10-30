@@ -132,12 +132,11 @@ export default function UploadPage() {
         className={`document-dropzone${fileList.length > 0 ? " has-files" : ""}`}
         accept={ACCEPTED_EXTENSIONS.join(",")}
         multiple
-        maxCount={MAX_BATCH_FILES}
         fileList={fileList}
         beforeUpload={beforeUpload}
         onChange={({ fileList: nextFiles }) => {
           if (nextFiles.length > MAX_BATCH_FILES) {
-            setFileError(`Можно выбрать не больше ${MAX_BATCH_FILES} файлов за один раз.`);
+            setFileError(`Можно выбрать не больше ${MAX_BATCH_FILES} файлов. В пакет добавлены первые ${MAX_BATCH_FILES}.`);
           } else {
             setFileError(null);
           }
@@ -156,7 +155,7 @@ export default function UploadPage() {
             <span className="dropzone-hint">
               {fileList.length > 0
                 ? `До ${MAX_BATCH_FILES} файлов · PDF, DOCX, XLSX или XML · каждый до 50 МБ`
-                : `До ${MAX_BATCH_FILES} файлов за раз · PDF, DOCX или XLSX · до 50 МБ каждый`}
+                : `До ${MAX_BATCH_FILES} файлов за раз · PDF, DOCX, XLSX или XML · до 50 МБ каждый`}
             </span>
           </span>
           <span className="choose-file">{fileList.length > 0 ? "Добавить файлы" : "Выбрать файлы"}</span>

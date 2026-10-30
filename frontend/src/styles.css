@@ -298,10 +298,3 @@ button, input, textarea { font: inherit; }
 .law-references > .ant-space-item { max-width: 100%; min-width: 0; }
 .quality-page .upload-tabs .ant-tabs-tab { min-width: 0; flex: 1 1 0; }
 .quality-page .upload-tabs .ant-tabs-tab-btn { white-space: normal; overflow-wrap: anywhere; text-align: center; line-height: 1.4; }
-@media (max-width: 1100px) {
-  .upload-layout { grid-template-columns: minmax(0, 1fr); }
-  .upload-aside { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: stretch; }
-  .upload-aside .privacy-note, .upload-aside h2 { grid-column: 1 / -1; }
-  .upload-aside .privacy-note { margin-bottom: 0; }
-  .upload-aside .feature-card { min-height: 100px; margin-bottom: 0; }
-}
