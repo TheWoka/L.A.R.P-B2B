@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Button, Card, Progress, Result, Spin, Steps, Tabs, Tag } from "antd";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { ApiError, getReport, getTask } from "../api/client";
 import type { Report, Stage, TaskInfo } from "../api/types";
@@ -17,6 +17,7 @@ const STAGES: { stage: Stage; title: string }[] = [
 ];
 
 export default function BatchPage() {
+  const navigate = useNavigate();
   const { search } = useLocation();
   const ids = useMemo(() => parseBatchTasks(search), [search]);
   const [tasks, setTasks] = useState<Record<string, TaskInfo>>({});
@@ -115,6 +116,6 @@ export default function BatchPage() {
       else children = <Card className="batch-progress"><Spin size="large" /><h2>{task?.stage === "reporting" ? "Подготавливаем отчёт" : "Документ проверяется"}</h2><p>Обычно это занимает меньше минуты. Большие документы могут обрабатываться дольше.</p><Steps className="batch-stages" current={Math.max(0, STAGES.findIndex(({ stage }) => stage === task?.stage))} items={STAGES.map(({ title }) => ({ title }))} direction="vertical" size="small" /><Progress percent={task?.progress ?? 0} status="active" /><Tag>{task?.status === "queued" || !task ? "В очереди" : "Проверяется"}</Tag></Card>;
       return { key: id, label, children };
     })} />
-    <Button type="primary" className="batch-new-check" onClick={() => { window.location.href = "/"; }}>Проверить другие документы</Button>
+    <Button type="primary" className="batch-new-check" onClick={() => navigate("/")}>Проверить другие документы</Button>
   </div>;
 }
