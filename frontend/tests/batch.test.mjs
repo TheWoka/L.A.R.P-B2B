@@ -35,4 +35,13 @@ test("submits files in order and preserves successful tasks when one fails", asy
   assert.deepEqual(result.failed, [{ name: "b.pdf", reason: "Сервис недоступен" }]);
 });
 
-
+test("uses its own purpose for every file when a function is given", async () => {
+  const files = [{ name: "a.pdf" }, { name: "b.xml" }];
+  const purposes = ["contract", "publication"];
+  const seen = [];
+  await submitBatchFiles(files, (file, index) => purposes[index], async (file, purpose) => {
+    seen.push([file.name, purpose]);
+    return { task_id: file.name, document_id: "doc" };
+  });
+  assert.deepEqual(seen, [["a.pdf", "contract"], ["b.xml", "publication"]]);
+});
