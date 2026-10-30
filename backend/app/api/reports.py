@@ -70,10 +70,14 @@ def get_report_text(report_id: str, session: DbSession) -> ReportText:
 def export_report(
     report_id: str, session: DbSession, format: Literal["json", "pdf", "md"] = "json",
 ) -> Response:
+    report = get_report(report_id, session)
+    if report.filename and _has_personal_data(Path(report.filename).stem):
+        report = report.model_copy(update={
+            "filename": f"{SAFE_NAME}{Path(report.filename).suffix}",
+        })
     if format == "md":
         from app.services.report.md_export import render_report_md
 
-        report = get_report(report_id, session)
         return Response(
             content=render_report_md(report), media_type="text/markdown",
             headers={"Content-Disposition": f'attachment; filename="report_{report_id}.md"'},
@@ -81,12 +85,10 @@ def export_report(
     if format == "pdf":
         from app.services.report.pdf_export import render_report_pdf
 
-        report = get_report(report_id, session)
         return Response(
             content=render_report_pdf(report), media_type="application/pdf",
             headers={"Content-Disposition": f'attachment; filename="report_{report_id}.pdf"'},
         )
-    report = get_report(report_id, session)
     return Response(
         content=json.dumps(report.model_dump(mode="json"), ensure_ascii=False, indent=2),
         media_type="application/json",
