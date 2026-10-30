@@ -217,6 +217,10 @@ export default function UploadPage() {
           <p className="example-link">Посмотреть результат заранее: <Link to="/reports/example">пример отчёта</Link></p>
         </section>
         <aside className="upload-aside" aria-label="Что проверит система">
+          <div className="privacy-note">
+            <svg className="privacy-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 2 20 5v6c0 5-3 8.5-8 11-5-2.5-8-6-8-11V5l8-3Z" /><path d="m9 12 2 2 4-4" /></svg>
+            <div><strong>Данные под защитой</strong><p>Персональные сведения скрываются до обращения к нейросети.</p></div>
+          </div>
           <h2>Что проверим</h2>
           <div className="feature-card">
             <svg className="feature-icon feature-icon-blue" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3" /><path d="M5.5 20v-1.5a6.5 6.5 0 0 1 13 0V20M3 4h2M19 4h2" /></svg>
@@ -235,10 +239,7 @@ export default function UploadPage() {
           </div>
         </aside>
       </div>
-      <div className="privacy-note">
-        <svg className="privacy-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 2 20 5v6c0 5-3 8.5-8 11-5-2.5-8-6-8-11V5l8-3Z" /><path d="m9 12 2 2 4-4" /></svg>
-        <div><strong>Данные под защитой</strong><p>Персональные сведения скрываются до обращения к нейросети.</p></div>
-      </div>
+
     </div>
   );
 }
