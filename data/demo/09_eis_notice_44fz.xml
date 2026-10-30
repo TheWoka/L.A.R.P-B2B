@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Синтетический документ для демонстрации. Все данные выдуманы. -->
+<epNotificationEF xmlns="http://zakupki.gov.ru/oos/EPtypes/1">
+  <commonInfo>
+    <purchaseNumber>0000000000000000065</purchaseNumber>
+    <versionNumber>1</versionNumber>
+    <noticeTitle>Извещение об электронном аукционе по 44-ФЗ</noticeTitle>
+    <purchaseObjectInfo>Поставка офисной бумаги для учебного банковского офиса</purchaseObjectInfo>
+    <publicationDate>2026-11-02T09:00:00+07:00</publicationDate>
+    <law>44-ФЗ</law>
+    <status>Учебный проект извещения для публикации</status>
+  </commonInfo>
+  <purchaseResponsible>
+    <responsibleOrg>
+      <fullName>АО «Банк Пример»</fullName>
+      <INN>0000000064</INN>
+      <KPP>000001001</KPP>
+      <organizationRole>Заказчик</organizationRole>
+    </responsibleOrg>
+    <responsibleInfo>
+      <lastName>Кукушкин</lastName>
+      <firstName>Илья</firstName>
+      <middleName>Петрович</middleName>
+      <contactEMail>ilya.kukushkin@example.ru</contactEMail>
+      <contactPhone>+7 (900) 000-00-09</contactPhone>
+      <position>Ответственное должностное лицо заказчика</position>
+    </responsibleInfo>
+  </purchaseResponsible>
+  <procedureInfo>
+    <collecting>
+      <startDate>2026-11-02T09:00:00+07:00</startDate>
+      <endDate>2026-11-12T09:00:00+07:00</endDate>
+      <applicationProcedure>Заявки принимаются в электронной форме</applicationProcedure>
+    </collecting>
+    <auction>
+      <auctionDate>2026-11-16T10:00:00+07:00</auctionDate>
+      <electronicPlatform>Учебная электронная площадка «Пример»</electronicPlatform>
+    </auction>
+  </procedureInfo>
+  <lot>
+    <lotNumber>1</lotNumber>
+    <maxPrice>480000.00</maxPrice>
+    <currency>RUB</currency>
+    <priceName>Начальная максимальная цена контракта</priceName>
+    <purchaseObjects>
+      <purchaseObject>
+        <name>Бумага офисная белая формата А4</name>
+        <quantity>1000</quantity>
+        <unit>пачка</unit>
+        <description>Плотность 80 г/м², 500 листов в пачке</description>
+      </purchaseObject>
+    </purchaseObjects>
+    <delivery>
+      <place>Учебный офис заказчика</place>
+      <term>В течение 20 рабочих дней после заключения контракта</term>
+      <acceptance>Приёмка по количеству и качеству</acceptance>
+    </delivery>
+    <paymentTerms>Оплата после приёмки товара</paymentTerms>
+  </lot>
+  <additionalInfo>
+    <heading>Дополнительная информация</heading>
+    <commissionNote>В проект случайно включены реквизиты члена комиссии: паспорт 4520 000065; СНИЛС 900-000-065 98.</commissionNote>
+    <publicationNote>Перед размещением требуется проверка состава открытых сведений</publicationNote>
+  </additionalInfo>
+</epNotificationEF>

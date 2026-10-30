@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Синтетический документ для демонстрации. Все данные выдуманы. -->
+<purchaseNotice xmlns="http://zakupki.gov.ru/223fz/purchase/1">
+  <header>
+    <registrationNumber>0000000000000000066</registrationNumber>
+    <revision>1</revision>
+    <publicationDateTime>2026-11-03T09:00:00+07:00</publicationDateTime>
+    <name>Извещение о закупке по 223-ФЗ</name>
+    <legalBasis>223-ФЗ и учебное положение о закупке</legalBasis>
+  </header>
+  <body>
+    <customer>
+      <organization>
+        <name>АО «Банк Пример»</name>
+        <taxpayerCode>0000000064</taxpayerCode>
+        <registrationReasonCode>000001001</registrationReasonCode>
+      </organization>
+      <contacts>
+        <person>
+          <lastName>Зябликов</lastName>
+          <firstName>Аркадий</firstName>
+          <middleName>Венедиктович</middleName>
+          <role>Специалист по вопросам закупки</role>
+        </person>
+        <contactEMail>arkady.zyablikov@example.ru</contactEMail>
+        <contactPhone>+7 (900) 000-00-10</contactPhone>
+      </contacts>
+    </customer>
+    <procedure>
+      <method>Запрос предложений в электронной форме</method>
+      <submission>
+        <opensAt>2026-11-03T09:00:00+07:00</opensAt>
+        <closesAt>2026-11-17T09:00:00+07:00</closesAt>
+        <channel>Учебная электронная площадка «Пример»</channel>
+      </submission>
+      <reviewDate>2026-11-19</reviewDate>
+      <resultsDate>2026-11-20</resultsDate>
+      <clarificationTerms>Запросы разъяснений принимаются через площадку</clarificationTerms>
+    </procedure>
+    <lots>
+      <item>
+        <number>1</number>
+        <subject>Изготовление настольных календарей для учебного офиса</subject>
+        <initialPrice>
+          <amount>360000.00</amount>
+          <currency>RUB</currency>
+          <includesTax>Цена включает все расходы на поставку</includesTax>
+        </initialPrice>
+        <goods>
+          <title>Календарь настольный перекидной</title>
+          <count>1000</count>
+          <measure>штука</measure>
+          <requirements>Печать по макету заказчика, картонная подставка</requirements>
+        </goods>
+        <fulfilment>
+          <destination>Учебный офис заказчика</destination>
+          <deadline>В течение 30 рабочих дней после заключения договора</deadline>
+          <payment>Оплата после приёмки всей партии</payment>
+        </fulfilment>
+      </item>
+    </lots>
+    <notes>
+      <title>Примечание к проекту извещения</title>
+      <internalCalculation>Внутренний расчёт заказчика: себестоимость изготовления одного календаря составляет 180 рублей.</internalCalculation>
+      <explanation>Рабочая заметка ошибочно оставлена в открытой части извещения</explanation>
+    </notes>
+  </body>
+</purchaseNotice>
