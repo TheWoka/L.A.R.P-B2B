@@ -18,6 +18,7 @@ from app.services.retention import purge_expired
 from app.services.rules import repository
 from app.services.storage import delete_file
 from app.worker.celery_app import celery_app
+from app.worker.recovery import document_lock
 
 logger = logging.getLogger(__name__)
 PROCESSING_ERROR = "Не удалось обработать документ. Попробуйте ещё раз"
@@ -110,9 +111,15 @@ def _audit_document(document: DocumentRow, task: TaskRow, session: Session, star
 
 
 def run_pipeline(task_id: str, session: Session) -> None:
+    """Не допускает одновременную или повторную обработку доставленной задачи."""
+    with document_lock(session, task_id):
+        _run_pipeline(task_id, session)
+
+
+def _run_pipeline(task_id: str, session: Session) -> None:
     """Обновляет статус, проверяет документ и удаляет исходник при любом результате."""
     task = session.get(TaskRow, task_id)
-    if task is None:
+    if task is None or task.status in {"done", "failed"}:
         return
     document = session.get(DocumentRow, task.document_id)
     started = monotonic()
