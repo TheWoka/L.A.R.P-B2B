@@ -23,7 +23,6 @@ from app.services.redaction.redact import MEDIA_TYPES
 router = APIRouter(tags=["reports"])
 DbSession = Annotated[Session, Depends(get_db)]
 
-NOT_IMPLEMENTED_PDF = "Будет реализовано в T-020"
 REDACTED_UNAVAILABLE = "Обезличенная копия недоступна"
 REDACTED_SUFFIX = "_обезличено"
 QUERY_NAME, SAFE_NAME = "запрос", "документ"

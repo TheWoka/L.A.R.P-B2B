@@ -106,12 +106,12 @@ sequenceDiagram
 | Обезличенная копия | `backend/app/services/redaction/` | Физическое удаление найденных ПДн в PDF, замены в DOCX/XLSX/TXT, самопроверка копии |
 | Файлы | `backend/app/services/storage.py` | Временное сохранение исходников и их удаление |
 | Сроки хранения | `backend/app/services/retention.py` | Удаляет просроченные отчёты вместе с копиями и связанными записями |
-| Поиск законов (RAG) | `backend/app/services/rag/` | Интерфейсы индексации и поиска статей в pgvector пока являются заглушками; `run_audit` их не вызывает |
+| Тексты законов | `data/legal/*.md`, `frontend/src/components/legalArticles.ts` | Статья открывается по клику из нарушения; смысловой поиск по законам (RAG) не делали — ссылка задаётся в правиле |
 
 ## Развёртывание и хранение
 
 `docker-compose.yml` поднимает `frontend` (React, nginx, порт 3000), `api` (FastAPI,
-порт 8000), `worker`, `redis` и `postgres` (PostgreSQL 16 с pgvector). Профиль
+порт 8000), `worker`, `redis` и `postgres` (PostgreSQL 16; образ с pgvector — задел под поиск по законам). Профиль
 `local-llm` дополнительно запускает Ollama без публикации порта 11434 на хосте.
 Выбор моделей CPU/GPU и настройка NVIDIA — в [local-llm.md](local-llm.md#какую-модель-выбрать-t-029b).
 
