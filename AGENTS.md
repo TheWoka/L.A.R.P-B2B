@@ -1,7 +1,7 @@
 # AGENTS.md — правила проекта для ИИ-агентов и людей
 
 Этот файл читают Codex, Claude и все участники команды. Перед любой задачей прочитай его целиком,
-затем `docs/contracts.md`. Копия файла лежит в `CLAUDE.md` — держите их одинаковыми.
+затем `docs/contracts.md`.
 
 ## О проекте
 
@@ -30,13 +30,12 @@
 | Бэкенд | Python 3.11, FastAPI, Pydantic v2, SQLAlchemy 2 |
 | Очередь | Celery + Redis |
 | БД | PostgreSQL 16 + pgvector |
-| Извлечение | PyMuPDF (pdf), python-docx (docx), openpyxl (xlsx) |
-| Детекция | регулярные выражения с проверкой контрольных сумм, Natasha (NER), Microsoft Presidio |
-| Эмбеддинги | `intfloat/multilingual-e5-small` (локально, CPU) |
-| LLM | любой OpenAI-совместимый API; провайдер задаётся в `.env`; режим `mock` для разработки |
+| Извлечение | PyMuPDF (pdf), python-docx (docx), openpyxl (xlsx), defusedxml (xml ЕИС) |
+| Детекция | регулярные выражения с проверкой контрольных сумм, Natasha (NER), словари, классификатор grif-cls (rubert-tiny2, ONNX Runtime, CPU) |
+| LLM | необязательна: любой OpenAI-совместимый API или локальная Ollama; провайдер задаётся в `.env`; по умолчанию `mock` |
 | Фронтенд | React 18 + TypeScript + Vite + Ant Design |
-| Тесты | pytest (бэкенд), vitest (фронт, по возможности) |
-| Линтер | ruff (Python), eslint (TS) |
+| Тесты | pytest (бэкенд), node:test (фронт) |
+| Линтер | ruff (Python), tsc (TS) |
 
 ## Структура репозитория
 
@@ -44,7 +43,7 @@
 docker-compose.yml        # api, worker, redis, postgres, frontend
 .env.example              # все переменные окружения с комментариями
 README.md
-AGENTS.md / CLAUDE.md
+AGENTS.md
 docs/
   contracts.md            # схемы данных и API — ЕДИНСТВЕННЫЙ источник правды
   rules.md                # каталог правил человеческим языком
@@ -64,7 +63,6 @@ backend/
       markers/            # find_markers.py — согласования, грифы, сроки хранения и т.д.
       masking/            # masker.py
       llm/                # client.py, prompts/, checks.py
-      rag/                # index.py, retrieve.py
       rules/              # loader.py, engine.py
       report/             # builder.py
     worker/               # celery_app.py, tasks.py

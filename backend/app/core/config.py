@@ -57,7 +57,6 @@ class Settings(BaseSettings):
         return value
 
     # --- Прочее ---
-    embedding_model: str = "intfloat/multilingual-e5-small"
     max_upload_mb: int = 50
     report_ttl_days: int = 7
 
