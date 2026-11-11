@@ -15,6 +15,10 @@ from app.schemas.llm import LlmMode
 # Таймаут одного запроса к LLM по умолчанию, секунды (LLM_TIMEOUT_S, T-029b).
 # providers.REQUEST_TIMEOUT_S ссылается на это же значение.
 DEFAULT_LLM_TIMEOUT_S = 30.0
+# Обезличенная копия скана (T-072): ещё один OCR на копию и ещё один на самопроверку.
+# Больше страниц OCR — копию не делаем (redacted_available=false), чтобы не держать воркер.
+# Константа, не переменная окружения: раздел 5 контракта не меняется.
+OCR_REDACT_MAX_PAGES = 20
 
 
 class Settings(BaseSettings):

@@ -12,6 +12,8 @@ from app.db.session import SessionLocal
 from app.schemas import DocPurpose, Entity, ExtractedDocument, LlmMode, Stage, TextSegment
 from app.services.extraction.extract import extract
 from app.services.extraction.ocr import ocr_progress
+from app.services.llm import modes
+from app.services.llm.client import use_llm_mode
 from app.services.pipeline import run_audit
 from app.services.redaction.check import count_leftovers
 from app.services.redaction.redact import RedactedFile, redact
