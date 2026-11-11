@@ -419,7 +419,8 @@ def test_unsupported_extension(tmp_path: Path) -> None:
     with pytest.raises(ValueError) as error:
         extract(tmp_path / "missing", "sample.txt", "synthetic-id")
     assert str(error.value) == (
-        "Формат файла не поддерживается. Загрузите .pdf, .docx, .xlsx или .xml"
+        "Формат файла не поддерживается. "
+        "Загрузите .pdf, .docx, .xlsx, .xml, .png, .jpg, .jpeg, .tif или .tiff"
     )
 
 
@@ -471,8 +472,7 @@ def test_pdf_without_text_reports_scan(tmp_path: Path, page_count: int) -> None:
     with pytest.raises(ValueError) as error:
         extract(path, path.name, "synthetic-id")
     assert str(error.value) == (
-        "Документ похож на скан: текст не распознаётся. "
-        "Загрузите документ с текстовым слоем."
+        "Не удалось распознать текст скана. Загрузите более чёткий документ."
     )
 
 

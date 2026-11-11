@@ -87,6 +87,13 @@ class Settings(BaseSettings):
     batch_max_documents: int = 20
     report_ttl_days: int = 7
 
+    # --- OCR ---
+    ocr_lang: str = "rus+eng"
+    ocr_dpi: int = Field(default=300, gt=0)
+    ocr_max_pages: int = Field(default=100, gt=0)
+    ocr_low_word_conf: float = Field(default=0.6, ge=0, le=1)
+    ocr_low_page_conf: float = Field(default=0.75, ge=0, le=1)
+
 
 @lru_cache
 def get_settings() -> Settings:
