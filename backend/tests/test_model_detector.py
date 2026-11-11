@@ -183,13 +183,17 @@ def test_special_category_cut_from_redacted_docx(session: Session, tmp_path: Pat
 
 @requires_model
 @pytest.mark.parametrize("item", [
-    pytest.mark.xfail(
-        strict=True, reason="классификатор: лишняя КТ, см. data/demo/README",
-    ) if item["file"] in {
-        "07_international_dpa.docx", "08_kii_publication.docx", "09_eis_notice_44fz.xml",
-    } else pytest.mark.xfail(
-        strict=False, reason="скан: ждёт OCR (T-071)",
-    ) if item["file"] in {"11_scan_application.pdf", "12_scan_anketa.jpg"} else ()
+    pytest.param(
+        item, id=item["file"], marks=(
+            pytest.mark.xfail(
+                strict=True, reason="классификатор: лишняя КТ, см. data/demo/README",
+            ) if item["file"] in {
+                "07_international_dpa.docx", "08_kii_publication.docx", "09_eis_notice_44fz.xml",
+            } else pytest.mark.xfail(
+                strict=False, reason="скан: ждёт OCR (T-071)",
+            ) if item["file"] in {"11_scan_application.pdf", "12_scan_anketa.jpg"} else ()
+        ),
+    )
     for item in yaml.safe_load((DEMO_DIR / "answers.yaml").read_text(encoding="utf-8"))
 ] if (DEMO_DIR / "answers.yaml").is_file() else [None])
 def test_demo_regression(item: dict | None) -> None:

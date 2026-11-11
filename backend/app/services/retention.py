@@ -35,8 +35,11 @@ def purge_expired(session: Session, now: datetime | None = None) -> int:
             session.execute(delete(TaskRow).where(TaskRow.document_id == document_id))
             session.delete(document)
     session.flush()
+    # Пустой комплект удаляется, только если он старше срока хранения: только что
+    # созданный комплект ещё ждёт первую загрузку (POST /api/batches → POST /api/documents).
     session.execute(delete(BatchRow).where(
-        ~select(DocumentRow.id).where(DocumentRow.batch_id == BatchRow.id).exists()
+        BatchRow.created_at < cutoff,
+        ~select(DocumentRow.id).where(DocumentRow.batch_id == BatchRow.id).exists(),
     ))
     session.commit()
     logger.info("purged_reports=%d", len(expired))

@@ -313,7 +313,11 @@ def test_empty_api_exports_and_invalid_format(
 def test_retention_removes_only_empty_batches(retention_db: Session) -> None:
     session = retention_db
     for identifier in ("expired", "current", "queued", "empty"):
-        session.add(BatchRow(id=identifier, purpose="internal"))
+        session.add(BatchRow(id=identifier, purpose="internal",
+                             created_at=test_retention.NOW - timedelta(days=10)))
+    # Только что созданный комплект без документов ждёт первую загрузку — не удаляется.
+    session.add(BatchRow(id="fresh-empty", purpose="internal",
+                         created_at=test_retention.NOW - timedelta(minutes=1)))
     session.commit()
     for identifier, days in (("expired", 10), ("current", 1)):
         test_retention.add_report(session, identifier, timedelta(days=days))
@@ -322,7 +326,7 @@ def test_retention_removes_only_empty_batches(retention_db: Session) -> None:
     session.commit()
     assert purge_expired(session, test_retention.NOW) == 1
     session.expire_all()
-    assert set(session.scalars(select(BatchRow.id))) == {"current", "queued"}
+    assert set(session.scalars(select(BatchRow.id))) == {"current", "queued", "fresh-empty"}
     assert purge_expired(session, test_retention.NOW) == 0
 
 
