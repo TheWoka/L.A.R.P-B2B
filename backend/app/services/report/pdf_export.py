@@ -5,6 +5,7 @@ from html import escape
 import pymupdf
 
 from app.schemas import Report, Violation
+from app.schemas.batch import BatchDocument, BatchSummary, Overall
 
 PURPOSE_LABELS = {
     "internal": "Внутренний документ",
@@ -22,6 +23,15 @@ CATEGORY_LABELS = {
     "retention": "Сроки хранения",
 }
 STATUS_LABELS = {"ok": "В порядке", "missing": "Отсутствует", "not_required": "Не требуется"}
+BATCH_STATUS_LABELS = {
+    "queued": "Ожидает проверки", "processing": "Проверяется",
+    "done": "Проверен", "failed": "Ошибка проверки",
+}
+BATCH_COLUMNS = ("Имя", "Назначение", "Итог", "red/yellow", "Распознан OCR", "Ошибка")
+OCR_WARNING = (
+    "Текст части документов распознан автоматически, возможны ошибки — "
+    "проверьте находки вручную"
+)
 CSS = """
 body { font-family: sans-serif; font-size: 10pt; line-height: 1.3; color: #262626; }
 h1 { font-size: 19pt; margin: 0 0 12pt; }
@@ -95,11 +105,68 @@ def _report_html(report: Report) -> str:
 
 def render_report_pdf(report: Report) -> bytes:
     """A4 с полями 15 мм, автоматической пагинацией и встроенными шрифтами MuPDF."""
+    return _render_pdf(_report_html(report), report.overall)
+
+
+def batch_warnings(summary: BatchSummary) -> list[str]:
+    warnings = [OCR_WARNING] if any(doc.ocr for doc in summary.documents) else []
+    if summary.documents_done < summary.documents_total:
+        warnings.append(f"Проверено {summary.documents_done} из {summary.documents_total}")
+    return warnings
+
+
+def batch_document_cells(document: BatchDocument) -> tuple[str, ...]:
+    verdict = (OVERALL_LABELS[document.overall][1] if document.overall
+               else BATCH_STATUS_LABELS[document.status])
+    return (
+        document.filename or "Текстовый запрос", PURPOSE_LABELS[document.purpose], verdict,
+        f"{document.violations_red}/{document.violations_yellow}",
+        "Да" if document.ocr else "Нет", document.error or "—",
+    )
+
+
+def _batch_html(summary: BatchSummary) -> str:
+    verdict = OVERALL_LABELS[summary.overall][1] if summary.overall else "Нет готовых отчётов"
+    parts = ["<h1>Сводный отчёт по комплекту</h1>",
+             _paragraph("Название", summary.name or "Комплект документов"),
+             _paragraph("Дата", summary.created_at.isoformat(sep=" ", timespec="seconds")),
+             _paragraph("Назначение", PURPOSE_LABELS[summary.purpose]),
+             f'<p class="signal">{escape(verdict)}</p>']
+    counters = (
+        ("Всего документов", summary.documents_total), ("Проверено", summary.documents_done),
+        ("Ошибок проверки", summary.documents_failed),
+        ("Серьёзных нарушений", summary.violations_red), ("Замечаний", summary.violations_yellow),
+    )
+    parts.extend(_paragraph(label, str(count)) for label, count in counters)
+    parts.extend(f"<p>{escape(warning)}</p>" for warning in batch_warnings(summary))
+    parts.append("<h2>Что исправить в первую очередь</h2>")
+    for rule in summary.rules:
+        level = "Серьёзное нарушение" if rule.severity == "red" else "Замечание"
+        parts.append(f"<p>{escape(level)}: {escape(rule.title)} "
+                     f"({escape(rule.rule_id)}) — документов: {rule.documents}</p>")
+    if not summary.rules:
+        parts.append("<p>Нарушений не найдено в готовых отчётах</p>")
+    parts.append("<h2>Документы</h2><table><tr>" + "".join(
+        f"<th>{escape(column)}</th>" for column in BATCH_COLUMNS
+    ) + "</tr>")
+    for document in summary.documents:
+        parts.append("<tr>" + "".join(
+            f"<td>{escape(cell)}</td>" for cell in batch_document_cells(document)
+        ) + "</tr>")
+    return "".join(parts) + "</table>"
+
+
+def render_batch_pdf(summary: BatchSummary) -> bytes:
+    """Тот же макет A4, светофор и пагинация, что у отчёта документа."""
+    return _render_pdf(_batch_html(summary), summary.overall)
+
+
+def _render_pdf(html: str, overall: Overall | None) -> bytes:
     page_rect = pymupdf.paper_rect("a4")
     margin = 15 * 72 / 25.4
     content_rect = pymupdf.Rect(margin, margin, page_rect.width - margin,
                                 page_rect.height - margin - 20)
-    story = pymupdf.Story(html=_report_html(report), user_css=CSS)
+    story = pymupdf.Story(html=html, user_css=CSS)
     flow_rect = pymupdf.Rect(0, 0, content_rect.width, content_rect.height)
     # Отдельная область потока обрезает фон HTML-блоков на границах страниц.
     with story.write_with_links(lambda *_: (flow_rect, flow_rect, None)) as flow:
@@ -108,7 +175,9 @@ def render_report_pdf(report: Report) -> bytes:
                 page = document.new_page(width=page_rect.width, height=page_rect.height)
                 page.show_pdf_page(content_rect, flow, number - 1)
                 if number == 1:
-                    color, verdict = OVERALL_LABELS[report.overall]
+                    color, verdict = OVERALL_LABELS.get(
+                        overall, ("#595959", "Нет готовых отчётов"),
+                    )
                     bounds = page.search_for(verdict)[0]
                     banner = pymupdf.Rect(content_rect.x0, bounds.y0 - 8,
                                           content_rect.x1, bounds.y1 + 8)

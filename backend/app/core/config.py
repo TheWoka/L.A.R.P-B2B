@@ -80,6 +80,7 @@ class Settings(BaseSettings):
 
     # --- Прочее ---
     max_upload_mb: int = 50
+    batch_max_documents: int = 20
     report_ttl_days: int = 7
 
 

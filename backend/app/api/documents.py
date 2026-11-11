@@ -5,11 +5,12 @@ from typing import Annotated, BinaryIO
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.llm import resolve_requested_mode
 from app.core.config import get_settings
-from app.db.models import DocumentRow, TaskRow
+from app.db.models import BatchRow, DocumentRow, TaskRow
 from app.db.session import get_db
 from app.schemas import DocPurpose, LlmMode, QueryRequest, TaskCreated
 from app.services.storage import delete_file, save_text, save_upload
@@ -37,6 +38,7 @@ def looks_like_xml(stream: BinaryIO) -> bool:
 def enqueue_document(
     session: Session, document_id: str, filename: str | None, purpose: DocPurpose, path: Path,
     llm_mode: LlmMode | None = None,
+    batch_id: str | None = None,
 ) -> TaskCreated:
     """Фиксирует документ и задачу до отправки идентификатора воркеру."""
     task_id = uuid4().hex
@@ -44,6 +46,7 @@ def enqueue_document(
         session.add(DocumentRow(
             id=document_id, filename=filename, purpose=purpose.value, stored_path=str(path),
             llm_mode=llm_mode,
+            batch_id=batch_id,
         ))
         session.flush()
         session.add(TaskRow(id=task_id, document_id=document_id, status="queued"))
@@ -66,6 +69,19 @@ def enqueue_document(
     return TaskCreated(task_id=task_id, document_id=document_id)
 
 
+def check_batch_capacity(session: Session, batch_id: str) -> None:
+    """Держит блокировку комплекта до фиксации загрузки, чтобы не превысить лимит."""
+    batch = session.scalar(select(BatchRow).where(BatchRow.id == batch_id).with_for_update())
+    if batch is None:
+        raise HTTPException(status_code=404, detail="Комплект не найден")
+    count = session.scalar(
+        select(func.count()).select_from(DocumentRow).where(DocumentRow.batch_id == batch_id)
+    )
+    limit = get_settings().batch_max_documents
+    if count >= limit:
+        raise HTTPException(status_code=400, detail=f"В комплекте не больше {limit} документов")
+
+
 @router.post(
     "/documents", status_code=202, response_model=TaskCreated,
     summary="Загрузить документ на проверку",
@@ -77,9 +93,12 @@ def upload_document(
     llm_mode: Annotated[
         LlmMode | None, Form(description="Режим нейросети: mock, local или cloud")
     ] = None,
+    batch_id: Annotated[str | None, Form(description="Комплект документов")] = None,
 ) -> TaskCreated:
     """Проверяет формат, размер и режим нейросети, сохраняет файл и ставит проверку в очередь."""
     mode = resolve_requested_mode(llm_mode)
+    if batch_id is not None:
+        check_batch_capacity(session, batch_id)
     extension = Path(file.filename or "").suffix.lower()
     signatures = {".pdf": b"%PDF", ".docx": b"PK\x03\x04", ".xlsx": b"PK\x03\x04"}
     signature = file.file.read(4)
@@ -101,7 +120,7 @@ def upload_document(
         path = save_upload(file, document_id, get_settings().max_upload_mb * 1024 * 1024)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from None
-    return enqueue_document(session, document_id, file.filename, purpose, path, mode)
+    return enqueue_document(session, document_id, file.filename, purpose, path, mode, batch_id)
 
 
 @router.post(

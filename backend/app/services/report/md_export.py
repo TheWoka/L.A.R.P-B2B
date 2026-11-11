@@ -1,11 +1,15 @@
 """Markdown из сохранённого отчёта, без исходника и значений сущностей."""
 
 from app.schemas import Report, Violation
+from app.schemas.batch import BatchSummary
 from app.services.report.pdf_export import (
+    BATCH_COLUMNS,
     CATEGORY_LABELS,
     OVERALL_LABELS,
     PURPOSE_LABELS,
     STATUS_LABELS,
+    batch_document_cells,
+    batch_warnings,
 )
 
 
@@ -74,3 +78,30 @@ def render_report_md(report: Report) -> str:
     rows.extend(f"| {_escape_md(kind)} | {count} |" for kind, count in sorted(report.stats.items()))
     parts.extend(["\n".join(rows), "## След проверки", _audit_md(report)])
     return "\n\n".join(parts) + "\n"
+
+
+def render_batch_md(summary: BatchSummary) -> str:
+    """Только сводные данные; цитаты, рекомендации и значения сущностей не переносятся."""
+    verdict = OVERALL_LABELS[summary.overall][1] if summary.overall else "Нет готовых отчётов"
+    parts = [
+        "# Сводный отчёт по комплекту",
+        f"Название: {_escape_md(summary.name or 'Комплект документов')}",
+        f"Дата: {summary.created_at.isoformat(sep=' ', timespec='seconds')}",
+        f"Назначение: {PURPOSE_LABELS[summary.purpose]}", f"Итог: {verdict}",
+        f"Всего документов: {summary.documents_total}", f"Проверено: {summary.documents_done}",
+        f"Ошибок проверки: {summary.documents_failed}",
+        f"Серьёзных нарушений: {summary.violations_red}", f"Замечаний: {summary.violations_yellow}",
+    ]
+    parts.extend(batch_warnings(summary))
+    parts.append("## Что исправить в первую очередь")
+    for rule in summary.rules:
+        level = "Серьёзное нарушение" if rule.severity == "red" else "Замечание"
+        parts.append(f"- {level}: {_escape_md(rule.title)} ({_escape_md(rule.rule_id)}) "
+                     f"— документов: {rule.documents}")
+    if not summary.rules:
+        parts.append("Нарушений не найдено в готовых отчётах")
+    parts.append("## Документы")
+    rows = ["| " + " | ".join(BATCH_COLUMNS) + " |", "| " + " | ".join(["---"] * 6) + " |"]
+    for document in summary.documents:
+        rows.append("| " + " | ".join(_escape_md(c) for c in batch_document_cells(document)) + " |")
+    return "\n\n".join([*parts, "\n".join(rows)]) + "\n"
