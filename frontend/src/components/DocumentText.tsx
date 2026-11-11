@@ -1,15 +1,17 @@
 import { useEffect, useRef } from "react";
 import { Alert, Card, Typography } from "antd";
 
-import type { Entity, Evidence, ReportText } from "../api/types";
+import type { Entity, Evidence, OcrInfo, ReportText } from "../api/types";
+import { ocrRanges } from "./ocrRanges";
 
 interface Props {
   document: ReportText;
   entities: Entity[];
   selected: Evidence | null;
+  ocr?: OcrInfo | null;
 }
 
-export default function DocumentText({ document, entities, selected }: Props) {
+export default function DocumentText({ document, entities, selected, ocr }: Props) {
   const targetRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -17,6 +19,8 @@ export default function DocumentText({ document, entities, selected }: Props) {
   }, [selected]);
 
   const boundaries = new Set<number>([0, document.text.length]);
+  const uncertain = ocrRanges(document.text.length, ocr?.low_confidence_spans ?? []);
+  for (const [start, end] of uncertain) { boundaries.add(start); boundaries.add(end); }
   for (const entity of entities) {
     boundaries.add(Math.max(0, Math.min(document.text.length, entity.start)));
     boundaries.add(Math.max(0, Math.min(document.text.length, entity.end)));
@@ -35,9 +39,12 @@ export default function DocumentText({ document, entities, selected }: Props) {
           const end = offsets[index + 1];
           const isSelected = selected != null && start >= selected.start && end <= selected.end;
           const isEntity = entities.some((entity) => start >= entity.start && end <= entity.end);
+          const isUncertain = uncertain.some(([from, to]) => start >= from && end <= to);
           return (
             <mark
               key={start}
+              className={isUncertain ? "ocr-uncertain" : undefined}
+              title={isUncertain ? "Распознано неуверенно" : undefined}
               ref={isSelected && start === selected?.start ? targetRef : undefined}
               style={{ background: isSelected ? "#ffd666" : isEntity ? "#e6f4ff" : "transparent", color: "inherit" }}
             >
@@ -46,6 +53,7 @@ export default function DocumentText({ document, entities, selected }: Props) {
           );
         })}
       </Typography.Text>
+      {ocr && <p className="ocr-legend"><span className="ocr-uncertain">Пунктир</span> — слово распознано неуверенно. Сверьте его с исходным документом.</p>}
     </Card>
   );
 }
