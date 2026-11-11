@@ -12,6 +12,8 @@ from app.db.session import SessionLocal
 from app.schemas import DocPurpose, Entity, ExtractedDocument, LlmMode, Stage, TextSegment
 from app.services.extraction.extract import extract
 from app.services.extraction.ocr import ocr_progress
+from app.services.llm import modes
+from app.services.llm.client import use_llm_mode
 from app.services.pipeline import run_audit
 from app.services.redaction.check import count_leftovers
 from app.services.redaction.redact import (
@@ -66,8 +68,6 @@ def make_redacted_copy(
     if not scan_copy_allowed(doc):
         logger.info("task_id=%s копия скана пропущена: %d страниц", task_id, ocr_page_count(doc))
         return None
-    if doc.ocr is not None:
-        return None  # Обезличивание пикселей — T-072.
     try:
         redacted = redact(source, doc, entities)
         remaining = count_leftovers(redacted, doc, entities)
