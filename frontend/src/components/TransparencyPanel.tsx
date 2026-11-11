@@ -92,6 +92,7 @@ export default function TransparencyPanel({ report, example = false }: Props) {
 
   const audit = report.audit;
   const auditItems = [
+    ...(report.ocr ? [{ key: "ocr", label: "Распознавание текста", children: `${report.ocr.engine}, уверенность ${Math.round(report.ocr.mean_confidence * 100)}%` }] : []),
     {
       key: "hash", label: "Отпечаток документа (SHA-256)",
       children: (

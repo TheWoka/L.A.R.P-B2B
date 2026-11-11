@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { Alert, Button, Card, Col, Progress, Row, Skeleton, Statistic, Table, Tabs, Tag, Typography } from "antd";
+import { Alert, Button, Card, Col, Empty, Radio, Progress, Row, Skeleton, Statistic, Table, Tabs, Tag, Typography } from "antd";
 import type { TableColumnsType } from "antd";
 
 import { ApiError, getMetrics } from "../api/client";
@@ -10,9 +10,12 @@ import { roundPercentage } from "../lib/metrics";
 import exampleMetrics from "../mocks/metrics.example.json";
 
 type LoadedMetrics = { data: Metrics; example: boolean };
-type Corpus = "reference" | "blind";
+type Corpus = "reference" | "blind" | "scan-dev" | "scan-blind";
+const SCAN_DESCRIPTION = "Синтетические сканы документов, 200 dpi, шум и поворот до 1,5°. Сущности, которые распознавание потеряло целиком, считаются пропуском.";
 
 const CORPUS_DESCRIPTION: Record<Corpus, string> = {
+  "scan-dev": SCAN_DESCRIPTION,
+  "scan-blind": SCAN_DESCRIPTION,
   reference: "Набор составлен вместе с разработкой детектора, на нём мы проверяем, что ничего не сломали.",
   blind: "Документы написал участник команды, который не видел устройство детектора, и под этот набор детектор не настраивается. Это самая честная оценка: так система поведёт себя на чужих документах.",
 };
@@ -74,12 +77,16 @@ function MetricsTab({ corpus }: { corpus: Corpus }) {
 
   useEffect(() => {
     let active = true;
-    (corpus === "blind" ? getMetrics("blind") : getMetrics()).then(
+    setLoading(true);
+    setError(null);
+    setLoaded(null);
+    setNotCounted(false);
+    getMetrics(corpus === "reference" ? undefined : corpus).then(
       (data) => { if (active) setLoaded({ data, example: false }); },
       (reason: unknown) => {
         if (!active) return;
         if (reason instanceof ApiError && (reason.status === 404 || reason.status === 501)) {
-          if (corpus === "blind") setNotCounted(true);
+          if (corpus !== "reference") setNotCounted(true);
           else setLoaded({ data: exampleMetrics, example: true });
         } else {
           setError(reason instanceof Error ? reason.message : "Попробуйте ещё раз.");
@@ -103,7 +110,7 @@ function MetricsTab({ corpus }: { corpus: Corpus }) {
       />
     );
   } else if (notCounted) {
-    content = <Alert type="info" showIcon title="Слепой набор ещё не посчитан" description="Метрики появятся здесь после отдельного запуска оценки слепого набора." />;
+    content = corpus.startsWith("scan-") ? <Card><Empty description="Замер на сканах ещё не выполнен" /></Card> : <Alert type="info" showIcon title="Слепой набор ещё не посчитан" description="Метрики появятся здесь после отдельного запуска оценки слепого набора." />;
   } else {
     content = loaded && <MetricsContent loaded={loaded} corpus={corpus} />;
   }
@@ -180,15 +187,22 @@ function MetricsContent({ loaded, corpus }: { loaded: LoadedMetrics; corpus: Cor
         <Col xs={24} lg={12}>
           <Card title="Почему этим цифрам можно верить" style={{ height: "100%" }}>
             <ul style={{ margin: 0, paddingLeft: 20 }}>
-              <li>Ручной набор документов содержит сложные случаи и ловушки.</li>
-              <li>Независимый корпус генератора содержит 210 документов.</li>
-              <li>Слепой набор от другого автора: 12 документов, 150 размеченных фрагментов — вкладка «Слепой набор».</li>
+              {corpus.startsWith("scan-") ? <li>Использованы только синтетические сканы. Полностью потерянные при распознавании сведения учитываются как пропуски.</li> : <li>Ручной набор документов содержит сложные случаи и ловушки.</li>}
+              {!corpus.startsWith("scan-") && <li>Независимый корпус генератора содержит 210 документов.</li>}
+              {!corpus.startsWith("scan-") && <li>Слепой набор от другого автора: 12 документов, 150 размеченных фрагментов — вкладка «Слепой набор».</li>}
             </ul>
           </Card>
         </Col>
       </Row>
     </>
   );
+}
+
+function ScansTab() {
+  const [corpus, setCorpus] = useState<"scan-dev" | "scan-blind">("scan-dev");
+  return <><Radio.Group className="scan-corpus-picker" value={corpus} onChange={(event) => setCorpus(event.target.value)} aria-label="Набор сканов">
+    <Radio.Button value="scan-dev">Набор для настройки</Radio.Button><Radio.Button value="scan-blind">Слепой набор</Radio.Button>
+  </Radio.Group><MetricsTab key={corpus} corpus={corpus} /></>;
 }
 
 export default function QualityPage() {
@@ -204,6 +218,7 @@ export default function QualityPage() {
         items={[
           { key: "reference", label: "Эталонный набор", children: <MetricsTab corpus="reference" /> },
           { key: "blind", label: "Слепой набор (другой автор)", children: <MetricsTab corpus="blind" /> },
+          { key: "scans", label: "Сканы (распознавание)", children: <ScansTab /> },
         ]}
       />
     </div>

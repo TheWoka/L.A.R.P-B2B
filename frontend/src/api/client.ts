@@ -2,6 +2,7 @@
 // В dev их проксирует Vite, в docker-compose — nginx.
 
 import type {
+  BatchCreate, BatchCreated, BatchSummary,
   DocPurpose,
   LlmCall,
   LlmMode,
@@ -60,12 +61,29 @@ function jsonInit(method: string, body: unknown): RequestInit {
   };
 }
 
-export function uploadDocument(file: File, purpose: DocPurpose, llmMode?: LlmMode): Promise<TaskCreated> {
+export type UploadOptions = { batchId?: string; llmMode?: LlmMode };
+
+/** Третий аргумент — режим нейросети (T-076b) или объект с комплектом и режимом (T-075). */
+export function uploadDocument(file: File, purpose: DocPurpose, options?: LlmMode | UploadOptions): Promise<TaskCreated> {
+  const { batchId, llmMode } = typeof options === "string" ? { batchId: undefined, llmMode: options } : options ?? {};
   const form = new FormData();
   form.append("file", file);
   form.append("purpose", purpose);
+  if (batchId) form.append("batch_id", batchId);
   if (llmMode !== undefined) form.append("llm_mode", llmMode);
   return request<TaskCreated>("/documents", { method: "POST", body: form });
+}
+
+export function createBatch(body: BatchCreate): Promise<BatchCreated> {
+  return request<BatchCreated>("/batches", jsonInit("POST", body));
+}
+
+export function getBatch(id: string): Promise<BatchSummary> {
+  return request<BatchSummary>(`/batches/${encodeURIComponent(id)}`);
+}
+
+export function batchExportUrl(id: string, format: "pdf" | "md" | "json"): string {
+  return `${BASE_URL}/batches/${encodeURIComponent(id)}/export?format=${format}`;
 }
 
 export function submitQuery(query: QueryRequest, llmMode?: LlmMode): Promise<TaskCreated> {

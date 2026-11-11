@@ -29,6 +29,11 @@ export default function ReportView({ reportId, embedded = false }: { reportId: s
   useEffect(() => {
     if (!reportId || reportId === "example") return;
     let active = true;
+    setLiveReport(null);
+    setDocumentText(null);
+    setError(null);
+    setTextError(false);
+    setSelectedEvidence(null);
     void getReport(reportId).then(
       (result) => { if (active) { setLiveReport(result); addToHistory(result); } },
       (reason: unknown) => { if (active) setError(reason); },
@@ -77,6 +82,10 @@ export default function ReportView({ reportId, embedded = false }: { reportId: s
       </Row>
 
       <Card style={{ minWidth: 0, marginTop: 16 }}>
+        {report.ocr && <Alert className="ocr-notice" type="warning" showIcon
+          title="Текст получен автоматическим распознаванием"
+          description={<><p>Средняя уверенность распознавания — {Math.round(report.ocr.mean_confidence * 100)}%. Возможны ошибки в именах и номерах — проверьте находки по исходному документу.</p>
+            {report.ocr.low_confidence_pages.length > 0 && <p>Низкое качество на страницах: {report.ocr.low_confidence_pages.join(", ")}</p>}</>} />}
         <Space size="large" align="center" wrap>
           <TrafficLight value={report.overall} />
           <Tag color={overall.color} style={{ fontSize: 16, padding: "4px 12px" }}>
@@ -105,7 +114,7 @@ export default function ReportView({ reportId, embedded = false }: { reportId: s
             </div>
             {!report.redacted_available && (
               <Typography.Paragraph type="secondary" style={{ margin: "8px 0 0" }}>
-                Копия недоступна: в документе не нашлось персональных данных или её не удалось безопасно сделать.
+                {report.ocr ? "Для сканов копия пока не формируется" : "Копия недоступна: в документе не нашлось персональных данных или её не удалось безопасно сделать."}
               </Typography.Paragraph>
             )}
             {report.redacted_available && (
@@ -128,7 +137,7 @@ export default function ReportView({ reportId, embedded = false }: { reportId: s
         <ViolationsTable violations={report.violations} onSelectEvidence={documentText ? setSelectedEvidence : undefined} onShowLaw={setSelectedLaw} />
       </Card>
 
-      {documentText && <div style={{ marginTop: 20 }}><DocumentText document={documentText} entities={report.entities} selected={selectedEvidence} /></div>}
+      {documentText && <div style={{ marginTop: 20 }}><DocumentText document={documentText} entities={report.entities} selected={selectedEvidence} ocr={report.ocr} /></div>}
       {textError && <Alert type="warning" showIcon title="Текст документа пока недоступен" style={{ marginTop: 20 }} />}
 
       <Card title={`Найденные данные (${report.entities.length})`} style={{ marginTop: 20 }}>
