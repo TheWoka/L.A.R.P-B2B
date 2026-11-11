@@ -15,6 +15,12 @@
 
 Текст не нормализуется: смещения совпадают с исходным doc.text. Исходные значения
 нигде не сохраняются и не логируются — в Entity только value_masked и координаты.
+
+OCR-документы (doc.ocr is not None, T-077c): номера ищутся в digits_view(doc.text) — копии
+той же длины, где путаемые буквы в числах заменены цифрами («1l2-233-445 9S» → «112-233-445 95»).
+Координаты и value_masked берутся из исходного текста; если внутри найденного спана была
+замена, уверенность × OCR_FIX_FACTOR. Email ищется в исходном тексте: в адресе буквы — данные.
+Для документов без OCR код и результат прежние.
 """
 
 import re
@@ -24,6 +30,7 @@ from dataclasses import dataclass
 
 from app.schemas import Entity, EntityCategory, EntityType, ExtractedDocument
 from app.services.detection import validators as v
+from app.services.detection.ocr_normalize import digits_view
 from app.services.masking.masker import mask_value
 
 # ---------- Уверенность ----------
@@ -34,6 +41,7 @@ CONF_PHONE_LOCAL = 0.85     # телефон без кода страны, ря�
 CONF_ACCOUNT_NO_BIK = 0.8   # счёт физлица, рядом нет БИК для проверки ключа
 CONF_ACCOUNT_LABELED = 0.8  # счёт физлица, ключ по БИК не сошёлся, но слева «счёт» (T-019b)
 CONF_EMAIL = 0.95
+OCR_FIX_FACTOR = 0.9        # в спане OCR-документа буквы заменены цифрами (T-077c)
 
 # При пересечении остаётся сущность с меньшим рангом; при равенстве — более длинная.
 PRIORITY: dict[EntityType, int] = {
@@ -441,9 +449,10 @@ def _find_accounts(ctx: _Ctx) -> tuple[list[Candidate], list[tuple[int, int]]]:
     return found, blockers
 
 
-_FINDERS: tuple[Callable[[_Ctx], Iterator[Candidate]], ...] = (
+# Номера и даты: в OCR-документе ищутся в digits_view (T-077c).
+_NUMBER_FINDERS: tuple[Callable[[_Ctx], Iterator[Candidate]], ...] = (
     _find_snils, _find_inn, _find_card, _find_passport,
-    _find_birth_date, _find_phone, _find_phone_local, _find_email,
+    _find_birth_date, _find_phone, _find_phone_local,
 )
 
 
@@ -506,12 +515,25 @@ def detect_regex(doc: ExtractedDocument) -> list[Entity]:
     if not text:
         return []
     segments = sorted(doc.segments, key=lambda s: s.offset)
-    ctx = _Ctx(
-        text=text,
-        seg_starts=[s.offset for s in segments],
-        seg_ends=[s.offset + len(s.text) for s in segments],
-    )
-    candidates, blockers = _find_accounts(ctx)
-    for finder in _FINDERS:
-        candidates.extend(finder(ctx))
+    seg_starts = [s.offset for s in segments]
+    seg_ends = [s.offset + len(s.text) for s in segments]
+    ctx = _Ctx(text=text, seg_starts=seg_starts, seg_ends=seg_ends)
+    # OCR (T-077c): номера ищем в копии той же длины, координаты — общие с text.
+    view = digits_view(text) if doc.ocr is not None else text
+    num_ctx = ctx if view == text else _Ctx(text=view, seg_starts=seg_starts, seg_ends=seg_ends)
+    candidates, blockers = _find_accounts(num_ctx)
+    for finder in _NUMBER_FINDERS:
+        candidates.extend(finder(num_ctx))
+    if view != text:
+        candidates = [_ocr_fixed(c, text, view) for c in candidates]
+    candidates.extend(_find_email(ctx))
     return [_to_entity(text, c) for c in resolve_overlaps(candidates, blockers)]
+
+
+def _ocr_fixed(cand: Candidate, text: str, view: str) -> Candidate:
+    """Внутри спана были замены букв на цифры → уверенность × OCR_FIX_FACTOR."""
+    if text[cand.start:cand.end] == view[cand.start:cand.end]:
+        return cand
+    return Candidate(
+        cand.type, cand.start, cand.end, round(cand.confidence * OCR_FIX_FACTOR, 4),
+    )

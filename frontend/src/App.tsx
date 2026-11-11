@@ -1,8 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { Button, Drawer, Layout } from "antd";
+import { Button, Drawer, Layout, Tooltip } from "antd";
 import { Link, Route, Routes, useLocation } from "react-router-dom";
 
+import { getLlmModes } from "./api/client";
+import type { LlmMode } from "./api/types";
+import { LABELS } from "./lib/llmMode";
 import ReportPage from "./pages/ReportPage";
 import BatchSummaryPage from "./pages/BatchSummaryPage";
 import BatchPage from "./pages/BatchPage";
@@ -48,6 +51,22 @@ function activePath(pathname: string): string | null {
 export default function App() {
   const { pathname } = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [defaultMode, setDefaultMode] = useState<LlmMode>("mock");
+  useEffect(() => {
+    let active = true;
+    void getLlmModes().then((result) => {
+      if (active) setDefaultMode(result.default);
+    }).catch(() => { if (active) setDefaultMode("mock"); });
+    return () => { active = false; };
+  }, []);
+  const modeBadge = (
+    <Tooltip title={`Режим нейросети по умолчанию: ${LABELS[defaultMode]}`}>
+      <span className={`default-llm-mode is-${defaultMode}`} aria-label={`Режим нейросети по умолчанию: ${LABELS[defaultMode]}`}>
+        <span className="default-llm-mode-dot" aria-hidden="true" />
+        {defaultMode === "local" ? "Локально" : LABELS[defaultMode]}
+      </span>
+    </Tooltip>
+  );
   const selected = activePath(pathname);
   const links = NAV_ITEMS.map((item) => (
     <Link key={item.path} to={item.path} className={`sidebar-link${selected === item.path ? " is-active" : ""}`} aria-current={selected === item.path ? "page" : undefined} onClick={() => setMenuOpen(false)}>
@@ -62,7 +81,7 @@ export default function App() {
         <div className="brand-block"><Link to="/" className="brand" aria-label="Гриф — новая проверка"><span className="brand-mark" aria-hidden="true" /><span>Гриф</span></Link><span className="brand-subtitle">ИИ-аудитор документов</span></div>
         <div className="sidebar-caption">РАБОЧЕЕ ПРОСТРАНСТВО</div>
         <nav className="sidebar-nav" aria-label="Основная навигация">{links}</nav>
-        <div className="sidebar-foot">Техподдержка: <a href="mailto:dnl9@tpu.ru">dnl9@tpu.ru</a></div>
+        <div className="sidebar-foot">{modeBadge}<div>Техподдержка: <a href="mailto:dnl9@tpu.ru">dnl9@tpu.ru</a></div></div>
       </Sider>
       <Layout className="app-main">
         <header className="mobile-header">
@@ -87,6 +106,7 @@ export default function App() {
       </Layout>
       <Drawer title="Разделы" placement="right" width={280} open={menuOpen} onClose={() => setMenuOpen(false)} className="mobile-nav-drawer">
         <nav className="sidebar-nav" aria-label="Мобильная навигация">{links}</nav>
+        <div className="sidebar-foot">{modeBadge}</div>
       </Drawer>
     </Layout>
   );

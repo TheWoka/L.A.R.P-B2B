@@ -1,0 +1,350 @@
+{
+  "dev/01_supplier_letter.txt": [
+    ["PERSON", "pd", 123, 150, "ner", 0.85],
+    ["PHONE", "pd", 700, 718, "regex", 0.9],
+    ["EMAIL", "pd", 747, 774, "regex", 0.95],
+    ["PERSON", "pd", 789, 805, "ner", 0.9]
+  ],
+  "dev/02_manager_chat.txt": [
+    ["PERSON", "pd", 114, 132, "ner", 0.85],
+    ["PERSON", "pd", 201, 213, "ner", 0.85],
+    ["PERSON", "pd", 271, 289, "ner", 0.85],
+    ["PERSON", "pd", 359, 371, "ner", 0.85],
+    ["PERSON", "pd", 435, 453, "ner", 0.85],
+    ["PERSON", "pd", 514, 526, "ner", 0.85],
+    ["PERSON", "pd", 598, 616, "ner", 0.85],
+    ["PERSON", "pd", 618, 633, "ner", 0.85],
+    ["PERSON", "pd", 687, 699, "ner", 0.85],
+    ["PERSON", "pd", 701, 720, "ner", 0.85],
+    ["SPECIAL_CATEGORY", "pd_special", 735, 767, "dict", 0.8],
+    ["PERSON", "pd", 775, 793, "ner", 0.85],
+    ["PERSON", "pd", 866, 878, "ner", 0.85],
+    ["PERSON", "pd", 923, 941, "ner", 0.85],
+    ["PERSON", "pd", 998, 1010, "ner", 0.85]
+  ],
+  "dev/03_cost_calculation.txt": [
+    ["PERSON", "pd", 124, 153, "ner", 0.85],
+    ["TRADE_SECRET", "trade_secret", 166, 202, "dict", 0.9],
+    ["TRADE_SECRET", "trade_secret", 337, 377, "dict", 0.9],
+    ["TRADE_SECRET", "trade_secret", 394, 437, "dict", 0.9],
+    ["TRADE_SECRET", "trade_secret", 454, 490, "dict", 0.9],
+    ["PERSON", "pd", 763, 779, "ner", 0.9]
+  ],
+  "dev/04_internal_memo.txt": [
+    ["PERSON", "pd", 117, 144, "ner", 0.85],
+    ["FINANCIAL", "financial", 350, 360, "dict", 0.9],
+    ["TRADE_SECRET", "trade_secret", 417, 462, "dict", 0.9],
+    ["TRADE_SECRET", "trade_secret", 503, 523, "dict", 0.9],
+    ["PERSON", "pd", 602, 618, "ner", 0.85],
+    ["SPECIAL_CATEGORY", "pd_special", 619, 651, "dict", 0.85]
+  ],
+  "dev/05_negotiation_minutes.txt": [
+    ["PERSON", "pd", 118, 138, "ner", 0.85],
+    ["PERSON", "pd", 154, 171, "ner", 0.85],
+    ["TRADE_SECRET", "trade_secret", 289, 328, "dict", 0.9],
+    ["TRADE_SECRET", "trade_secret", 610, 646, "dict", 0.9],
+    ["PERSON", "pd", 824, 844, "ner", 0.85]
+  ],
+  "dev/06_commercial_offer.txt": [
+    ["PERSON", "pd", 142, 161, "ner", 0.85],
+    ["TRADE_SECRET", "trade_secret", 248, 293, "dict", 0.9],
+    ["TRADE_SECRET", "trade_secret", 312, 346, "dict", 0.9],
+    ["EMAIL", "pd", 746, 777, "regex", 0.95],
+    ["PHONE", "pd", 807, 822, "regex", 0.9]
+  ],
+  "dev/07_sales_plan.txt": [
+    ["PERSON", "pd", 118, 146, "ner", 0.85],
+    ["TRADE_SECRET", "trade_secret", 533, 560, "dict", 0.9],
+    ["FINANCIAL", "financial", 667, 708, "dict", 0.9]
+  ],
+  "dev/08_technical_knowhow.txt": [
+    ["PERSON", "pd", 118, 143, "ner", 0.85],
+    ["TRADE_SECRET", "trade_secret", 175, 222, "dict", 0.75]
+  ],
+  "dev/09_procurement_report.txt": [
+    ["PERSON", "pd", 96, 124, "ner", 0.85],
+    ["TRADE_SECRET", "trade_secret", 348, 388, "dict", 0.9]
+  ],
+  "dev/10_personnel_reference.txt": [
+    ["PERSON", "pd", 100, 127, "ner", 0.85],
+    ["BIRTH_DATE", "pd", 143, 153, "regex", 0.95],
+    ["ADDRESS", "pd", 171, 221, "ner", 0.8],
+    ["SPECIAL_CATEGORY", "pd_special", 305, 338, "dict", 0.85],
+    ["SPECIAL_CATEGORY", "pd_special", 368, 417, "dict", 0.85],
+    ["SPECIAL_CATEGORY", "pd_special", 456, 480, "dict", 0.8],
+    ["EMAIL", "pd", 515, 544, "regex", 0.95],
+    ["PHONE", "pd", 557, 573, "regex", 0.9],
+    ["SNILS", "pd", 590, 604, "regex", 0.98],
+    ["PERSON", "pd", 624, 650, "ner", 0.85]
+  ],
+  "dev/11_sick_leave.txt": [
+    ["PERSON", "pd", 104, 134, "ner", 0.85],
+    ["PERSON", "pd", 245, 265, "ner", 0.85],
+    ["SPECIAL_CATEGORY", "pd_special", 301, 336, "dict", 0.8],
+    ["PERSON", "pd", 348, 375, "ner", 0.85],
+    ["PERSON", "pd", 487, 513, "ner", 0.85],
+    ["PERSON", "pd", 826, 844, "ner", 0.85]
+  ],
+  "dev/12_employee_profile.txt": [
+    ["PERSON", "pd", 131, 162, "ner", 0.85],
+    ["SPECIAL_CATEGORY", "pd_special", 407, 425, "dict", 0.8],
+    ["BIRTH_DATE", "pd", 618, 628, "regex", 0.95],
+    ["PHONE", "pd", 646, 664, "regex", 0.9],
+    ["ADDRESS", "pd", 693, 735, "ner", 0.8],
+    ["PERSON", "pd", 764, 781, "ner", 0.85]
+  ],
+  "dev/13_questionnaire.txt": [
+    ["PERSON", "pd", 131, 157, "ner", 0.85],
+    ["BIRTH_DATE", "pd", 174, 184, "regex", 0.95],
+    ["PASSPORT", "pd", 195, 209, "regex", 0.95],
+    ["INN", "pd", 267, 279, "regex", 0.98],
+    ["SNILS", "pd", 288, 302, "regex", 0.98],
+    ["ADDRESS", "pd", 322, 371, "ner", 0.8],
+    ["EMAIL", "pd", 387, 415, "regex", 0.95],
+    ["PHONE", "pd", 426, 442, "regex", 0.9],
+    ["SPECIAL_CATEGORY", "pd_special", 482, 489, "dict", 0.8],
+    ["SPECIAL_CATEGORY", "pd_special", 518, 536, "dict", 0.8],
+    ["SPECIAL_CATEGORY", "pd_special", 559, 604, "dict", 0.85],
+    ["BANK_ACCOUNT", "pd", 653, 673, "regex", 0.8],
+    ["CARD", "pd", 701, 720, "regex", 0.98]
+  ],
+  "dev/14_supplier_terms.txt": [
+    ["PERSON", "pd", 100, 113, "ner", 0.85],
+    ["EMAIL", "pd", 128, 152, "regex", 0.95],
+    ["FINANCIAL", "financial", 332, 362, "dict", 0.9],
+    ["PERSON", "pd", 652, 670, "ner", 0.85],
+    ["PERSON", "pd", 754, 773, "ner", 0.85],
+    ["PERSON", "pd", 868, 886, "ner", 0.85]
+  ],
+  "dev/15_public_procurement.txt": [
+    ["PERSON", "pd", 541, 557, "ner", 0.85],
+    ["SPECIAL_CATEGORY", "pd_special", 697, 765, "dict", 0.8]
+  ],
+  "seed/01_dogovor_rekvizity.txt": [
+    ["PERSON", "pd", 166, 196, "ner", 0.85],
+    ["PERSON", "pd", 282, 304, "ner", 0.9],
+    ["INN", "pd", 310, 322, "regex", 0.98],
+    ["FINANCIAL", "financial", 520, 540, "dict", 0.95],
+    ["PERSON", "pd", 591, 602, "ner", 0.9],
+    ["ADDRESS", "pd", 623, 666, "ner", 0.8],
+    ["BANK_ACCOUNT", "pd", 672, 692, "regex", 0.98],
+    ["PHONE", "pd", 714, 730, "regex", 0.9],
+    ["EMAIL", "pd", 740, 759, "regex", 0.95]
+  ],
+  "seed/02_zayavka_uchastnika.txt": [
+    ["PERSON", "pd", 195, 219, "ner", 0.85],
+    ["BIRTH_DATE", "pd", 235, 245, "regex", 0.95],
+    ["PASSPORT", "pd", 275, 287, "regex", 0.95],
+    ["SNILS", "pd", 379, 393, "regex", 0.98],
+    ["INN", "pd", 399, 411, "regex", 0.98],
+    ["ADDRESS", "pd", 436, 498, "ner", 0.8],
+    ["PHONE", "pd", 519, 536, "regex", 0.9],
+    ["EMAIL", "pd", 557, 581, "regex", 0.95],
+    ["PERSON", "pd", 616, 629, "ner", 0.9]
+  ],
+  "seed/03_anketa_caps.txt": [
+    ["PERSON", "pd", 78, 102, "ner", 0.85],
+    ["BIRTH_DATE", "pd", 118, 128, "regex", 0.95],
+    ["ADDRESS", "pd", 148, 196, "ner", 0.8],
+    ["PASSPORT", "pd", 206, 217, "regex", 0.95],
+    ["SNILS", "pd", 225, 239, "regex", 0.98],
+    ["PHONE", "pd", 259, 271, "regex", 0.9],
+    ["EMAIL", "pd", 280, 302, "regex", 0.95],
+    ["SPECIAL_CATEGORY", "pd_special", 334, 357, "dict", 0.85]
+  ],
+  "seed/04_ip_kartochka.txt": [
+    ["PERSON", "pd", 52, 74, "ner", 0.9],
+    ["INN", "pd", 79, 91, "regex", 0.98],
+    ["ADDRESS", "pd", 123, 195, "ner", 0.8],
+    ["BANK_ACCOUNT", "pd", 211, 231, "regex", 0.98],
+    ["PHONE", "pd", 274, 292, "regex", 0.9],
+    ["EMAIL", "pd", 301, 322, "regex", 0.95]
+  ],
+  "seed/05_list_soglasovaniya.txt": [
+    ["PERSON", "pd", 174, 188, "ner", 0.9],
+    ["PERSON", "pd", 236, 258, "ner", 0.85],
+    ["PERSON", "pd", 286, 316, "ner", 0.85],
+    ["PERSON", "pd", 365, 388, "ner", 0.85],
+    ["PHONE", "pd", 395, 411, "regex", 0.9]
+  ],
+  "seed/06_kp_sebestoimost.txt": [
+    ["TRADE_SECRET", "trade_secret", 140, 196, "dict", 0.9],
+    ["TRADE_SECRET", "trade_secret", 197, 208, "dict", 0.9],
+    ["TRADE_SECRET", "trade_secret", 287, 332, "dict", 0.9],
+    ["TRADE_SECRET", "trade_secret", 334, 350, "dict", 0.9],
+    ["PERSON", "pd", 386, 409, "ner", 0.85],
+    ["EMAIL", "pd", 411, 433, "regex", 0.95]
+  ],
+  "seed/07_cena_kontrakta.txt": [],
+  "seed/08_tz_bez_pdn.txt": [],
+  "seed/09_protokol.txt": [
+    ["PERSON", "pd", 97, 120, "ner", 0.85],
+    ["PERSON", "pd", 139, 152, "ner", 0.9],
+    ["PERSON", "pd", 154, 169, "ner", 0.9],
+    ["PERSON", "pd", 191, 218, "ner", 0.85],
+    ["PERSON", "pd", 342, 352, "ner", 0.9],
+    ["INN", "pd", 358, 370, "regex", 0.98],
+    ["PERSON", "pd", 446, 468, "ner", 0.9]
+  ],
+  "seed/10_spravka_sotrudnik.txt": [
+    ["PERSON", "pd", 15, 43, "ner", 0.85],
+    ["BIRTH_DATE", "pd", 45, 55, "regex", 0.95],
+    ["SPECIAL_CATEGORY", "pd_special", 217, 239, "dict", 0.8],
+    ["CARD", "pd", 281, 300, "regex", 0.98],
+    ["PERSON", "pd", 378, 391, "ner", 0.9],
+    ["PHONE", "pd", 398, 413, "regex", 0.85]
+  ],
+  "seed/11_doverennost.txt": [
+    ["PERSON", "pd", 124, 140, "ner", 0.9],
+    ["PERSON", "pd", 156, 180, "ner", 0.85],
+    ["BIRTH_DATE", "pd", 182, 192, "regex", 0.95],
+    ["PASSPORT", "pd", 216, 228, "regex", 0.95],
+    ["ADDRESS", "pd", 310, 350, "ner", 0.8]
+  ],
+  "seed/12_kalkulyaciya.txt": [
+    ["TRADE_SECRET", "trade_secret", 68, 114, "dict", 0.9],
+    ["TRADE_SECRET", "trade_secret", 116, 138, "dict", 0.92],
+    ["TRADE_SECRET", "trade_secret", 140, 164, "dict", 0.92],
+    ["TRADE_SECRET", "trade_secret", 176, 202, "dict", 0.9],
+    ["TRADE_SECRET", "trade_secret", 204, 258, "dict", 0.9],
+    ["TRADE_SECRET", "trade_secret", 286, 356, "dict", 0.9]
+  ],
+  "seed/13_pismo_skidki.txt": [
+    ["PERSON", "pd", 0, 26, "ner", 0.85],
+    ["TRADE_SECRET", "trade_secret", 78, 103, "dict", 0.9],
+    ["TRADE_SECRET", "trade_secret", 132, 153, "dict", 0.9],
+    ["TRADE_SECRET", "trade_secret", 224, 238, "dict", 0.9],
+    ["PERSON", "pd", 360, 376, "ner", 0.85],
+    ["PHONE", "pd", 382, 398, "regex", 0.9]
+  ],
+  "seed/14_akt_priemki.txt": [
+    ["PERSON", "pd", 99, 128, "ner", 0.85],
+    ["PERSON", "pd", 194, 217, "ner", 0.85]
+  ],
+  "seed/15_reestr_vyplat.txt": [
+    ["PERSON", "pd", 54, 80, "ner", 0.85],
+    ["SNILS", "pd", 88, 102, "regex", 0.98],
+    ["BANK_ACCOUNT", "pd", 109, 129, "regex", 0.8],
+    ["PERSON", "pd", 150, 175, "ner", 0.85],
+    ["SNILS", "pd", 183, 197, "regex", 0.98],
+    ["BANK_ACCOUNT", "pd", 204, 224, "regex", 0.8],
+    ["PERSON", "pd", 245, 265, "ner", 0.85],
+    ["SNILS", "pd", 273, 287, "regex", 0.98],
+    ["BANK_ACCOUNT", "pd", 294, 314, "regex", 0.98]
+  ],
+  "seed/16_pismo_email.txt": [
+    ["PERSON", "pd", 4, 16, "ner", 0.85],
+    ["EMAIL", "pd", 18, 38, "regex", 0.95],
+    ["EMAIL", "pd", 72, 99, "regex", 0.95],
+    ["PHONE", "pd", 189, 204, "regex", 0.9]
+  ],
+  "seed/17_fin_polozhenie.txt": [
+    ["FINANCIAL", "financial", 64, 100, "dict", 0.9],
+    ["FINANCIAL", "financial", 101, 143, "dict", 0.9],
+    ["FINANCIAL", "financial", 144, 200, "dict", 0.9],
+    ["FINANCIAL", "financial", 262, 282, "dict", 0.95],
+    ["PERSON", "pd", 320, 331, "ner", 0.9]
+  ],
+  "seed/18_noy_hau.txt": [
+    ["TRADE_SECRET", "trade_secret", 104, 195, "dict", 0.75]
+  ],
+  "seed/19_dogovor_arendy.txt": [
+    ["PERSON", "pd", 54, 77, "ner", 0.85],
+    ["BIRTH_DATE", "pd", 93, 103, "regex", 0.95],
+    ["PASSPORT", "pd", 119, 133, "regex", 0.95],
+    ["INN", "pd", 139, 151, "regex", 0.98],
+    ["SNILS", "pd", 159, 173, "regex", 0.98],
+    ["ADDRESS", "pd", 198, 224, "ner", 0.8],
+    ["BANK_ACCOUNT", "pd", 381, 401, "regex", 0.98]
+  ],
+  "seed/20_zhaloba_fas.txt": [
+    ["PERSON", "pd", 47, 69, "ner", 0.85],
+    ["ADDRESS", "pd", 71, 117, "ner", 0.8],
+    ["PHONE", "pd", 124, 140, "regex", 0.9],
+    ["EMAIL", "pd", 142, 163, "regex", 0.95]
+  ],
+  "seed/21_kvalifikaciya.txt": [
+    ["PERSON", "pd", 88, 110, "ner", 0.85],
+    ["PERSON", "pd", 186, 211, "ner", 0.85],
+    ["PERSON", "pd", 246, 255, "ner", 0.85],
+    ["SPECIAL_CATEGORY", "pd_special", 303, 349, "dict", 0.8],
+    ["PHONE", "pd", 375, 391, "regex", 0.9]
+  ],
+  "seed/22_soveshchanie.txt": [
+    ["TRADE_SECRET", "trade_secret", 89, 137, "dict", 0.9],
+    ["TRADE_SECRET", "trade_secret", 150, 193, "dict", 0.9],
+    ["TRADE_SECRET", "trade_secret", 221, 268, "dict", 0.9],
+    ["TRADE_SECRET", "trade_secret", 304, 341, "dict", 0.9],
+    ["PERSON", "pd", 380, 391, "ner", 0.9]
+  ],
+  "seed/23_soglasie_pdn.txt": [
+    ["PERSON", "pd", 45, 68, "ner", 0.85],
+    ["PASSPORT", "pd", 78, 89, "regex", 0.95],
+    ["ADDRESS", "pd", 120, 163, "ner", 0.8],
+    ["PHONE", "pd", 410, 428, "regex", 0.9],
+    ["EMAIL", "pd", 449, 471, "regex", 0.95],
+    ["PERSON", "pd", 508, 521, "ner", 0.9]
+  ],
+  "seed/24_vozvrat_obespecheniya.txt": [
+    ["CARD", "pd", 149, 168, "regex", 0.98],
+    ["PERSON", "pd", 180, 194, "ner", 0.9],
+    ["PERSON", "pd", 207, 230, "ner", 0.85],
+    ["INN", "pd", 236, 248, "regex", 0.98],
+    ["PHONE", "pd", 255, 271, "regex", 0.9]
+  ],
+  "seed/25_kontakty_postavshchika.txt": [
+    ["PERSON", "pd", 291, 316, "ner", 0.85],
+    ["PHONE", "pd", 323, 339, "regex", 0.9],
+    ["EMAIL", "pd", 341, 368, "regex", 0.95],
+    ["FINANCIAL", "financial", 384, 404, "dict", 0.95]
+  ],
+  "seed/26_dopusk_personala.txt": [
+    ["PERSON", "pd", 155, 179, "ner", 0.85],
+    ["SPECIAL_CATEGORY", "pd_special", 192, 275, "dict", 0.85],
+    ["PERSON", "pd", 280, 303, "ner", 0.85],
+    ["SPECIAL_CATEGORY", "pd_special", 323, 383, "dict", 0.8],
+    ["SPECIAL_CATEGORY", "pd_special", 410, 460, "dict", 0.85],
+    ["PERSON", "pd", 465, 491, "ner", 0.85],
+    ["SPECIAL_CATEGORY", "pd_special", 509, 576, "dict", 0.8],
+    ["PHONE", "pd", 693, 709, "regex", 0.9]
+  ],
+  "seed/27_anketa_komissiya.txt": [
+    ["PERSON", "pd", 51, 77, "ner", 0.85],
+    ["BIRTH_DATE", "pd", 93, 103, "regex", 0.95],
+    ["SPECIAL_CATEGORY", "pd_special", 120, 127, "dict", 0.8],
+    ["SPECIAL_CATEGORY", "pd_special", 150, 209, "dict", 0.8],
+    ["SPECIAL_CATEGORY", "pd_special", 233, 267, "dict", 0.8],
+    ["SPECIAL_CATEGORY", "pd_special", 300, 331, "dict", 0.8],
+    ["SPECIAL_CATEGORY", "pd_special", 359, 402, "dict", 0.85],
+    ["PHONE", "pd", 656, 673, "regex", 0.9]
+  ],
+  "seed/28_kalkulyaciya_lot3.txt": [
+    ["TRADE_SECRET", "trade_secret", 109, 130, "dict", 0.92],
+    ["TRADE_SECRET", "trade_secret", 132, 156, "dict", 0.92],
+    ["TRADE_SECRET", "trade_secret", 158, 186, "dict", 0.92],
+    ["TRADE_SECRET", "trade_secret", 188, 206, "dict", 0.92],
+    ["TRADE_SECRET", "trade_secret", 216, 254, "dict", 0.9],
+    ["TRADE_SECRET", "trade_secret", 285, 336, "dict", 0.9]
+  ],
+  "seed/29_tehnologiya_ip.txt": [
+    ["PERSON", "pd", 107, 130, "ner", 0.9],
+    ["INN", "pd", 136, 148, "regex", 0.98],
+    ["BANK_ACCOUNT", "pd", 193, 213, "regex", 0.98],
+    ["TRADE_SECRET", "trade_secret", 271, 391, "dict", 0.75],
+    ["FINANCIAL", "financial", 663, 683, "dict", 0.95]
+  ],
+  "seed/30_informacionnoe_pismo.txt": [
+    ["PERSON", "pd", 465, 487, "ner", 0.85],
+    ["PHONE", "pd", 494, 510, "regex", 0.9],
+    ["EMAIL", "pd", 512, 534, "regex", 0.95],
+    ["PERSON", "pd", 547, 559, "ner", 0.9],
+    ["PHONE", "pd", 566, 582, "regex", 0.9]
+  ],
+  "seed/31_poyasnitelnaya_zapiska.txt": [
+    ["FINANCIAL", "financial", 71, 117, "dict", 0.9],
+    ["FINANCIAL", "financial", 118, 159, "dict", 0.9],
+    ["FINANCIAL", "financial", 299, 354, "dict", 0.9],
+    ["PERSON", "pd", 447, 476, "ner", 0.85],
+    ["PHONE", "pd", 483, 501, "regex", 0.9]
+  ]
+}
