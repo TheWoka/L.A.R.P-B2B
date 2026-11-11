@@ -319,8 +319,9 @@ button, input, textarea { font: inherit; }
 .scan-corpus-picker .ant-radio-button-wrapper:focus-within { outline:2px solid #087ff5; outline-offset:3px; }
 @media (max-width:600px) {
  .quality-page .ant-tabs-nav-list { flex-wrap:wrap; }
- .quality-page .ant-tabs-tab { flex:1 1 45%; }
- .quality-page .ant-tabs-tab-btn { white-space:normal; text-align:center; }
+ .quality-page .upload-tabs .ant-tabs-tab { flex:1 1 45%; margin:0; }
+ .quality-page .upload-tabs .ant-tabs-tab:last-child { flex-basis:100%; }
+ .quality-page .upload-tabs .ant-tabs-tab-btn { white-space:normal; overflow-wrap:normal; text-align:center; }
  .scan-corpus-picker .ant-radio-button-wrapper { flex:1; padding:8px; line-height:1.4; text-align:center; }
 }
 @media print { .ocr-notice { display:block !important; break-inside:avoid; } .ocr-uncertain { text-decoration:underline dotted #8a5800; } }
