@@ -29,7 +29,7 @@ FORMULAS = (
     "В таблице формулы без сохранённых значений. Откройте файл в Excel и сохраните его."
 )
 SCAN = (
-    "Документ похож на скан: текст не распознаётся. Загрузите документ с текстовым слоем."
+    "Не удалось распознать текст скана. Загрузите более чёткий документ."
 )
 
 
@@ -100,7 +100,7 @@ def test_file_failure_via_api_and_worker(
     ("private.docx", b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1", None),
     ("private.xlsx", b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1", None),
     ("renamed.pdf", b"Synthetic text file", "Формат файла не поддерживается. "
-     "Загрузите .pdf, .docx, .xlsx или .xml"),
+     "Загрузите .pdf, .docx, .xlsx, .xml, .png, .jpg, .jpeg, .tif или .tiff"),
 ])
 def test_rejected_upload(
     client: TestClient, api_db: tuple[Session, Mock], tmp_path: Path,

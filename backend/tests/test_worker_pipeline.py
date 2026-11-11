@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, Mock
 
 import pytest
 from docx import Document
+from PIL import Image
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
@@ -18,7 +19,71 @@ from app.services import pipeline
 from app.services.extraction.extract import extract
 from app.services.pipeline import AuditResult
 from app.worker import tasks
+from tests.test_extraction_ocr import contact_image as contact_image
+from tests.test_extraction_ocr import image_pdf, make_line, mixed_image_pdf
 from tests.test_pipeline import NAME, TEXT, make_report
+
+
+def test_ocr_pipeline_progress_report_and_no_redaction(
+    session: Session, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.services.extraction import pdf
+
+    path = tmp_path / "scan.pdf"
+    image_pdf(path, Image.new("RGB", (100, 100), "white"), 2)
+    task = create_task(session, path, path.name)
+    monkeypatch.setattr(pdf, "ocr_image", lambda image: [make_line(("Синтетический", 0.5))])
+    redact = Mock(side_effect=AssertionError("OCR redaction belongs to T-072"))
+    monkeypatch.setattr(tasks, "redact", redact)
+    stages: list[tuple[str, int]] = []
+    original_extract = tasks.extract
+
+    def checked_extract(source: Path, filename: str, document_id: str) -> ExtractedDocument:
+        from app.services.extraction.ocr import ocr_progress
+
+        def progress(done: int, total: int) -> None:
+            # Вызываем установленный воркером колбэк и наблюдаем сохранённую стадию.
+            worker_callback(done, total)
+            with Session(session.bind) as observer:
+                row = observer.get(TaskRow, task.id)
+                stages.append((row.stage, row.progress))
+
+        from app.services.extraction.ocr import _progress
+        worker_callback = _progress.get()
+        assert worker_callback is not None
+        with ocr_progress(progress):
+            return original_extract(source, filename, document_id)
+
+    monkeypatch.setattr(tasks, "extract", checked_extract)
+    tasks.run_pipeline(task.id, session)
+    assert task.status == "done" and task.error is None
+    assert stages == [("extracting", 19), ("extracting", 29)]
+    row = session.get(ReportRow, task.report_id)
+    report = Report.model_validate(row.data)
+    assert report.ocr is not None and [page.page for page in report.ocr.pages] == [1, 2]
+    assert not report.redacted_available and row.redacted is None
+    redact.assert_not_called()
+    assert not path.exists()
+
+
+def test_mixed_page_pipeline_never_returns_redacted_copy(
+    session: Session, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    contact_image: Image.Image,
+) -> None:
+    path = tmp_path / "mixed-scan.pdf"
+    mixed_image_pdf(path, contact_image)
+    task = create_task(session, path, path.name)
+    redact = Mock(side_effect=AssertionError("Image redaction belongs to T-072"))
+    monkeypatch.setattr(tasks, "redact", redact)
+    tasks.run_pipeline(task.id, session)
+    assert task.status == "done" and task.error is None
+    row = session.get(ReportRow, task.report_id)
+    report = Report.model_validate(row.data)
+    assert report.ocr is not None and [page.page for page in report.ocr.pages] == [1]
+    assert {entity.type.value for entity in report.entities} >= {"PERSON", "PHONE"}
+    assert not report.redacted_available and row.redacted is None
+    redact.assert_not_called()
+    assert not path.exists()
 
 
 @pytest.fixture(autouse=True)

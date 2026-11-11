@@ -17,7 +17,10 @@ from app.services.storage import delete_file, save_text, save_upload
 from app.worker.tasks import process_document
 
 router = APIRouter(tags=["documents"])
-UNSUPPORTED_FORMAT = "Формат файла не поддерживается. Загрузите .pdf, .docx, .xlsx или .xml"
+UNSUPPORTED_FORMAT = (
+    "Формат файла не поддерживается. "
+    "Загрузите .pdf, .docx, .xlsx, .xml, .png, .jpg, .jpeg, .tif или .tiff"
+)
 DbSession = Annotated[Session, Depends(get_db)]
 UTF8_BOM = b"\xef\xbb\xbf"
 XML_HEAD_BYTES = 64
@@ -87,7 +90,9 @@ def check_batch_capacity(session: Session, batch_id: str) -> None:
     summary="Загрузить документ на проверку",
 )
 def upload_document(
-    file: Annotated[UploadFile, File(description=".pdf, .docx, .xlsx или .xml, до 50 МБ")],
+    file: Annotated[UploadFile, File(
+        description=".pdf, .docx, .xlsx, .xml, .png, .jpg, .jpeg, .tif или .tiff, до 50 МБ",
+    )],
     purpose: Annotated[DocPurpose, Form(description="Назначение документа")],
     session: DbSession,
     llm_mode: Annotated[
@@ -100,7 +105,11 @@ def upload_document(
     if batch_id is not None:
         check_batch_capacity(session, batch_id)
     extension = Path(file.filename or "").suffix.lower()
-    signatures = {".pdf": b"%PDF", ".docx": b"PK\x03\x04", ".xlsx": b"PK\x03\x04"}
+    signatures = {
+        ".pdf": (b"%PDF",), ".docx": (b"PK\x03\x04",), ".xlsx": (b"PK\x03\x04",),
+        ".png": (b"\x89PNG",), ".jpg": (b"\xff\xd8\xff",), ".jpeg": (b"\xff\xd8\xff",),
+        ".tif": (b"II*\x00", b"MM\x00*"), ".tiff": (b"II*\x00", b"MM\x00*"),
+    }
     signature = file.file.read(4)
     file.file.seek(0)
     if not signature:
@@ -113,7 +122,7 @@ def upload_document(
     if extension == ".xml":
         if not looks_like_xml(file.file):
             raise HTTPException(status_code=400, detail=UNSUPPORTED_FORMAT)
-    elif extension not in signatures or signature != signatures[extension]:
+    elif extension not in signatures or not signature.startswith(signatures[extension]):
         raise HTTPException(status_code=400, detail=UNSUPPORTED_FORMAT)
     document_id = uuid4().hex
     try:

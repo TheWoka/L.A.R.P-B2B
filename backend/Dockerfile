@@ -11,7 +11,9 @@ WORKDIR /app
 # requirements-dev (pytest, ruff) ставим тоже, чтобы работала команда
 # `docker-compose exec api pytest` из AGENTS.md.
 COPY requirements.txt requirements-dev.txt ./
-RUN pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt
+RUN apt-get update && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-rus \
+    fonts-dejavu-core && rm -rf /var/lib/apt/lists/*
+RUN pip install --no-cache-dir --timeout 120 -r requirements.txt -r requirements-dev.txt
 
 # Непривилегированный пользователь. Папку /data/uploads создаём заранее,
 # чтобы именованный том унаследовал владельца appuser.
