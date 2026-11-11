@@ -16,12 +16,7 @@ from app.services.llm import modes
 from app.services.llm.client import use_llm_mode
 from app.services.pipeline import run_audit
 from app.services.redaction.check import count_leftovers
-from app.services.redaction.redact import (
-    RedactedFile,
-    ocr_page_count,
-    redact,
-    scan_copy_allowed,
-)
+from app.services.redaction.redact import RedactedFile, redact
 from app.services.retention import purge_expired
 from app.services.rules import repository
 from app.services.storage import delete_file
@@ -62,12 +57,12 @@ def make_redacted_copy(
     Любая ошибка не ломает проверку. Копия, в которой самопроверка повторным
     извлечением находит исходное значение ПДн, не отдаётся. В лог — только тип
     исключения, формат и число оставшихся значений (AGENTS.md, правило 4).
-    Скан больше OCR_REDACT_MAX_PAGES страниц OCR — копию не делаем (T-072): ещё два
-    прохода OCR (копия и её самопроверка) надолго заняли бы воркер.
     """
     if not scan_copy_allowed(doc):
         logger.info("task_id=%s копия скана пропущена: %d страниц", task_id, ocr_page_count(doc))
         return None
+    if doc.ocr is not None:
+        return None  # Обезличивание пикселей — T-072.
     try:
         redacted = redact(source, doc, entities)
         remaining = count_leftovers(redacted, doc, entities)
