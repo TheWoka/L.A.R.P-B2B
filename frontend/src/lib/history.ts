@@ -1,11 +1,13 @@
-import type { DocPurpose, Overall, Report } from "../api/types";
+import type { BatchSummary, DocPurpose, Overall, Report } from "../api/types";
 
 export interface HistoryItem {
   report_id: string;
-  kind: "file" | "text";
+  kind: "file" | "text" | "batch";
+  name?: string;
+  documents?: number;
   ext: string | null;
   purpose: DocPurpose;
-  overall: Overall;
+  overall: Overall | null;
   created_at: string;
   red: number;
   yellow: number;
@@ -19,11 +21,12 @@ function isHistoryItem(value: unknown): value is HistoryItem {
   if (typeof value !== "object" || value === null) return false;
   const item = value as Record<string, unknown>;
   return typeof item.report_id === "string" && item.report_id.length > 0
-    && (item.kind === "file" || item.kind === "text")
+    && (item.kind === "file" || item.kind === "text" || item.kind === "batch")
+    && (item.kind !== "batch" || (typeof item.name === "string" && item.name.length <= 120 && typeof item.documents === "number" && Number.isSafeInteger(item.documents) && item.documents >= 0))
     && (item.ext === null || item.ext === ".docx" || item.ext === ".pdf" || item.ext === ".xlsx")
     && (item.kind !== "text" || item.ext === null)
     && (item.purpose === "internal" || item.purpose === "publication" || item.purpose === "contract" || item.purpose === "international")
-    && (item.overall === "red" || item.overall === "yellow" || item.overall === "green")
+    && (item.overall === "red" || item.overall === "yellow" || item.overall === "green" || (item.kind === "batch" && item.overall === null))
     && typeof item.created_at === "string" && Number.isFinite(Date.parse(item.created_at))
     && typeof item.red === "number" && Number.isSafeInteger(item.red) && item.red >= 0
     && typeof item.yellow === "number" && Number.isSafeInteger(item.yellow) && item.yellow >= 0;
@@ -39,8 +42,8 @@ export function listHistory(): HistoryItem[] {
       if (seen.has(item.report_id)) return false;
       seen.add(item.report_id);
       return true;
-    }).slice(0, MAX_ITEMS).map(({ report_id, kind, ext, purpose, overall, created_at, red, yellow }) => (
-      { report_id, kind, ext, purpose, overall, created_at, red, yellow }
+    }).slice(0, MAX_ITEMS).map(({ report_id, kind, ext, purpose, overall, created_at, red, yellow, name, documents }) => (
+      { report_id, kind, ext, purpose, overall, created_at, red, yellow, ...(kind === "batch" ? { name, documents } : {}) }
     ));
   } catch {
     return [];
@@ -84,4 +87,14 @@ export function clearHistory(): void {
   } catch {
     storageUnavailable = true;
   }
+}
+
+export function addBatchToHistory(summary: BatchSummary): void {
+  const item: HistoryItem = {
+    report_id: summary.batch_id, kind: "batch", ext: null,
+    name: (summary.name || "Комплект документов").slice(0, 120), documents: summary.documents_total,
+    purpose: summary.purpose, overall: summary.overall, created_at: summary.created_at,
+    red: summary.violations_red, yellow: summary.violations_yellow,
+  };
+  saveHistory([item, ...listHistory().filter((entry) => entry.report_id !== item.report_id)].slice(0, MAX_ITEMS));
 }

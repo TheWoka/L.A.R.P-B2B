@@ -14,7 +14,7 @@ test("accepts supported files and rejects empty, oversized and unsupported files
   assert.equal(validateBatchFile({ name: "report.PDF", size: 120 }), null);
   assert.equal(validateBatchFile({ name: "report.pdf", size: 0 }), "Файл пустой");
   assert.equal(validateBatchFile({ name: "report.docx", size: 50 * 1024 * 1024 + 1 }), "Файл больше 50 МБ");
-  assert.equal(validateBatchFile({ name: "report.exe", size: 12 }), "Поддерживаются PDF, DOCX, XLSX или XML");
+  assert.equal(validateBatchFile({ name: "report.exe", size: 12 }), "Поддерживаются PDF, DOCX, XLSX, XML или изображение скана (PNG, JPG, TIFF)");
 });
 
 test("reads unique task ids and ignores malformed links", () => {
@@ -44,4 +44,21 @@ test("uses its own purpose for every file when a function is given", async () =>
     return { task_id: file.name, document_id: "doc" };
   });
   assert.deepEqual(seen, [["a.pdf", "contract"], ["b.xml", "publication"]]);
+});
+
+
+test("accepts scans and propagates the batch id on every upload", async () => {
+  for (const ext of ["png", "JPG", "jpeg", "tif", "tiff", "xml"]) {
+    assert.equal(validateBatchFile({name: `synthetic.${ext}`, size: 100}), null);
+  }
+  const optionsSeen = [];
+  await submitBatchFiles([{name: "a.pdf"}, {name: "b.png"}], "internal", async (_file, _purpose, options) => {
+    optionsSeen.push(options);
+    return {task_id: String(optionsSeen.length), document_id: "doc"};
+  }, "batch-123");
+  assert.deepEqual(optionsSeen, [{batchId: "batch-123"}, {batchId: "batch-123"}]);
+});
+
+test("limits legacy task links to twenty unique valid ids", () => {
+  assert.equal(parseBatchTasks("?tasks=" + Array.from({length: 25}, (_, i) => `task-${i}`).join(",")).length, 20);
 });

@@ -1,8 +1,8 @@
 import type { DocPurpose, TaskCreated } from "../api/types";
 
-export const MAX_BATCH_FILES = 10;
+export const MAX_BATCH_FILES = 20;
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
-const EXTENSIONS = [".pdf", ".docx", ".xlsx", ".xml"];
+export const EXTENSIONS = [".pdf", ".docx", ".xlsx", ".xml", ".png", ".jpg", ".jpeg", ".tif", ".tiff"];
 
 export function documentCountLabel(count: number): string {
   const lastTwo = count % 100;
@@ -12,7 +12,7 @@ export function documentCountLabel(count: number): string {
 }
 
 export function validateBatchFile(file: Pick<File, "name" | "size">): string | null {
-  if (!EXTENSIONS.some((extension) => file.name.toLowerCase().endsWith(extension))) return "Поддерживаются PDF, DOCX, XLSX или XML";
+  if (!EXTENSIONS.some((extension) => file.name.toLowerCase().endsWith(extension))) return "Поддерживаются PDF, DOCX, XLSX, XML или изображение скана (PNG, JPG, TIFF)";
   if (file.size === 0) return "Файл пустой";
   if (file.size > MAX_FILE_SIZE) return "Файл больше 50 МБ";
   return null;
@@ -27,13 +27,14 @@ export function parseBatchTasks(search: string): string[] {
 export async function submitBatchFiles(
   files: File[],
   purpose: DocPurpose | ((file: File, index: number) => DocPurpose),
-  upload: (file: File, purpose: DocPurpose) => Promise<TaskCreated>,
+  upload: (file: File, purpose: DocPurpose, options?: { batchId?: string }) => Promise<TaskCreated>,
+  batchId?: string,
 ): Promise<{ created: { id: string; name: string }[]; failed: { name: string; reason: string }[] }> {
   const created: { id: string; name: string }[] = [];
   const failed: { name: string; reason: string }[] = [];
   for (const [index, file] of files.entries()) {
     try {
-      const task = await upload(file, typeof purpose === "function" ? purpose(file, index) : purpose);
+      const task = await upload(file, typeof purpose === "function" ? purpose(file, index) : purpose, { batchId });
       created.push({ id: task.task_id, name: file.name });
     } catch (error: unknown) {
       failed.push({ name: file.name, reason: error instanceof Error ? error.message : "Не удалось отправить файл" });

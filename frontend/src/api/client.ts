@@ -2,6 +2,7 @@
 // В dev их проксирует Vite, в docker-compose — nginx.
 
 import type {
+  BatchCreate, BatchCreated, BatchSummary, LlmMode,
   DocPurpose,
   LlmCall,
   Metrics,
@@ -58,11 +59,25 @@ function jsonInit(method: string, body: unknown): RequestInit {
   };
 }
 
-export function uploadDocument(file: File, purpose: DocPurpose): Promise<TaskCreated> {
+export function uploadDocument(file: File, purpose: DocPurpose, options?: { batchId?: string; llmMode?: LlmMode }): Promise<TaskCreated> {
   const form = new FormData();
   form.append("file", file);
   form.append("purpose", purpose);
+  if (options?.batchId) form.append("batch_id", options.batchId);
+  if (options?.llmMode) form.append("llm_mode", options.llmMode);
   return request<TaskCreated>("/documents", { method: "POST", body: form });
+}
+
+export function createBatch(body: BatchCreate): Promise<BatchCreated> {
+  return request<BatchCreated>("/batches", jsonInit("POST", body));
+}
+
+export function getBatch(id: string): Promise<BatchSummary> {
+  return request<BatchSummary>(`/batches/${encodeURIComponent(id)}`);
+}
+
+export function batchExportUrl(id: string, format: "pdf" | "md" | "json"): string {
+  return `${BASE_URL}/batches/${encodeURIComponent(id)}/export?format=${format}`;
 }
 
 export function submitQuery(query: QueryRequest): Promise<TaskCreated> {
