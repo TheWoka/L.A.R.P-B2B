@@ -35,6 +35,9 @@ class DocumentRow(Base):
     filename: Mapped[str | None] = mapped_column(String(255))  # None для текстового запроса
     purpose: Mapped[str] = mapped_column(String(32))
     stored_path: Mapped[str | None] = mapped_column(Text)
+    # Режим нейросети проверки (контракт v3, T-073): mock / local / cloud.
+    # None — документ загружен до T-073, воркер берёт режим по умолчанию.
+    llm_mode: Mapped[str | None] = mapped_column(String(8))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

@@ -7,10 +7,11 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
+from app.api.llm import resolve_requested_mode
 from app.core.config import get_settings
 from app.db.models import DocumentRow, TaskRow
 from app.db.session import get_db
-from app.schemas import DocPurpose, QueryRequest, TaskCreated
+from app.schemas import DocPurpose, LlmMode, QueryRequest, TaskCreated
 from app.services.storage import delete_file, save_text, save_upload
 from app.worker.tasks import process_document
 
@@ -35,12 +36,14 @@ def looks_like_xml(stream: BinaryIO) -> bool:
 
 def enqueue_document(
     session: Session, document_id: str, filename: str | None, purpose: DocPurpose, path: Path,
+    llm_mode: LlmMode | None = None,
 ) -> TaskCreated:
     """Фиксирует документ и задачу до отправки идентификатора воркеру."""
     task_id = uuid4().hex
     try:
         session.add(DocumentRow(
             id=document_id, filename=filename, purpose=purpose.value, stored_path=str(path),
+            llm_mode=llm_mode,
         ))
         session.flush()
         session.add(TaskRow(id=task_id, document_id=document_id, status="queued"))
@@ -71,8 +74,12 @@ def upload_document(
     file: Annotated[UploadFile, File(description=".pdf, .docx, .xlsx или .xml, до 50 МБ")],
     purpose: Annotated[DocPurpose, Form(description="Назначение документа")],
     session: DbSession,
+    llm_mode: Annotated[
+        LlmMode | None, Form(description="Режим нейросети: mock, local или cloud")
+    ] = None,
 ) -> TaskCreated:
-    """Проверяет формат и размер, сохраняет файл и ставит проверку в очередь."""
+    """Проверяет формат, размер и режим нейросети, сохраняет файл и ставит проверку в очередь."""
+    mode = resolve_requested_mode(llm_mode)
     extension = Path(file.filename or "").suffix.lower()
     signatures = {".pdf": b"%PDF", ".docx": b"PK\x03\x04", ".xlsx": b"PK\x03\x04"}
     signature = file.file.read(4)
@@ -94,7 +101,7 @@ def upload_document(
         path = save_upload(file, document_id, get_settings().max_upload_mb * 1024 * 1024)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from None
-    return enqueue_document(session, document_id, file.filename, purpose, path)
+    return enqueue_document(session, document_id, file.filename, purpose, path, mode)
 
 
 @router.post(
@@ -102,7 +109,8 @@ def upload_document(
     summary="Проверить текст без файла",
 )
 def submit_query(body: QueryRequest, session: DbSession) -> TaskCreated:
-    """Сохраняет текст запроса и ставит проверку в очередь."""
+    """Проверяет режим нейросети, сохраняет текст запроса и ставит проверку в очередь."""
+    mode = resolve_requested_mode(body.llm_mode)
     document_id = uuid4().hex
     path = save_text(body.text, document_id)
-    return enqueue_document(session, document_id, None, body.purpose, path)
+    return enqueue_document(session, document_id, None, body.purpose, path, mode)

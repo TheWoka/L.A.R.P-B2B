@@ -10,7 +10,6 @@ from time import monotonic
 
 import yaml
 
-from app.core.config import get_settings
 from app.core.version import APP_VERSION
 from app.schemas import (
     AuditInfo,
@@ -72,11 +71,13 @@ def build_audit(
     T-013e: если нейросеть искала сущности в этом документе (в журнале есть запись КТ или
     особых категорий с отправленным текстом, в том числе из кэша) — в detectors "llm:<модель>".
     T-036b: если классификатор загружен — "model:grif-cls-<первые 8 hex md5 model.onnx>".
+    T-073: провайдер и модель — из эффективных настроек режима проверки, llm_mode — сам режим.
     """
     with _rules_path("dictionaries.yaml").open(encoding="utf-8") as stream:
         dictionaries = yaml.safe_load(stream)
-    enabled = client.is_llm_enabled()
-    model = get_settings().llm_model if enabled else None
+    settings = client.effective_settings()
+    enabled = client.is_llm_enabled(settings)
+    model = settings.llm_model if enabled else None
     detectors = ["regex", f"ner:natasha-{version('natasha')}", "dict"]
     model_version = model_detector.model_version()
     if model_version is not None:
@@ -96,6 +97,7 @@ def build_audit(
         llm_provider="openai_compatible" if enabled else "mock",
         llm_model=model,
         llm_calls=budget.used,
+        llm_mode=client.current_mode(),
     )
 
 

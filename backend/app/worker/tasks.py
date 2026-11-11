@@ -9,8 +9,10 @@ from sqlalchemy.orm import Session
 
 from app.db.models import DocumentRow, ReportRow, TaskRow
 from app.db.session import SessionLocal
-from app.schemas import DocPurpose, Entity, ExtractedDocument, Stage, TextSegment
+from app.schemas import DocPurpose, Entity, ExtractedDocument, LlmMode, Stage, TextSegment
 from app.services.extraction.extract import extract
+from app.services.llm import modes
+from app.services.llm.client import use_llm_mode
 from app.services.pipeline import run_audit
 from app.services.redaction.check import count_leftovers
 from app.services.redaction.redact import RedactedFile, redact
@@ -73,6 +75,26 @@ def make_redacted_copy(
     return redacted
 
 
+def document_llm_mode(document: DocumentRow) -> LlmMode:
+    """Режим из документа; у документов до T-073 (None) или с мусором — режим по умолчанию."""
+    if document.llm_mode in modes.ALL_MODES:
+        return document.llm_mode  # type: ignore[return-value]
+    return modes.default_mode()
+
+
+def llm_mode_available(mode: LlmMode, task_id: str) -> bool:
+    """Доступен ли режим в момент обработки. Ошибка проверки — «недоступен», не падение."""
+    try:
+        available = modes.mode_info(mode).available
+    except Exception as exc:
+        logger.warning("task_id=%s llm mode check failed: %s", task_id, type(exc).__name__)
+        available = False
+    if not available:
+        # Только имя режима: причина может содержать адрес сервера (AGENTS.md, правила 3–4).
+        logger.warning("task_id=%s режим %s недоступен", task_id, mode)
+    return available
+
+
 def _audit_document(document: DocumentRow, task: TaskRow, session: Session, started: float) -> None:
     """Запускает проверку, фиксирует стадии и сохраняет только безопасный результат."""
     def on_stage(stage: Stage, progress: int) -> None:
@@ -90,7 +112,10 @@ def _audit_document(document: DocumentRow, task: TaskRow, session: Session, star
     if document.filename is None:
         source_bytes = doc.text.encode("utf-8")
     rules = repository.list_rules(session)
-    result = run_audit(doc, DocPurpose(document.purpose), source_bytes, on_stage, rules=rules)
+    mode = document_llm_mode(document)
+    # T-073: вся проверка — в режиме документа; недоступный режим → LLM-шаги дают unknown.
+    with use_llm_mode(mode, available=llm_mode_available(mode, task.id)):
+        result = run_audit(doc, DocPurpose(document.purpose), source_bytes, on_stage, rules=rules)
     report, report_text = result.report, result.report_text
     redacted = make_redacted_copy(Path(document.stored_path), doc, report.entities, task.id)
     if redacted is not None:
