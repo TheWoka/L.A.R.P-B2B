@@ -3,6 +3,7 @@ import { Alert, Button, Card, Collapse, Descriptions, Skeleton, Space, Tag, Typo
 
 import { getLlmLog } from "../api/client";
 import type { LlmCall, Report } from "../api/types";
+import { LABELS } from "../lib/llmMode";
 import { detectorLabel, llmPurposeTitle, LLM_VERDICT_LABELS } from "./labels";
 
 interface Props {
@@ -112,6 +113,7 @@ export default function TransparencyPanel({ report, example = false }: Props) {
         </Typography.Text>
       ) : "Не указаны",
     },
+    { key: "llm-mode", label: "Режим нейросети", children: LABELS[audit.llm_mode ?? "mock"] },
     { key: "llm", label: "Генеративная нейросеть (LLM)", children: audit.llm_provider === "mock" ? "Не использовалась" : audit.llm_model ?? "Модель не указана" },
     { key: "calls", label: "Вызовов генеративной нейросети", children: audit.llm_calls },
   ];

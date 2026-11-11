@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert, Button, Input, Radio, Select, Tabs, Typography, Upload } from "antd";
 import type { UploadFile, UploadProps } from "antd";
 import { Link, useNavigate } from "react-router-dom";
 
-import { ApiError, submitQuery, uploadDocument } from "../api/client";
-import type { DocPurpose } from "../api/types";
+import { ApiError, getLlmModes, submitQuery, uploadDocument } from "../api/client";
+import type { DocPurpose, LlmMode, LlmModeInfo } from "../api/types";
+import LlmModeSelect from "../components/LlmModeSelect";
 import { documentCountLabel, MAX_BATCH_FILES, submitBatchFiles, validateBatchFile } from "../lib/batch";
+import { loadSavedMode, MOCK_MODES, pickInitialMode, saveMode } from "../lib/llmMode";
 
 const MAX_TEXT_LENGTH = 200_000;
 
@@ -68,6 +70,30 @@ export default function UploadPage() {
   const [fileError, setFileError] = useState<string | null>(null);
   const [rejectedFiles, setRejectedFiles] = useState<RejectedFile[]>([]);
   const [queryError, setQueryError] = useState<string | null>(null);
+  const [llmMode, setLlmMode] = useState<LlmMode>("mock");
+  const [llmModes, setLlmModes] = useState<LlmModeInfo[]>(MOCK_MODES);
+  const [modesLoading, setModesLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    void getLlmModes().then((result) => {
+      if (!active) return;
+      setLlmModes(result.modes);
+      setLlmMode(pickInitialMode(result.modes, loadSavedMode(), result.default));
+    }).catch(() => {
+      if (!active) return;
+      setLlmModes(MOCK_MODES);
+      setLlmMode("mock");
+    }).finally(() => { if (active) setModesLoading(false); });
+    return () => { active = false; };
+  }, []);
+
+  function selectLlmMode(mode: LlmMode) {
+    setLlmMode(mode);
+    saveMode(mode);
+  }
+
+  const llmModeSelect = <LlmModeSelect modes={llmModes} value={llmMode} onChange={selectLlmMode} loading={modesLoading} disabled={uploading || submittingQuery} />;
 
   const beforeUpload: UploadProps["beforeUpload"] = (file) => {
     const validationError = validateBatchFile(file);
@@ -92,10 +118,10 @@ export default function UploadPage() {
     setUploading(true);
     try {
       if (files.length === 1) {
-        const task = await uploadDocument(files[0], purposeAt(files[0], 0));
+        const task = await uploadDocument(files[0], purposeAt(files[0], 0), llmMode);
         navigate(`/tasks/${encodeURIComponent(task.task_id)}`);
       } else {
-        const { created, failed } = await submitBatchFiles(files, purposeAt, uploadDocument);
+        const { created, failed } = await submitBatchFiles(files, purposeAt, (file, purpose) => uploadDocument(file, purpose, llmMode));
         if (failed.length > 0) setRejectedFiles((current) => [...current, ...failed.map((entry, index) => ({ ...entry, uid: `upload-failed-${index}-${entry.name}` }))]);
         if (created.length === 0) {
           setFileError("Не удалось отправить документы. Проверьте список ошибок и повторите попытку.");
@@ -128,7 +154,7 @@ export default function UploadPage() {
     setQueryError(null);
     setSubmittingQuery(true);
     try {
-      const task = await submitQuery({ text, purpose: queryPurpose });
+      const task = await submitQuery({ text, purpose: queryPurpose }, llmMode);
       navigate(`/tasks/${encodeURIComponent(task.task_id)}`);
     } catch (error: unknown) {
       setQueryError(errorMessage(error));
@@ -235,9 +261,10 @@ export default function UploadPage() {
           : "Это поможет применить нужные правила проверки."}</p>
         <PurposePicker value={filePurpose} onChange={(value) => { setFilePurpose(value); setPurposeByFile({}); }} />
       </section>
+      {llmModeSelect}
       <div className="form-actions">
         {fileError && <Alert type="error" showIcon title={fileError} className="form-error" />}
-        <Button type="primary" size="large" loading={uploading} disabled={uploading} onClick={() => { void handleUpload(); }}>
+        <Button type="primary" size="large" loading={uploading} disabled={uploading || modesLoading} onClick={() => { void handleUpload(); }}>
           {fileList.length > 1 ? `Проверить ${documentCountLabel(fileList.length)}` : "Начать проверку"}
         </Button>
         <Typography.Text type="secondary">
@@ -265,9 +292,10 @@ export default function UploadPage() {
         <p>Это поможет применить нужные правила проверки.</p>
         <PurposePicker value={queryPurpose} onChange={setQueryPurpose} />
       </section>
+      {llmModeSelect}
       <div className="form-actions">
         {queryError && <Alert type="error" showIcon title={queryError} className="form-error" />}
-        <Button type="primary" size="large" loading={submittingQuery} disabled={submittingQuery} onClick={() => { void handleSubmitQuery(); }}>
+        <Button type="primary" size="large" loading={submittingQuery} disabled={submittingQuery || modesLoading} onClick={() => { void handleSubmitQuery(); }}>
           Начать проверку
         </Button>
         <Typography.Text type="secondary">Персональные сведения скрываются до анализа</Typography.Text>

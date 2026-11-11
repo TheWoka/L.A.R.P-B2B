@@ -4,6 +4,8 @@
 import type {
   DocPurpose,
   LlmCall,
+  LlmMode,
+  LlmModesResponse,
   Metrics,
   QueryRequest,
   Report,
@@ -58,15 +60,20 @@ function jsonInit(method: string, body: unknown): RequestInit {
   };
 }
 
-export function uploadDocument(file: File, purpose: DocPurpose): Promise<TaskCreated> {
+export function uploadDocument(file: File, purpose: DocPurpose, llmMode?: LlmMode): Promise<TaskCreated> {
   const form = new FormData();
   form.append("file", file);
   form.append("purpose", purpose);
+  if (llmMode !== undefined) form.append("llm_mode", llmMode);
   return request<TaskCreated>("/documents", { method: "POST", body: form });
 }
 
-export function submitQuery(query: QueryRequest): Promise<TaskCreated> {
-  return request<TaskCreated>("/queries", jsonInit("POST", query));
+export function submitQuery(query: QueryRequest, llmMode?: LlmMode): Promise<TaskCreated> {
+  return request<TaskCreated>("/queries", jsonInit("POST", { ...query, llm_mode: llmMode ?? query.llm_mode }));
+}
+
+export function getLlmModes(): Promise<LlmModesResponse> {
+  return request<LlmModesResponse>("/llm/modes");
 }
 
 export function getTask(taskId: string): Promise<TaskInfo> {
