@@ -1,0 +1,54 @@
+{
+ "purpose": "scan",
+ "source": "07_sales_plan.txt",
+ "entities": [
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 118,
+   "end": 146
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 165,
+   "end": 208
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 233,
+   "end": 277
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 302,
+   "end": 348
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 373,
+   "end": 418
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 453,
+   "end": 506
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 524,
+   "end": 560
+  },
+  {
+   "type": "FINANCIAL",
+   "category": "financial",
+   "start": 667,
+   "end": 707
+  }
+ ]
+}

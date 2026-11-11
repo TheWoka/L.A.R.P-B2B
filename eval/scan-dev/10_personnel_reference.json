@@ -1,0 +1,72 @@
+{
+ "purpose": "scan",
+ "source": "10_personnel_reference.txt",
+ "entities": [
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 100,
+   "end": 127
+  },
+  {
+   "type": "BIRTH_DATE",
+   "category": "pd",
+   "start": 143,
+   "end": 153
+  },
+  {
+   "type": "ADDRESS",
+   "category": "pd",
+   "start": 171,
+   "end": 221
+  },
+  {
+   "type": "SPECIAL_CATEGORY",
+   "category": "pd_special",
+   "start": 247,
+   "end": 281
+  },
+  {
+   "type": "SPECIAL_CATEGORY",
+   "category": "pd_special",
+   "start": 305,
+   "end": 338
+  },
+  {
+   "type": "SPECIAL_CATEGORY",
+   "category": "pd_special",
+   "start": 368,
+   "end": 417
+  },
+  {
+   "type": "SPECIAL_CATEGORY",
+   "category": "pd_special",
+   "start": 473,
+   "end": 480
+  },
+  {
+   "type": "EMAIL",
+   "category": "pd",
+   "start": 515,
+   "end": 544
+  },
+  {
+   "type": "PHONE",
+   "category": "pd",
+   "start": 557,
+   "end": 573
+  },
+  {
+   "type": "SNILS",
+   "category": "pd",
+   "start": 590,
+   "end": 604
+  },
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 624,
+   "end": 650
+  }
+ ]
+}

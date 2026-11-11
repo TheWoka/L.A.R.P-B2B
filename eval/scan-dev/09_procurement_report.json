@@ -1,0 +1,54 @@
+{
+ "purpose": "scan",
+ "source": "09_procurement_report.txt",
+ "entities": [
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 96,
+   "end": 124
+  },
+  {
+   "type": "FINANCIAL",
+   "category": "financial",
+   "start": 156,
+   "end": 188
+  },
+  {
+   "type": "FINANCIAL",
+   "category": "financial",
+   "start": 210,
+   "end": 251
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 282,
+   "end": 323
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 343,
+   "end": 387
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 408,
+   "end": 441
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 483,
+   "end": 515
+  },
+  {
+   "type": "FINANCIAL",
+   "category": "financial",
+   "start": 803,
+   "end": 823
+  }
+ ]
+}

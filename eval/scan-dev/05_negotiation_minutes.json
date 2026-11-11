@@ -1,0 +1,66 @@
+{
+ "purpose": "scan",
+ "source": "05_negotiation_minutes.txt",
+ "entities": [
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 118,
+   "end": 138
+  },
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 154,
+   "end": 171
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 289,
+   "end": 327
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 351,
+   "end": 397
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 428,
+   "end": 481
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 545,
+   "end": 585
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 610,
+   "end": 646
+  },
+  {
+   "type": "FINANCIAL",
+   "category": "financial",
+   "start": 674,
+   "end": 700
+  },
+  {
+   "type": "FINANCIAL",
+   "category": "financial",
+   "start": 788,
+   "end": 808
+  },
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 824,
+   "end": 844
+  }
+ ]
+}

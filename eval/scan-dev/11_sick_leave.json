@@ -1,0 +1,60 @@
+{
+ "purpose": "scan",
+ "source": "11_sick_leave.txt",
+ "entities": [
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 104,
+   "end": 134
+  },
+  {
+   "type": "SPECIAL_CATEGORY",
+   "category": "pd_special",
+   "start": 189,
+   "end": 226
+  },
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 239,
+   "end": 265
+  },
+  {
+   "type": "SPECIAL_CATEGORY",
+   "category": "pd_special",
+   "start": 301,
+   "end": 336
+  },
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 348,
+   "end": 375
+  },
+  {
+   "type": "SPECIAL_CATEGORY",
+   "category": "pd_special",
+   "start": 419,
+   "end": 474
+  },
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 487,
+   "end": 513
+  },
+  {
+   "type": "SPECIAL_CATEGORY",
+   "category": "pd_special",
+   "start": 570,
+   "end": 604
+  },
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 826,
+   "end": 844
+  }
+ ]
+}
