@@ -7,7 +7,8 @@
 - `is_llm_enabled` — True только при реальном провайдере, идёт в `Report.llm_used`;
 - `llm_call_budget` — лимит вызовов на документ;
 - ошибки `LLMError` → `LLMRequestError`, `LLMResponseError`, `LLMBudgetExceeded`;
-- `set_mock_response` / `reset_mock_responses` — подмена ответов mock в тестах.
+- `set_mock_response` / `reset_mock_responses` — подмена ответов mock в тестах;
+- `use_llm_mode` / `current_mode` / `effective_settings` — режим нейросети проверки (T-073).
 """
 
 from __future__ import annotations
@@ -24,6 +25,8 @@ import httpx
 from pydantic import BaseModel, ValidationError
 
 from app.core.config import Settings, get_settings
+from app.schemas import LlmMode
+from app.services.llm import modes
 from app.services.llm.budget import CallBudget, charge_llm_call, llm_call_budget
 from app.services.llm.cache import CACHE_TTL_S, Cache, get_default_cache, make_cache_key
 from app.services.llm.providers import (
@@ -49,12 +52,15 @@ __all__ = [
     "LLMResponseError",
     "CacheTrace",
     "complete_json",
+    "current_mode",
+    "effective_settings",
     "is_llm_enabled",
     "llm_call_budget",
     "reset_mock_responses",
     "run_complete_json",
     "set_mock_response",
     "trace_cache",
+    "use_llm_mode",
 ]
 
 logger = logging.getLogger(__name__)
@@ -90,6 +96,54 @@ def trace_cache() -> Iterator[CacheTrace]:
         _cache_trace.reset(token)
 
 
+# T-073: режим нейросети текущей проверки. Сигнатура complete_json — контракт, поэтому режим
+# передаётся через contextvars, как лимит вызовов (budget.py) и признак кэша (trace_cache).
+_mode_override: ContextVar[LlmMode | None] = ContextVar("llm_mode_override", default=None)
+# Режим выбран, но в момент проверки недоступен (Ollama упала): вызовы сразу дают LLMRequestError.
+_mode_unavailable: ContextVar[bool] = ContextVar("llm_mode_unavailable", default=False)
+MODE_UNAVAILABLE_ERROR = "Режим нейросети недоступен"
+
+
+@contextmanager
+def use_llm_mode(mode: LlmMode | None, *, available: bool = True) -> Iterator[None]:
+    """Все вызовы LLM внутри блока идут в режиме mode (None — режим по умолчанию).
+
+    available=False: режим выбран, но недоступен. complete_json сразу бросает
+    LLMRequestError без сети и без списания из бюджета — шаги конвейера пишут unknown,
+    как при обычном сбое LLM, а проверка не падает и не ждёт таймаутов.
+    """
+    mode_token = _mode_override.set(mode)
+    unavailable_token = _mode_unavailable.set(not available)
+    try:
+        yield
+    finally:
+        _mode_unavailable.reset(unavailable_token)
+        _mode_override.reset(mode_token)
+
+
+def current_mode(settings: Settings | None = None) -> LlmMode:
+    """Режим текущей проверки: из use_llm_mode, иначе режим по умолчанию."""
+    return _mode_override.get() or modes.default_mode(settings or get_settings())
+
+
+def effective_settings(settings: Settings | None = None) -> Settings:
+    """Настройки с llm_provider / llm_base_url / llm_api_key / llm_model текущего режима.
+
+    Провайдеры читают привычные поля settings.llm_* и о режимах не знают.
+    llm_reasoning_effort уходит только в local: облаку поле не отправляется.
+    """
+    base = settings or get_settings()
+    mode = current_mode(base)
+    config = modes.config_for(mode, base)
+    return base.model_copy(update={
+        "llm_provider": config.provider,
+        "llm_base_url": config.base_url,
+        "llm_api_key": config.api_key,
+        "llm_model": config.model,
+        "llm_reasoning_effort": base.llm_reasoning_effort if mode == "local" else None,
+    })
+
+
 def resolve_provider(settings: Settings) -> ProviderName:
     """Фактический провайдер. openai_compatible без LLM_BASE_URL/LLM_MODEL → mock.
 
@@ -111,8 +165,11 @@ def resolve_provider(settings: Settings) -> ProviderName:
 
 
 def is_llm_enabled(settings: Settings | None = None) -> bool:
-    """True, только если запросы реально уходят в LLM (не mock). Для Report.llm_used."""
-    return resolve_provider(settings or get_settings()) == "openai_compatible"
+    """True, только если запросы реально уходят в LLM (не mock). Для Report.llm_used.
+
+    Без аргумента — по эффективным настройкам текущего режима (use_llm_mode).
+    """
+    return resolve_provider(settings or effective_settings()) == "openai_compatible"
 
 
 def complete_json(system: str, user: str, schema: type[BaseModel]) -> BaseModel:
@@ -128,9 +185,12 @@ def complete_json(system: str, user: str, schema: type[BaseModel]) -> BaseModel:
 
     Ошибки: LLMRequestError (сеть/HTTP), LLMResponseError (ответ не по схеме),
     LLMBudgetExceeded (лимит исчерпан). Все — наследники LLMError.
+    Режим (mock / local / cloud) — из `use_llm_mode`, иначе режим по умолчанию (T-073).
     Контракт: docs/contracts.md, раздел 3.
     """
-    return run_complete_json(system, user, schema, settings=get_settings())
+    if _mode_unavailable.get():
+        raise LLMRequestError(MODE_UNAVAILABLE_ERROR)
+    return run_complete_json(system, user, schema, settings=effective_settings())
 
 
 def run_complete_json(
@@ -150,7 +210,7 @@ def run_complete_json(
     if resolve_provider(settings) == "mock":
         return mock_complete(schema)
     active_cache = cache if cache is not None else get_default_cache(settings.redis_url)
-    key = make_cache_key("openai_compatible", settings.llm_model, system, user, schema)
+    key = make_cache_key(cache_provider(settings), settings.llm_model, system, user, schema)
     cached = _read_cache(active_cache, key, schema)
     if cached is not None:
         trace = _cache_trace.get()
@@ -161,6 +221,15 @@ def run_complete_json(
     result = _call_with_repair(system, user, schema, settings, transport, sleep)
     active_cache.set(key, result.model_dump_json(), CACHE_TTL_S)
     return result
+
+
+def cache_provider(settings: Settings) -> str:
+    """Провайдер для ключа кэша: тип + адрес сервера (T-073).
+
+    local и cloud — оба openai_compatible; с одинаковым именем модели без адреса в ключе
+    ответ облака мог бы вернуться в локальном режиме и наоборот.
+    """
+    return f"openai_compatible@{settings.llm_base_url.strip().rstrip('/')}"
 
 
 def _read_cache(cache: Cache, key: str, schema: type[BaseModel]) -> BaseModel | None:

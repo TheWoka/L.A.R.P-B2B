@@ -65,7 +65,6 @@ def make_doc(text: str = TEXT) -> ExtractedDocument:
 @pytest.fixture(autouse=True)
 def mock_settings(monkeypatch: pytest.MonkeyPatch) -> None:
     settings = Settings(_env_file=None, llm_provider="mock")
-    monkeypatch.setattr(pipeline, "get_settings", lambda: settings)
     monkeypatch.setattr(pipeline.client, "get_settings", lambda: settings)
 
 
@@ -166,7 +165,6 @@ def test_real_provider_metadata_and_llm_used(
 ) -> None:
     settings = Settings(_env_file=None, llm_provider="openai_compatible",
                         llm_base_url="https://example.invalid/v1", llm_model="test-model")
-    monkeypatch.setattr(pipeline, "get_settings", lambda: settings)
     monkeypatch.setattr(pipeline.client, "get_settings", lambda: settings)
     monkeypatch.setattr(pipeline, "build_report", make_report)
 

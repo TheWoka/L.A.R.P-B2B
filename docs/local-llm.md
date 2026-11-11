@@ -365,9 +365,54 @@ docker-compose run --rm -e LLM_PROVIDER=openai_compatible -e LLM_BASE_URL=http:/
 
 `/out`, а не `/eval/results`: у сервиса `api` папка `eval/results` смонтирована только для чтения.
 
+## Режимы в интерфейсе (T-073)
+
+С контракта v3 режим нейросети выбирается **для каждой проверки**, а не один раз в `.env`:
+
+| Режим | Что происходит | Когда доступен |
+|---|---|---|
+| `mock` | без нейросети: словари, регулярные выражения, классификатор | всегда |
+| `local` | локальная модель в Ollama (этот документ) | Ollama отвечает на `GET {LLM_LOCAL_BASE_URL}/models` и модель `LLM_LOCAL_MODEL` скачана |
+| `cloud` | OpenAI-совместимый API по ключу | в `.env` заданы `LLM_CLOUD_BASE_URL`, `LLM_CLOUD_API_KEY`, `LLM_CLOUD_MODEL` (наружу при проверке не ходим) |
+
+Настройка в `.env` (новый способ; старые `LLM_PROVIDER`/`LLM_BASE_URL`/`LLM_API_KEY`/`LLM_MODEL`
+продолжают работать и задают режим по умолчанию):
+
+```
+LLM_DEFAULT_MODE=mock
+LLM_LOCAL_BASE_URL=http://ollama:11434/v1
+LLM_LOCAL_MODEL=gemma4:12b-it-qat
+LLM_REASONING_EFFORT=none
+LLM_TIMEOUT_S=60
+```
+
+Какие режимы доступны сейчас — без Ollama `local` серый, с причиной:
+
+```powershell
+docker-compose up -d
+curl.exe -s http://localhost:8000/api/llm/modes
+docker-compose --profile local-llm up -d ollama
+Start-Sleep -Seconds 10
+curl.exe -s http://localhost:8000/api/llm/modes
+```
+
+Ответ кэшируется на 10 секунд, поэтому после запуска Ollama подождите. Причины недоступности:
+«Ollama не запущена», «Модель <имя> не скачана: ollama pull <имя>», «Не задана LLM_LOCAL_MODEL»,
+«Нет ключа или модели в .env». Ключ облака в ответ не попадает никогда.
+
+Выбранный режим сохраняется в документе и в следе проверки (`audit.llm_mode` в отчёте).
+Недоступный режим при загрузке — ошибка `400 «Режим недоступен: <причина>»`. Если Ollama
+остановилась уже во время проверки, проверка не падает: условия, требующие нейросети,
+получают «не удалось проверить» (unknown), в логе воркера — только «режим local недоступен».
+
+`LLM_REASONING_EFFORT` и `LLM_TIMEOUT_S` общие; `reasoning_effort` уходит только в режиме `local`.
+Ответы кэшируются отдельно для каждого сервера: ответ облака не вернётся в локальном режиме.
+
 ## Возврат к mock
 
-В `.env` установите `LLM_PROVIDER=mock`. Остальные три локальные настройки
+С T-073 достаточно выбрать режим «без нейросети» в интерфейсе. Чтобы mock стал режимом
+по умолчанию для всех проверок, в `.env` установите `LLM_DEFAULT_MODE=mock`
+(или, по-старому, `LLM_PROVIDER=mock` при пустом `LLM_DEFAULT_MODE`). Остальные три локальные настройки
 можно оставить: mock их не использует. Пересоздайте API и worker, затем
 остановите Ollama:
 

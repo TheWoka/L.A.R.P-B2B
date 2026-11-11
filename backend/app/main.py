@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import documents, health, metrics, reports, rules, tasks
+from app.api import documents, health, llm, metrics, reports, rules, tasks
 from app.api.errors import VALIDATION_ERROR_RESPONSE, request_validation_error_handler
 from app.core.logging import setup_logging
 from app.core.version import APP_VERSION
@@ -46,5 +46,5 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for module in (health, documents, tasks, reports, rules, metrics):
+for module in (health, documents, tasks, reports, rules, metrics, llm):
     app.include_router(module.router, prefix="/api")
