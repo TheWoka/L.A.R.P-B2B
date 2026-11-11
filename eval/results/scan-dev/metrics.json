@@ -1,13 +1,13 @@
 {
   "corpus": "scan-dev",
   "documents": 15,
-  "created_at": "2026-11-11T13:23:51.694006Z",
+  "created_at": "2026-11-11T15:38:13.301057Z",
   "by_type": [
     {
       "type": "PERSON",
-      "precision": 0.9762,
-      "recall": 0.9762,
-      "f1": 0.9762,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
       "support": 42
     },
     {
@@ -75,27 +75,27 @@
     },
     {
       "type": "SPECIAL_CATEGORY",
-      "precision": 0.6818,
-      "recall": 0.75,
-      "f1": 0.7143,
+      "precision": 0.8,
+      "recall": 0.8,
+      "f1": 0.8,
       "support": 20
     },
     {
       "type": "TRADE_SECRET",
-      "precision": 0.9592,
-      "recall": 0.8545,
-      "f1": 0.9038,
+      "precision": 1.0,
+      "recall": 0.8909,
+      "f1": 0.9423,
       "support": 55
     },
     {
       "type": "FINANCIAL",
       "precision": 1.0,
-      "recall": 0.0,
-      "f1": 0.0,
+      "recall": 0.0909,
+      "f1": 0.1667,
       "support": 11
     }
   ],
-  "pd_recall": 0.9286,
-  "trade_secret_recall": 0.8545,
+  "pd_recall": 0.9524,
+  "trade_secret_recall": 0.8909,
   "matching": "тот же type и пересечение ≥ 50% длины эталонной сущности; один к одному, жадно по убыванию пересечения"
 }

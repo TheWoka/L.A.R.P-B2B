@@ -32,20 +32,20 @@ JPEG 85.
 
 | Документ | Страниц | Похожесть OCR | Потеряно |
 |---|---:|---:|---:|
-| 01_supplier_letter | 1 | 0.999 | 0 |
-| 02_manager_chat | 1 | 0.992 | 0 |
+| 01_supplier_letter | 1 | 0.996 | 0 |
+| 02_manager_chat | 1 | 0.998 | 0 |
 | 03_cost_calculation | 1 | 0.998 | 0 |
 | 04_internal_memo | 1 | 0.997 | 0 |
-| 05_negotiation_minutes | 1 | 0.995 | 0 |
-| 06_commercial_offer | 1 | 0.998 | 0 |
-| 07_sales_plan | 1 | 0.993 | 0 |
-| 08_technical_knowhow | 1 | 0.998 | 0 |
-| 09_procurement_report | 1 | 0.997 | 0 |
-| 10_personnel_reference | 1 | 0.997 | 0 |
-| 11_sick_leave | 1 | 0.998 | 0 |
-| 12_employee_profile | 1 | 0.995 | 0 |
-| 13_questionnaire | 1 | 0.999 | 0 |
-| 14_supplier_terms | 1 | 0.997 | 0 |
+| 05_negotiation_minutes | 1 | 0.997 | 0 |
+| 06_commercial_offer | 1 | 0.993 | 0 |
+| 07_sales_plan | 1 | 0.988 | 0 |
+| 08_technical_knowhow | 1 | 0.990 | 0 |
+| 09_procurement_report | 1 | 0.990 | 0 |
+| 10_personnel_reference | 1 | 0.992 | 0 |
+| 11_sick_leave | 1 | 0.992 | 0 |
+| 12_employee_profile | 1 | 0.996 | 0 |
+| 13_questionnaire | 1 | 0.993 | 0 |
+| 14_supplier_terms | 1 | 0.994 | 0 |
 | 15_public_procurement | 1 | 0.995 | 0 |
 
 Похожесть — `difflib.SequenceMatcher.ratio()` чистого текста и текста OCR
