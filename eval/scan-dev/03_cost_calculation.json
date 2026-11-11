@@ -1,0 +1,60 @@
+{
+ "purpose": "scan",
+ "source": "03_cost_calculation.txt",
+ "entities": [
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 124,
+   "end": 153
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 166,
+   "end": 211
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 221,
+   "end": 255
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 265,
+   "end": 318
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 337,
+   "end": 377
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 394,
+   "end": 437
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 454,
+   "end": 490
+  },
+  {
+   "type": "FINANCIAL",
+   "category": "financial",
+   "start": 519,
+   "end": 542
+  },
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 763,
+   "end": 779
+  }
+ ]
+}

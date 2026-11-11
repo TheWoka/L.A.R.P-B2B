@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert, Button, Input, Radio, Select, Tabs, Typography, Upload } from "antd";
 import type { UploadFile, UploadProps } from "antd";
 import { Link, useNavigate } from "react-router-dom";
 
-import { ApiError, submitQuery, uploadDocument } from "../api/client";
-import type { DocPurpose } from "../api/types";
-import { documentCountLabel, MAX_BATCH_FILES, submitBatchFiles, validateBatchFile } from "../lib/batch";
+import { ApiError, createBatch, getLlmModes, submitQuery, uploadDocument } from "../api/client";
+import type { DocPurpose, LlmMode, LlmModeInfo } from "../api/types";
+import LlmModeSelect from "../components/LlmModeSelect";
+import { documentCountLabel, EXTENSIONS, MAX_BATCH_FILES, submitBatchFiles, validateBatchFile } from "../lib/batch";
+import { loadSavedMode, MOCK_MODES, pickInitialMode, saveMode } from "../lib/llmMode";
 
 const MAX_TEXT_LENGTH = 200_000;
 
@@ -22,7 +24,6 @@ function formatFileSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} КБ`;
   return `${(bytes / (1024 * 1024)).toFixed(1).replace(".", ",")} МБ`;
 }
-const ACCEPTED_EXTENSIONS = [".pdf", ".docx", ".xlsx", ".xml"];
 
 const PURPOSES: { value: DocPurpose; title: string; description: string }[] = [
   { value: "publication", title: "Для публикации", description: "Сайт, ЕИС или открытый доступ" },
@@ -59,15 +60,41 @@ export default function UploadPage() {
   const navigate = useNavigate();
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [filePurpose, setFilePurpose] = useState<DocPurpose>("publication");
-  // Своё назначение у отдельного файла пакета; нет записи — действует общее filePurpose.
+  // Своё назначение у отдельного файла комплекта; нет записи — действует общее filePurpose.
   const [purposeByFile, setPurposeByFile] = useState<Record<string, DocPurpose>>({});
   const [queryPurpose, setQueryPurpose] = useState<DocPurpose>("publication");
   const [queryText, setQueryText] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [batchName, setBatchName] = useState("");
+  const [batchId, setBatchId] = useState<string | null>(null);
   const [submittingQuery, setSubmittingQuery] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
   const [rejectedFiles, setRejectedFiles] = useState<RejectedFile[]>([]);
   const [queryError, setQueryError] = useState<string | null>(null);
+  const [llmMode, setLlmMode] = useState<LlmMode>("mock");
+  const [llmModes, setLlmModes] = useState<LlmModeInfo[]>(MOCK_MODES);
+  const [modesLoading, setModesLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    void getLlmModes().then((result) => {
+      if (!active) return;
+      setLlmModes(result.modes);
+      setLlmMode(pickInitialMode(result.modes, loadSavedMode(), result.default));
+    }).catch(() => {
+      if (!active) return;
+      setLlmModes(MOCK_MODES);
+      setLlmMode("mock");
+    }).finally(() => { if (active) setModesLoading(false); });
+    return () => { active = false; };
+  }, []);
+
+  function selectLlmMode(mode: LlmMode) {
+    setLlmMode(mode);
+    saveMode(mode);
+  }
+
+  const llmModeSelect = <LlmModeSelect modes={llmModes} value={llmMode} onChange={selectLlmMode} loading={modesLoading} disabled={uploading || submittingQuery} />;
 
   const beforeUpload: UploadProps["beforeUpload"] = (file) => {
     const validationError = validateBatchFile(file);
@@ -91,21 +118,25 @@ export default function UploadPage() {
     setFileError(null);
     setUploading(true);
     try {
-      if (files.length === 1) {
-        const task = await uploadDocument(files[0], purposeAt(files[0], 0));
+      if (files.length === 1 && !batchId) {
+        const task = await uploadDocument(files[0], purposeAt(files[0], 0), { llmMode });
         navigate(`/tasks/${encodeURIComponent(task.task_id)}`);
       } else {
-        const { created, failed } = await submitBatchFiles(files, purposeAt, uploadDocument);
-        if (failed.length > 0) setRejectedFiles((current) => [...current, ...failed.map((entry, index) => ({ ...entry, uid: `upload-failed-${index}-${entry.name}` }))]);
-        if (created.length === 0) {
-          setFileError("Не удалось отправить документы. Проверьте список ошибок и повторите попытку.");
+        const id = batchId ?? (await createBatch({ name: batchName.trim() || null, purpose: filePurpose })).batch_id;
+        setBatchId(id);
+        const accepted = new Set<string>();
+        const { failed } = await submitBatchFiles(files, purposeAt, async (file, purpose, options) => {
+          const result = await uploadDocument(file, purpose, { ...options, llmMode });
+          accepted.add(entries[files.findIndex((candidate) => candidate === file)].uid);
+          return result;
+        }, id);
+        if (failed.length > 0) {
+          setFileList((current) => current.filter((entry) => !accepted.has(entry.uid)));
+          setRejectedFiles(failed.map((entry, index) => ({ ...entry, uid: `upload-failed-${index}` })));
+          setFileError(`Не отправлено файлов: ${failed.length}. Повторите отправку или откройте сводный отчёт по уже загруженным.`);
           return;
         }
-        try {
-          const batchKey = created.map(({ id }) => id).join(",");
-          sessionStorage.setItem(`grif-batch-${batchKey}`, JSON.stringify({ names: Object.fromEntries(created.map(({ id, name }) => [id, name])), failed }));
-        } catch { /* Проверка продолжится и без подписей файлов. */ }
-        navigate(`/batch?tasks=${created.map(({ id }) => encodeURIComponent(id)).join(",")}`);
+        navigate(`/batches/${encodeURIComponent(id)}`);
       }
     } catch (error: unknown) {
       setFileError(errorMessage(error));
@@ -128,7 +159,7 @@ export default function UploadPage() {
     setQueryError(null);
     setSubmittingQuery(true);
     try {
-      const task = await submitQuery({ text, purpose: queryPurpose });
+      const task = await submitQuery({ text, purpose: queryPurpose }, llmMode);
       navigate(`/tasks/${encodeURIComponent(task.task_id)}`);
     } catch (error: unknown) {
       setQueryError(errorMessage(error));
@@ -141,13 +172,14 @@ export default function UploadPage() {
     <>
       <Upload.Dragger
         className={`document-dropzone${fileList.length > 0 ? " has-files" : ""}`}
-        accept={ACCEPTED_EXTENSIONS.join(",")}
+        accept={EXTENSIONS.join(",")}
+        disabled={uploading}
         multiple
         fileList={fileList}
         beforeUpload={beforeUpload}
         onChange={({ fileList: nextFiles }) => {
           if (nextFiles.length > MAX_BATCH_FILES) {
-            setFileError(`Можно выбрать не больше ${MAX_BATCH_FILES} файлов. В пакет добавлены первые ${MAX_BATCH_FILES}.`);
+            setFileError(`Можно выбрать не больше ${MAX_BATCH_FILES} файлов. В комплект добавлены первые ${MAX_BATCH_FILES}.`);
           } else {
             setFileError(null);
           }
@@ -162,11 +194,11 @@ export default function UploadPage() {
             </svg>
           </span>
           <span className="upload-drop-copy">
-            <strong>{fileList.length > 0 ? "Добавьте файлы в пакет" : "Перетащите документы сюда"}</strong>
+            <strong>{fileList.length > 0 ? "Добавьте файлы в комплект" : "Перетащите документы сюда"}</strong>
             <span className="dropzone-hint">
               {fileList.length > 0
-                ? `До ${MAX_BATCH_FILES} файлов · PDF, DOCX, XLSX или XML · каждый до 50 МБ`
-                : `До ${MAX_BATCH_FILES} файлов за раз · PDF, DOCX, XLSX или XML · до 50 МБ каждый`}
+                ? `До ${MAX_BATCH_FILES} файлов · PDF, DOCX, XLSX, XML или изображение скана · каждый до 50 МБ`
+                : `До ${MAX_BATCH_FILES} файлов за раз · PDF, DOCX, XLSX, XML или изображение скана · до 50 МБ каждый`}
             </span>
           </span>
           <span className="choose-file">{fileList.length > 0 ? "Добавить файлы" : "Выбрать файлы"}</span>
@@ -174,9 +206,9 @@ export default function UploadPage() {
       </Upload.Dragger>
 
       {(fileList.length > 0 || rejectedFiles.length > 0) && (
-        <section className="file-list-section" aria-label="Файлы в пакете">
+        <section className="file-list-section" aria-label="Файлы в комплекте">
           <div className="file-list-heading">
-            <h2>Файлы в пакете</h2>
+            <h2>Файлы в комплекте</h2>
             <span>{fileList.length} из {MAX_BATCH_FILES} файлов</span>
           </div>
           <div className="selected-file-list">
@@ -229,15 +261,21 @@ export default function UploadPage() {
       )}
 
       <section className="purpose-section">
+        {fileList.length > 1 && <div className="batch-name-field">
+          <label htmlFor="batch-name">Название комплекта <span>необязательно</span></label>
+          <Input id="batch-name" maxLength={120} showCount value={batchName} disabled={uploading || Boolean(batchId)} onChange={(event) => setBatchName(event.target.value)} placeholder="Например, документы закупки № 12" />
+        </div>}
         <h2>Куда пойдут документы?</h2>
         <p>{fileList.length > 1
-          ? "Назначение для всех файлов пакета. Для отдельного файла его можно поменять в списке выше."
+          ? "Назначение для всех файлов комплекта. Для отдельного файла его можно поменять в списке выше."
           : "Это поможет применить нужные правила проверки."}</p>
         <PurposePicker value={filePurpose} onChange={(value) => { setFilePurpose(value); setPurposeByFile({}); }} />
       </section>
+      {llmModeSelect}
       <div className="form-actions">
         {fileError && <Alert type="error" showIcon title={fileError} className="form-error" />}
-        <Button type="primary" size="large" loading={uploading} disabled={uploading} onClick={() => { void handleUpload(); }}>
+        {batchId && <Link to={`/batches/${encodeURIComponent(batchId)}`}>Открыть сводный отчёт</Link>}
+        <Button type="primary" size="large" loading={uploading} disabled={uploading || modesLoading} onClick={() => { void handleUpload(); }}>
           {fileList.length > 1 ? `Проверить ${documentCountLabel(fileList.length)}` : "Начать проверку"}
         </Button>
         <Typography.Text type="secondary">
@@ -265,9 +303,10 @@ export default function UploadPage() {
         <p>Это поможет применить нужные правила проверки.</p>
         <PurposePicker value={queryPurpose} onChange={setQueryPurpose} />
       </section>
+      {llmModeSelect}
       <div className="form-actions">
         {queryError && <Alert type="error" showIcon title={queryError} className="form-error" />}
-        <Button type="primary" size="large" loading={submittingQuery} disabled={submittingQuery} onClick={() => { void handleSubmitQuery(); }}>
+        <Button type="primary" size="large" loading={submittingQuery} disabled={submittingQuery || modesLoading} onClick={() => { void handleSubmitQuery(); }}>
           Начать проверку
         </Button>
         <Typography.Text type="secondary">Персональные сведения скрываются до анализа</Typography.Text>
@@ -279,9 +318,9 @@ export default function UploadPage() {
     <div className="page-container upload-page">
       <header className="page-heading">
         <h1>Проверка документов</h1>
-        <p>{fileList.length > 0 ? "Один пакет — отдельный отчёт для каждого документа." : "Загрузите до 10 файлов и получите отдельный отчёт для каждого."}</p>
+        <p>{fileList.length > 0 ? "Один комплект — общий итог и приоритет исправлений." : "Загрузите до 20 документов и сканов — получите общий итог и отчёт по каждому."}</p>
         <h1 className="mobile-upload-title">Проверка документов</h1>
-        <p className="mobile-upload-subtitle">Загрузите до 10 файлов и получите отдельный отчёт для каждого.</p>
+        <p className="mobile-upload-subtitle">Загрузите до 20 документов и сканов — получите общий итог и отчёт по каждому.</p>
       </header>
       <div className="upload-layout">
         <section className="upload-primary">

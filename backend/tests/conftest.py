@@ -11,8 +11,11 @@ import pytest
 # и тесты не должны уходить во внешний API (деньги, лимиты, данные наружу).
 os.environ["LLM_PROVIDER"] = "mock"
 # LLM_TIMEOUT_S тоже: тесты проверяют значение по умолчанию (30 с), а в .env может стоять 60/120.
+# T-073: режимы нейросети тоже — иначе LLM_DEFAULT_MODE=cloud из .env увёл бы тесты в облако.
 for _name in (
     "LLM_BASE_URL", "LLM_API_KEY", "LLM_MODEL", "LLM_TIMEOUT_S", "LLM_REASONING_EFFORT",
+    "LLM_DEFAULT_MODE", "LLM_LOCAL_BASE_URL", "LLM_LOCAL_MODEL",
+    "LLM_CLOUD_BASE_URL", "LLM_CLOUD_API_KEY", "LLM_CLOUD_MODEL",
 ):
     os.environ.pop(_name, None)
 

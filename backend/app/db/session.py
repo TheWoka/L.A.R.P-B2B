@@ -35,15 +35,24 @@ def init_db() -> None:
     """
     from app.db.models import Base  # локальный импорт, чтобы не было циклов
 
-    with engine.begin() as conn:
-        conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+    if engine.dialect.name == "postgresql":
+        with engine.begin() as conn:
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
     Base.metadata.create_all(bind=engine)
+    if engine.dialect.name != "postgresql":
+        return
     # create_all не добавляет колонки в существующие таблицы: том pgdata мог остаться
-    # со схемой до T-013b / T-026. Колонки добавляются идемпотентно.
+    # со схемой до T-013b / T-026 / T-073. Колонки добавляются идемпотентно.
     with engine.begin() as conn:
         conn.execute(text("ALTER TABLE reports ADD COLUMN IF NOT EXISTS llm_log JSONB"))
         conn.execute(text("ALTER TABLE reports ADD COLUMN IF NOT EXISTS redacted BYTEA"))
         conn.execute(text(
             "ALTER TABLE reports ADD COLUMN IF NOT EXISTS redacted_ext VARCHAR(8)"
+        ))
+        conn.execute(text(
+            "ALTER TABLE documents ADD COLUMN IF NOT EXISTS llm_mode VARCHAR(8)"
+        ))
+        conn.execute(text(
+            "ALTER TABLE documents ADD COLUMN IF NOT EXISTS batch_id VARCHAR(64)"
         ))
     logger.info("База данных инициализирована")

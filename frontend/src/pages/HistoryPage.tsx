@@ -34,15 +34,15 @@ export default function HistoryPage() {
           <ul className="history-list">
             {items.map((item) => (
               <li key={item.report_id} className="history-card">
-                <span className="history-status" style={{ background: OVERALL[item.overall].color }} role="img" aria-label={OVERALL[item.overall].label} title={OVERALL[item.overall].label} />
+                <span className="history-status" style={{ background: item.overall ? OVERALL[item.overall].color : "#8c8c8c" }} role="img" aria-label={item.overall ? OVERALL[item.overall].label : "Проверка идёт"} title={item.overall ? OVERALL[item.overall].label : "Проверка идёт"} />
                 <div className="history-details">
-                  <h2>{item.kind === "text" ? "Текстовый запрос" : `Документ${item.ext ? ` ${item.ext}` : ""}`}</h2>
+                  <h2>{item.kind === "batch" ? `${item.name} · ${item.documents} док.` : item.kind === "text" ? "Текстовый запрос" : `Документ${item.ext ? ` ${item.ext}` : ""}`}</h2>
                   <p>{PURPOSE_LABELS[item.purpose]}</p>
                   <time dateTime={item.created_at}>{new Date(item.created_at).toLocaleString("ru-RU", { dateStyle: "long", timeStyle: "short" })}</time>
                   <div className="history-counts">серьёзных: {item.red}, замечаний: {item.yellow}</div>
                 </div>
                 <div className="history-actions">
-                  <Button type="primary" onClick={() => navigate(`/reports/${encodeURIComponent(item.report_id)}`)}>Открыть</Button>
+                  <Button type="primary" onClick={() => navigate(`/${item.kind === "batch" ? "batches" : "reports"}/${encodeURIComponent(item.report_id)}`)}>Открыть</Button>
                   <Button type="text" onClick={() => { removeFromHistory(item.report_id); setItems(listHistory()); }}>Убрать из истории</Button>
                 </div>
               </li>

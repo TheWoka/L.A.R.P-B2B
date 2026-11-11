@@ -10,6 +10,8 @@ from typing import Literal
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.schemas.llm import LlmMode
+
 # Таймаут одного запроса к LLM по умолчанию, секунды (LLM_TIMEOUT_S, T-029b).
 # providers.REQUEST_TIMEOUT_S ссылается на это же значение.
 DEFAULT_LLM_TIMEOUT_S = 30.0
@@ -34,11 +36,23 @@ class Settings(BaseSettings):
     # --- Redis ---
     redis_url: str = "redis://redis:6379/0"
 
-    # --- LLM ---
+    # --- LLM: старые переменные (устаревшее, работает) ---
+    # Задают режим по умолчанию, если LLM_DEFAULT_MODE пуст, и заполняют пустые
+    # LLM_LOCAL_* / LLM_CLOUD_* этого режима (services/llm/modes.resolve_mode_configs, T-073).
     llm_provider: Literal["mock", "openai_compatible"] = "mock"
     llm_base_url: str = ""
     llm_api_key: str = ""
     llm_model: str = ""
+
+    # --- LLM: режимы нейросети (контракт v3, T-073) ---
+    # None — режим по умолчанию выводится из LLM_PROVIDER / LLM_BASE_URL.
+    llm_default_mode: LlmMode | None = None
+    llm_local_base_url: str = "http://ollama:11434/v1"
+    llm_local_model: str = ""
+    llm_cloud_base_url: str = ""
+    llm_cloud_api_key: str = ""   # только в .env; в ответы API и логи не попадает
+    llm_cloud_model: str = ""
+
     llm_max_calls_per_doc: int = 30
     # Таймаут одного HTTP-запроса к LLM, секунды; > 0, конечное число.
     # Для локальной модели на CPU — 120 (docs/local-llm.md).
@@ -47,6 +61,14 @@ class Settings(BaseSettings):
     # у Qwen3.5 / Gemma 4. Только для Ollama и других серверов, принимающих reasoning_effort;
     # облачной gpt-4o-mini не задавать. None (по умолчанию) — поля в запросе нет.
     llm_reasoning_effort: str | None = None
+
+    @field_validator("llm_default_mode", mode="before")
+    @classmethod
+    def _blank_default_mode_is_none(cls, value: object) -> object:
+        """LLM_DEFAULT_MODE= (пусто) в .env — «не задан», режим берётся из старых переменных."""
+        if isinstance(value, str):
+            return value.strip().lower() or None
+        return value
 
     @field_validator("llm_reasoning_effort", mode="before")
     @classmethod
@@ -58,6 +80,7 @@ class Settings(BaseSettings):
 
     # --- Прочее ---
     max_upload_mb: int = 50
+    batch_max_documents: int = 20
     report_ttl_days: int = 7
 
     # --- OCR ---

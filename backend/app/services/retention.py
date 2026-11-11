@@ -7,7 +7,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.db.models import DocumentRow, ReportRow, TaskRow
+from app.db.models import BatchRow, DocumentRow, ReportRow, TaskRow
 from app.services.storage import delete_file
 
 logger = logging.getLogger(__name__)
@@ -34,6 +34,13 @@ def purge_expired(session: Session, now: datetime | None = None) -> int:
                 delete_file(document.stored_path)
             session.execute(delete(TaskRow).where(TaskRow.document_id == document_id))
             session.delete(document)
+    session.flush()
+    # Пустой комплект удаляется, только если он старше срока хранения: только что
+    # созданный комплект ещё ждёт первую загрузку (POST /api/batches → POST /api/documents).
+    session.execute(delete(BatchRow).where(
+        BatchRow.created_at < cutoff,
+        ~select(DocumentRow.id).where(DocumentRow.batch_id == BatchRow.id).exists(),
+    ))
     session.commit()
     logger.info("purged_reports=%d", len(expired))
     return len(expired)

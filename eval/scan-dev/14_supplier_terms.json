@@ -1,0 +1,78 @@
+{
+ "purpose": "scan",
+ "source": "14_supplier_terms.txt",
+ "entities": [
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 100,
+   "end": 113
+  },
+  {
+   "type": "EMAIL",
+   "category": "pd",
+   "start": 128,
+   "end": 152
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 171,
+   "end": 223
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 236,
+   "end": 283
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 307,
+   "end": 362
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 384,
+   "end": 433
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 466,
+   "end": 503
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 526,
+   "end": 568
+  },
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 652,
+   "end": 670
+  },
+  {
+   "type": "SPECIAL_CATEGORY",
+   "category": "pd_special",
+   "start": 671,
+   "end": 712
+  },
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 754,
+   "end": 773
+  },
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 868,
+   "end": 886
+  }
+ ]
+}

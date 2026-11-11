@@ -355,7 +355,6 @@ def provider(monkeypatch: pytest.MonkeyPatch) -> Mock:
         llm_base_url="https://llm.invalid/v1", llm_model="synthetic-model",
     )
     monkeypatch.setattr(llm_client, "get_settings", lambda: settings)
-    monkeypatch.setattr(pipeline, "get_settings", lambda: settings)
     monkeypatch.setattr(llm_client, "get_default_cache", lambda url: DictCache())
     content = json.dumps({"items": [{"quote": FACT}]}, ensure_ascii=False)
     fake = Mock(return_value=ChatResult(content=content))

@@ -1,0 +1,54 @@
+{
+ "purpose": "scan",
+ "source": "04_internal_memo.txt",
+ "entities": [
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 117,
+   "end": 144
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 187,
+   "end": 226
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 270,
+   "end": 302
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 330,
+   "end": 377
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 417,
+   "end": 462
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 495,
+   "end": 523
+  },
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 602,
+   "end": 618
+  },
+  {
+   "type": "SPECIAL_CATEGORY",
+   "category": "pd_special",
+   "start": 619,
+   "end": 651
+  }
+ ]
+}

@@ -1,0 +1,66 @@
+{
+ "purpose": "scan",
+ "source": "01_supplier_letter.txt",
+ "entities": [
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 123,
+   "end": 150
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 261,
+   "end": 291
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 312,
+   "end": 346
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 384,
+   "end": 417
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 441,
+   "end": 485
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 515,
+   "end": 559
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 591,
+   "end": 617
+  },
+  {
+   "type": "PHONE",
+   "category": "pd",
+   "start": 700,
+   "end": 718
+  },
+  {
+   "type": "EMAIL",
+   "category": "pd",
+   "start": 747,
+   "end": 774
+  },
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 789,
+   "end": 805
+  }
+ ]
+}

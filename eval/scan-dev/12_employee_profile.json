@@ -1,0 +1,60 @@
+{
+ "purpose": "scan",
+ "source": "12_employee_profile.txt",
+ "entities": [
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 131,
+   "end": 162
+  },
+  {
+   "type": "SPECIAL_CATEGORY",
+   "category": "pd_special",
+   "start": 255,
+   "end": 273
+  },
+  {
+   "type": "SPECIAL_CATEGORY",
+   "category": "pd_special",
+   "start": 310,
+   "end": 348
+  },
+  {
+   "type": "SPECIAL_CATEGORY",
+   "category": "pd_special",
+   "start": 371,
+   "end": 425
+  },
+  {
+   "type": "SPECIAL_CATEGORY",
+   "category": "pd_special",
+   "start": 456,
+   "end": 503
+  },
+  {
+   "type": "BIRTH_DATE",
+   "category": "pd",
+   "start": 618,
+   "end": 628
+  },
+  {
+   "type": "PHONE",
+   "category": "pd",
+   "start": 646,
+   "end": 664
+  },
+  {
+   "type": "ADDRESS",
+   "category": "pd",
+   "start": 693,
+   "end": 735
+  },
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 764,
+   "end": 781
+  }
+ ]
+}
