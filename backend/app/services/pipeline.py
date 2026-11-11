@@ -148,6 +148,7 @@ def run_audit(
     audit = build_audit(source_bytes, rules, budget, llm_log)
     llm_used = audit.llm_provider == "openai_compatible" and audit.llm_calls > 0
     report = build_report(ctx, violations, int((monotonic() - started) * 1000), llm_used, audit)
+    report = report.model_copy(update={"ocr": doc.ocr})
     segments = [segment.model_copy(update={
         "text": text[segment.offset:segment.offset + len(segment.text)],
     }) for segment in doc.segments]

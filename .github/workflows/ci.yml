@@ -18,6 +18,8 @@ jobs:
           cache-dependency-path: |
             backend/requirements.txt
             backend/requirements-dev.txt
+      - name: Установка распознавания и шрифтов
+        run: sudo apt-get update && sudo apt-get install -y tesseract-ocr tesseract-ocr-rus fonts-dejavu-core
       - name: Установка зависимостей
         run: pip install -r backend/requirements.txt -r backend/requirements-dev.txt
       - name: Линтер

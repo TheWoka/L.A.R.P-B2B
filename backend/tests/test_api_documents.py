@@ -51,6 +51,34 @@ def docx_bytes() -> bytes:
     return stream.getvalue()
 
 
+@pytest.mark.parametrize(("extension", "signature"), [
+    ("png", b"\x89PNG"), ("jpg", b"\xff\xd8\xff\xe0"),
+    ("jpeg", b"\xff\xd8\xff\xe1"), ("tif", b"II*\x00"), ("tiff", b"MM\x00*"),
+])
+def test_upload_image_signatures(
+    client: TestClient, api_db: tuple[Session, Mock], extension: str, signature: bytes,
+) -> None:
+    response = client.post(
+        "/api/documents", files={"file": (f"synthetic.{extension}", signature + b"synthetic")},
+        data={"purpose": "internal"},
+    )
+    assert response.status_code == 202
+    api_db[1].assert_called_once_with(response.json()["task_id"])
+
+
+@pytest.mark.parametrize("extension", ["png", "jpg", "jpeg", "tif", "tiff"])
+def test_reject_image_with_wrong_signature(
+    client: TestClient, api_db: tuple[Session, Mock], extension: str,
+) -> None:
+    response = client.post(
+        "/api/documents", files={"file": (f"synthetic.{extension}", b"%PDF fake image")},
+        data={"purpose": "internal"},
+    )
+    assert response.status_code == 400
+    assert response.json()["detail"] == documents.UNSUPPORTED_FORMAT
+    api_db[1].assert_not_called()
+
+
 def test_upload_docx(
     client: TestClient, api_db: tuple[Session, Mock], tmp_path: Path,
 ) -> None:

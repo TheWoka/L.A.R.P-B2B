@@ -11,6 +11,7 @@ from app.db.models import DocumentRow, ReportRow, TaskRow
 from app.db.session import SessionLocal
 from app.schemas import DocPurpose, Entity, ExtractedDocument, Stage, TextSegment
 from app.services.extraction.extract import extract
+from app.services.extraction.ocr import ocr_progress
 from app.services.pipeline import run_audit
 from app.services.redaction.check import count_leftovers
 from app.services.redaction.redact import RedactedFile, redact
@@ -55,6 +56,8 @@ def make_redacted_copy(
     извлечением находит исходное значение ПДн, не отдаётся. В лог — только тип
     исключения, формат и число оставшихся значений (AGENTS.md, правило 4).
     """
+    if doc.ocr is not None:
+        return None  # Обезличивание пикселей — T-072.
     try:
         redacted = redact(source, doc, entities)
         remaining = count_leftovers(redacted, doc, entities)
@@ -86,7 +89,8 @@ def _audit_document(document: DocumentRow, task: TaskRow, session: Session, star
     if document.stored_path is None:
         raise FileNotFoundError
     source_bytes = Path(document.stored_path).read_bytes()
-    doc = extract_document(document)
+    with ocr_progress(lambda done, total: on_stage(Stage.extracting, 10 + 19 * done // total)):
+        doc = extract_document(document)
     if document.filename is None:
         source_bytes = doc.text.encode("utf-8")
     rules = repository.list_rules(session)
