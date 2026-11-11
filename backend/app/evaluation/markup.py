@@ -32,12 +32,17 @@ _OPEN_RE = re.compile(r"\[\[([A-Za-z_]*):")
 
 @dataclass(frozen=True)
 class GoldEntity:
-    """Эталонная сущность: тип, категория и отрезок [start, end) в чистом тексте."""
+    """Эталонная сущность: тип, категория и отрезок [start, end) в чистом тексте.
+
+    lost=True — сущность потеряна при OCR (корпус сканов, T-077b): отрезок нулевой длины,
+    найти её нельзя, поэтому при любом совпадении она считается пропуском.
+    """
 
     type: EntityType
     category: EntityCategory
     start: int
     end: int
+    lost: bool = False
 
 
 def parse_type(name: str, where: str) -> EntityType:

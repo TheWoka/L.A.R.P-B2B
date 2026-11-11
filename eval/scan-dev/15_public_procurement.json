@@ -1,0 +1,30 @@
+{
+ "purpose": "scan",
+ "source": "15_public_procurement.txt",
+ "entities": [
+  {
+   "type": "FINANCIAL",
+   "category": "financial",
+   "start": 196,
+   "end": 219
+  },
+  {
+   "type": "FINANCIAL",
+   "category": "financial",
+   "start": 248,
+   "end": 281
+  },
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 541,
+   "end": 557
+  },
+  {
+   "type": "FINANCIAL",
+   "category": "financial",
+   "start": 903,
+   "end": 923
+  }
+ ]
+}

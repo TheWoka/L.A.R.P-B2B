@@ -1,0 +1,60 @@
+{
+ "purpose": "scan",
+ "source": "06_commercial_offer.txt",
+ "entities": [
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 142,
+   "end": 161
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 248,
+   "end": 293
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 312,
+   "end": 345
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 385,
+   "end": 404
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 416,
+   "end": 459
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 484,
+   "end": 527
+  },
+  {
+   "type": "FINANCIAL",
+   "category": "financial",
+   "start": 603,
+   "end": 634
+  },
+  {
+   "type": "EMAIL",
+   "category": "pd",
+   "start": 746,
+   "end": 777
+  },
+  {
+   "type": "PHONE",
+   "category": "pd",
+   "start": 807,
+   "end": 822
+  }
+ ]
+}

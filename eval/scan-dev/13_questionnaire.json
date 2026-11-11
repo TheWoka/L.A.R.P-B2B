@@ -1,0 +1,90 @@
+{
+ "purpose": "scan",
+ "source": "13_questionnaire.txt",
+ "entities": [
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 131,
+   "end": 157
+  },
+  {
+   "type": "BIRTH_DATE",
+   "category": "pd",
+   "start": 174,
+   "end": 184
+  },
+  {
+   "type": "PASSPORT",
+   "category": "pd",
+   "start": 195,
+   "end": 209
+  },
+  {
+   "type": "INN",
+   "category": "pd",
+   "start": 267,
+   "end": 279
+  },
+  {
+   "type": "SNILS",
+   "category": "pd",
+   "start": 288,
+   "end": 302
+  },
+  {
+   "type": "ADDRESS",
+   "category": "pd",
+   "start": 322,
+   "end": 371
+  },
+  {
+   "type": "EMAIL",
+   "category": "pd",
+   "start": 387,
+   "end": 415
+  },
+  {
+   "type": "PHONE",
+   "category": "pd",
+   "start": 426,
+   "end": 442
+  },
+  {
+   "type": "SPECIAL_CATEGORY",
+   "category": "pd_special",
+   "start": 453,
+   "end": 464
+  },
+  {
+   "type": "SPECIAL_CATEGORY",
+   "category": "pd_special",
+   "start": 482,
+   "end": 489
+  },
+  {
+   "type": "SPECIAL_CATEGORY",
+   "category": "pd_special",
+   "start": 518,
+   "end": 536
+  },
+  {
+   "type": "SPECIAL_CATEGORY",
+   "category": "pd_special",
+   "start": 559,
+   "end": 604
+  },
+  {
+   "type": "BANK_ACCOUNT",
+   "category": "pd",
+   "start": 653,
+   "end": 673
+  },
+  {
+   "type": "CARD",
+   "category": "pd",
+   "start": 701,
+   "end": 720
+  }
+ ]
+}
