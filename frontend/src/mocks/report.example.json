@@ -231,7 +231,9 @@
     ],
     "llm_provider": "mock",
     "llm_model": null,
-    "llm_calls": 0
+    "llm_calls": 0,
+    "llm_mode": "mock"
   },
-  "redacted_available": false
+  "redacted_available": false,
+  "ocr": null
 }

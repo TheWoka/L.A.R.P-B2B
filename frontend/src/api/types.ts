@@ -13,12 +13,28 @@ export interface TextSegment {
   section: string | null;
 }
 
+// ---------- Распознавание (OCR), контракт v3 ----------
+export interface OcrPage {
+  page: number; // ≥ 1
+  confidence: number; // 0..1, средняя уверенность слов страницы
+}
+
+export interface OcrInfo {
+  engine: string; // "tesseract-5.3.0 rus+eng"
+  pages: OcrPage[]; // только распознанные страницы
+  mean_confidence: number; // 0..1, по всем распознанным словам
+  low_confidence_pages: number[]; // confidence < 0.75
+  /** [start, end) слов с уверенностью < 0.6, координаты полного текста. */
+  low_confidence_spans: [number, number][];
+}
+
 export interface ExtractedDocument {
   document_id: string;
   filename: string;
   text: string;
   segments: TextSegment[];
   pages: number | null;
+  ocr: OcrInfo | null; // null — весь текст из текстового слоя
 }
 
 // ---------- Найденные сущности ----------
@@ -128,6 +144,9 @@ export interface ChecklistItem {
 // След проверки (контракт v2): по нему отчёт можно воспроизвести.
 export type LlmProvider = "mock" | "openai_compatible";
 
+// Режим нейросети (контракт v3): без нейросети / локальная Ollama / облачный API.
+export type LlmMode = "mock" | "local" | "cloud";
+
 export interface AuditInfo {
   document_sha256: string; // sha256 исходного файла (для запроса — текста в UTF-8)
   ruleset_version: string; // первые 12 hex sha256 канонического JSON включённых правил
@@ -137,6 +156,7 @@ export interface AuditInfo {
   llm_provider: LlmProvider;
   llm_model: string | null; // null в режиме mock
   llm_calls: number; // реальных вызовов LLM (без кэша и mock)
+  llm_mode: LlmMode; // режим нейросети проверки; в старых отчётах — "mock"
 }
 
 export interface Report {
@@ -154,6 +174,7 @@ export interface Report {
   llm_used: boolean;
   audit: AuditInfo;
   redacted_available: boolean; // есть ли обезличенная копия (redactedUrl)
+  ocr: OcrInfo | null; // копия ExtractedDocument.ocr; null — OCR не применялся
 }
 
 // ---------- «Что видела нейросеть»: журнал вызовов LLM ----------
@@ -213,6 +234,8 @@ export interface QueryRequest {
   /** Не больше 200 000 символов (contracts.md, раздел 4.1). */
   text: string;
   purpose: DocPurpose;
+  /** Не указан или null — режим по умолчанию сервера. */
+  llm_mode?: LlmMode | null;
 }
 
 // Все смещения в Report и ReportText.segments — в координатах ИСХОДНОГО текста.
@@ -227,4 +250,66 @@ export interface HealthStatus {
   status: "ok" | "degraded"; // degraded — db или redis недоступны
   db: boolean;
   redis: boolean;
+}
+
+// ---------- Комплект документов и сводный отчёт (контракт v3) ----------
+export interface BatchCreate {
+  name?: string | null; // до 120 символов
+  purpose: DocPurpose;
+}
+
+export interface BatchCreated {
+  batch_id: string;
+}
+
+export type BatchDocumentStatus = "queued" | "processing" | "done" | "failed";
+
+export interface BatchDocument {
+  document_id: string;
+  task_id: string;
+  filename: string | null; // безопасное имя: ПДн в имени заменены нейтральным
+  purpose: DocPurpose;
+  status: BatchDocumentStatus;
+  report_id: string | null;
+  overall: Overall | null;
+  violations_red: number;
+  violations_yellow: number;
+  ocr: boolean; // хотя бы одна страница распознана OCR
+  error: string | null;
+}
+
+export interface BatchRuleSummary {
+  rule_id: string;
+  title: string;
+  severity: Severity;
+  documents: number; // ≥ 1: в скольких документах сработало
+}
+
+export interface BatchSummary {
+  batch_id: string;
+  name: string | null;
+  purpose: DocPurpose;
+  created_at: string; // ISO 8601
+  complete: boolean; // нет документов queued/processing
+  overall: Overall | null; // худший среди готовых; null — готовых нет
+  documents_total: number;
+  documents_done: number;
+  documents_failed: number;
+  violations_red: number;
+  violations_yellow: number;
+  rules: BatchRuleSummary[]; // red раньше yellow, затем по убыванию documents, затем rule_id
+  documents: BatchDocument[]; // red → yellow → green → processing/queued → failed
+}
+
+// ---------- Режимы нейросети (контракт v3) ----------
+export interface LlmModeInfo {
+  mode: LlmMode;
+  available: boolean;
+  model: string | null;
+  reason: string | null; // почему недоступен: «Ollama не запущена», «Нет ключа в .env»
+}
+
+export interface LlmModesResponse {
+  default: LlmMode;
+  modes: LlmModeInfo[]; // всегда три: mock, local, cloud
 }

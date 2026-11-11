@@ -1,0 +1,23 @@
+{
+  "default": "mock",
+  "modes": [
+    {
+      "mode": "mock",
+      "available": true,
+      "model": null,
+      "reason": null
+    },
+    {
+      "mode": "local",
+      "available": false,
+      "model": null,
+      "reason": "Ollama не запущена"
+    },
+    {
+      "mode": "cloud",
+      "available": true,
+      "model": "gpt-4o-mini",
+      "reason": null
+    }
+  ]
+}

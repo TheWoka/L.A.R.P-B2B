@@ -5,8 +5,9 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from app.schemas.document import DocPurpose, TextSegment
+from app.schemas.document import DocPurpose, OcrInfo, TextSegment
 from app.schemas.entity import Entity
+from app.schemas.llm import LlmMode
 from app.schemas.marker import Evidence
 from app.schemas.rule import Violation
 
@@ -32,6 +33,7 @@ class AuditInfo(BaseModel):
     llm_provider: Literal["mock", "openai_compatible"]
     llm_model: str | None            # None в режиме mock
     llm_calls: int = Field(0, ge=0)  # реальных вызовов LLM (без кэша и mock)
+    llm_mode: LlmMode = "mock"       # режим нейросети проверки (контракт v3)
 
 
 class Report(BaseModel):
@@ -49,6 +51,7 @@ class Report(BaseModel):
     llm_used: bool                   # False, если работали в режиме mock / без ключа
     audit: AuditInfo                 # след проверки (контракт v2)
     redacted_available: bool = False  # есть ли обезличенная копия (GET .../redacted)
+    ocr: OcrInfo | None = None       # копия ExtractedDocument.ocr (контракт v3)
 
 
 class ReportText(BaseModel):

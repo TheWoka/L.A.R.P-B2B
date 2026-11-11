@@ -31,12 +31,27 @@ class TextSegment(BaseModel):
     section: str | None = None       # "3.2. Обязанности сторон" или "Лист1!B2"
 
 
+class OcrPage(BaseModel):            # контракт v3 (schemas/document.py)
+    page: int = Field(ge=1)
+    confidence: float = Field(ge=0, le=1)  # средняя уверенность слов страницы
+
+
+class OcrInfo(BaseModel):            # контракт v3: распознавание страниц без текстового слоя
+    engine: str                      # "tesseract-5.3.0 rus+eng"
+    pages: list[OcrPage]             # только распознанные страницы
+    mean_confidence: float = Field(ge=0, le=1)  # по всем распознанным словам
+    low_confidence_pages: list[int] = []        # confidence < 0.75 (OCR_LOW_PAGE_CONF)
+    low_confidence_spans: list[tuple[int, int]] = []  # [start, end) слов с conf < 0.6
+                                     # (OCR_LOW_WORD_CONF), координаты полного текста
+
+
 class ExtractedDocument(BaseModel):
     document_id: str
     filename: str
     text: str                        # полный текст; сегменты склеены через "\n"
     segments: list[TextSegment]
     pages: int | None = None
+    ocr: OcrInfo | None = None       # None — весь текст из текстового слоя (контракт v3)
 
 
 # ---------- Найденные сущности ----------
@@ -135,6 +150,22 @@ class Violation(BaseModel):
     source: Literal["rule", "llm"]
 
 
+# ---------- Режимы нейросети (schemas/llm.py, контракт v3) ----------
+LlmMode = Literal["mock", "local", "cloud"]  # без нейросети / локальная Ollama / облачный API
+
+
+class LlmModeInfo(BaseModel):
+    mode: LlmMode
+    available: bool
+    model: str | None = None
+    reason: str | None = None        # почему недоступен: «Ollama не запущена», «Нет ключа в .env»
+
+
+class LlmModesResponse(BaseModel):   # ответ GET /api/llm/modes; ключ API никогда не возвращается
+    default: LlmMode
+    modes: list[LlmModeInfo]         # всегда три: mock, local, cloud
+
+
 # ---------- Отчёт ----------
 class AuditInfo(BaseModel):          # след проверки: отчёт можно воспроизвести и проверить
     document_sha256: str             # sha256 исходного файла (для текстового запроса — его текста в UTF-8)
@@ -145,6 +176,7 @@ class AuditInfo(BaseModel):          # след проверки: отчёт м�
     llm_provider: Literal["mock", "openai_compatible"]
     llm_model: str | None            # None в режиме mock
     llm_calls: int = Field(0, ge=0)  # реальных вызовов LLM (без кэша и mock)
+    llm_mode: LlmMode = "mock"       # режим нейросети проверки (контракт v3); старые отчёты — "mock"
 
 
 class ChecklistItem(BaseModel):
@@ -169,6 +201,54 @@ class Report(BaseModel):
     llm_used: bool                   # False, если работали в режиме mock / без ключа
     audit: AuditInfo                 # след проверки (контракт v2)
     redacted_available: bool = False # есть ли обезличенная копия (GET /api/reports/{id}/redacted)
+    ocr: OcrInfo | None = None       # копия ExtractedDocument.ocr (контракт v3)
+
+
+# ---------- Комплект документов и сводный отчёт (schemas/batch.py, контракт v3) ----------
+class BatchCreate(BaseModel):        # тело POST /api/batches
+    name: str | None = Field(None, max_length=120)
+    purpose: DocPurpose
+
+
+class BatchCreated(BaseModel):       # ответ 201 POST /api/batches
+    batch_id: str
+
+
+class BatchDocument(BaseModel):
+    document_id: str
+    task_id: str
+    filename: str | None             # безопасное имя: ПДн в имени -> нейтральное
+    purpose: DocPurpose
+    status: Literal["queued", "processing", "done", "failed"]
+    report_id: str | None = None
+    overall: Literal["red", "yellow", "green"] | None = None
+    violations_red: int = Field(0, ge=0)
+    violations_yellow: int = Field(0, ge=0)
+    ocr: bool = False                # хотя бы одна страница распознана OCR
+    error: str | None = None         # понятный пользователю текст, без технических деталей
+
+
+class BatchRuleSummary(BaseModel):
+    rule_id: str
+    title: str
+    severity: Literal["red", "yellow"]
+    documents: int = Field(ge=1)     # в скольких документах сработало
+
+
+class BatchSummary(BaseModel):       # ответ GET /api/batches/{batch_id}
+    batch_id: str
+    name: str | None
+    purpose: DocPurpose
+    created_at: datetime
+    complete: bool                   # нет queued/processing
+    overall: Literal["red", "yellow", "green"] | None  # худший среди готовых; None — готовых нет
+    documents_total: int
+    documents_done: int
+    documents_failed: int
+    violations_red: int
+    violations_yellow: int
+    rules: list[BatchRuleSummary]    # red раньше yellow, затем по убыванию documents, затем rule_id
+    documents: list[BatchDocument]   # red -> yellow -> green -> processing/queued -> failed
 
 
 # ---------- «Что видела нейросеть»: журнал вызовов LLM (schemas/llm_log.py) ----------
@@ -229,7 +309,12 @@ class TaskInfo(BaseModel):
 **След проверки (`Report.audit`).** Тот же документ + те же правила и словари + та же версия
 приложения = тот же результат. `ruleset_version` и `dictionaries_version` — первые 12 hex
 sha256 канонического JSON (ключи отсортированы, без пробелов) включённых правил и содержимого
-`data/rules/dictionaries.yaml`. Значения ПДн в `audit` не попадают.
+`data/rules/dictionaries.yaml`. Значения ПДн в `audit` не попадают. `llm_mode` — режим, в котором
+реально шла проверка (контракт v3); у отчётов, сохранённых до v3, — значение по умолчанию `"mock"`.
+
+**Совместимость v3.** Все поля контракта v3 в существующих моделях (`ExtractedDocument.ocr`,
+`Report.ocr`, `AuditInfo.llm_mode`, `QueryRequest.llm_mode`) необязательные и со значениями по
+умолчанию: отчёты из БД, сохранённые до v3, и `report.example.json` валидируются без изменений.
 
 **Правило итогового светофора:** `red`, если есть хотя бы одно нарушение `red`; иначе `yellow`, если есть хотя бы одно `yellow`; иначе `green`.
 
@@ -281,6 +366,10 @@ sha256 канонического JSON (ключи отсортированы, �
 ```python
 # services/extraction/extract.py
 def extract(path: Path, filename: str, document_id: str) -> ExtractedDocument: ...
+# контракт v3: возвращает и ExtractedDocument.ocr. Форматы: .pdf .docx .xlsx .xml
+# и изображения .png .jpg .jpeg .tif .tiff (каждый кадр TIFF — страница).
+# OCR — только для страниц без текстового слоя (PDF-скан, изображение); страницы с текстовым
+# слоем читаются как раньше. Ни одна страница не распознавалась → ocr = None.
 
 # services/detection/detect.py
 def detect(doc: ExtractedDocument) -> list[Entity]: ...          # regex + NER + словари
@@ -333,8 +422,12 @@ XML (выгрузки ЕИС, T-064a): сегмент = одно поле (ли�
 
 | Метод | Путь | Тело / параметры | Ответ |
 |---|---|---|---|
-| POST | `/api/documents` | multipart: `file` (.pdf / .docx / .xlsx / .xml), `purpose` | `202 TaskCreated` |
-| POST | `/api/queries` | JSON `QueryRequest` | `202 TaskCreated` |
+| POST | `/api/documents` | multipart: `file` (.pdf / .docx / .xlsx / .xml / .png / .jpg / .jpeg / .tif / .tiff), `purpose`; необязательные `batch_id`, `llm_mode` (v3) | `202 TaskCreated`; `batch_id` неизвестен → `404`; в комплекте уже `BATCH_MAX_DOCUMENTS` документов → `400`; `llm_mode` недоступен → `400` |
+| POST | `/api/queries` | JSON `QueryRequest` (необязательное `llm_mode`, v3) | `202 TaskCreated`; `llm_mode` недоступен → `400` |
+| POST | `/api/batches` | JSON `BatchCreate` | `201 BatchCreated` |
+| GET | `/api/batches/{batch_id}` | — | `BatchSummary`; нет комплекта → `404` |
+| GET | `/api/batches/{batch_id}/export?format=json\|md\|pdf` | — | файл `batch_<id>.<ext>` (`Content-Disposition: attachment`); нет комплекта → `404` |
+| GET | `/api/llm/modes` | — | `LlmModesResponse`; ключ API никогда не возвращается |
 | GET | `/api/tasks/{task_id}` | — | `TaskInfo` |
 | GET | `/api/reports/{report_id}` | — | `Report` |
 | GET | `/api/reports/{report_id}/text` | — | `ReportText` — текст с **замаскированными** ПДн для подсветки |
@@ -348,7 +441,8 @@ XML (выгрузки ЕИС, T-064a): сегмент = одно поле (ли�
 | DELETE | `/api/rules/{id}` | — | `204` |
 | GET | `/api/health` | — | `HealthStatus` |
 
-Ограничения: файл до 50 МБ; форматы .pdf, .docx, .xlsx, .xml (у .xml после UTF-8 BOM и пробелов первым должен идти `<`); иначе `400 {detail: "понятное сообщение"}`.
+Ограничения: файл до 50 МБ; форматы .pdf, .docx, .xlsx, .xml (у .xml после UTF-8 BOM и пробелов первым должен идти `<`) и изображения (v3) с проверкой сигнатуры: .png — `89 50 4E 47`, .jpg / .jpeg — `FF D8 FF`, .tif / .tiff — `49 49 2A 00` или `4D 4D 00 2A`; иначе `400 {detail: "понятное сообщение"}`.
+Режим нейросети (v3): `llm_mode` не указан → `LLM_DEFAULT_MODE`; режим есть в `GET /api/llm/modes`, но `available=false` → `400` с `reason` в `detail`.
 Ошибки валидации запроса: `422 {"detail": "строка по-русски"}`; ответ не содержит введённых значений.
 Исходные файлы удаляются после обработки; отчёты хранятся `REPORT_TTL_DAYS` дней (по умолчанию 7) — система сама соблюдает сроки хранения, которые проверяет.
 Обезличенная копия создаётся в конвейере **до** удаления исходника и хранится тот же срок, что отчёт (`REPORT_TTL_DAYS`); правила копии — в разделе 4.1.
@@ -365,6 +459,7 @@ class TaskCreated(BaseModel):        # ответ POST /api/documents и POST /a
 class QueryRequest(BaseModel):       # тело POST /api/queries
     text: str = Field(min_length=1, max_length=200_000)
     purpose: DocPurpose
+    llm_mode: LlmMode | None = None  # None — режим по умолчанию сервера (контракт v3)
 
 
 # schemas/report.py
@@ -412,6 +507,16 @@ class HealthStatus(BaseModel):       # ответ GET /api/health
 - .xml (T-064b): поля — те же, что видел детектор (`iter_xml_fields`); поле ФИО (lastName/firstName/middleName одного родителя), в котором найдено хоть одно значение ПДн, целиком становится «[ФИО]» в каждом элементе; найденные значения заменяются и в атрибутах и tail-тексте. Префиксы пространств имён сохраняются, вывод — UTF-8 с XML-декларацией; комментарии и инструкции обработки в копию не попадают.
 - Коммерческая тайна и финансы не трогаются (решение 17.10): маскируются только ПДн.
 
+**Комплект и сводный отчёт (контракт v3).**
+- `BatchSummary` не хранится, а **вычисляется при чтении** из статусов задач и отчётов документов комплекта; значений ПДн не содержит (только счётчики, `rule_id`, `title`, безопасные имена файлов).
+- `filename` в `BatchDocument` — безопасное имя: если в имени файла найдены ПДн, показывается нейтральное имя («Документ_3.pdf»).
+- `complete = true`, когда в комплекте нет документов `queued`/`processing`. `overall` — худший светофор среди готовых (`done`) документов; готовых нет → `None`.
+- Порядок `rules`: `red` раньше `yellow`, затем по убыванию `documents`, затем по `rule_id`. Порядок `documents`: `red` → `yellow` → `green` → `processing`/`queued` → `failed`.
+- Комплект удаляется retention'ом, когда в нём не осталось документов (отчёты удалены по `REPORT_TTL_DAYS`).
+
+**OCR (контракт v3).** `Report.ocr` — копия `ExtractedDocument.ocr`; `None`, если весь текст взят из текстового слоя. Смещения в `low_confidence_spans` — в координатах полного исходного текста, как и все смещения отчёта.
+Обезличенная копия OCR-документа: пиксели под ПДн **закрашиваются** на изображении страницы (в PDF-скане и в файле-изображении); если закрасить не удалось — копии нет и `redacted_available = false`.
+
 **Журнал LLM (`LlmCall`).** `masked_fragment` — ровно то, что ушло в LLM, поэтому в журнале
 только плейсхолдеры (`[PERSON_1]`). Исходный текст в журнал не пишется и при показе не
 восстанавливается (AGENTS.md, правило 5).
@@ -428,22 +533,42 @@ POSTGRES_DB=auditor
 DATABASE_URL=postgresql+psycopg://auditor:auditor@postgres:5432/auditor
 REDIS_URL=redis://redis:6379/0
 
-LLM_PROVIDER=mock                 # mock | openai_compatible
+LLM_PROVIDER=mock                 # mock | openai_compatible (старые переменные — см. ниже)
 LLM_BASE_URL=                     # например https://<сервис>/v1 или http://ollama:11434/v1
 LLM_API_KEY=
 LLM_MODEL=
+
+# Режимы нейросети (контракт v3). Старые LLM_PROVIDER/LLM_BASE_URL/LLM_API_KEY/LLM_MODEL
+# продолжают работать и задают режим по умолчанию.
+LLM_DEFAULT_MODE=mock             # mock | local | cloud
+LLM_LOCAL_BASE_URL=http://ollama:11434/v1
+LLM_LOCAL_MODEL=
+LLM_CLOUD_BASE_URL=
+LLM_CLOUD_API_KEY=                # только в .env; в API и логи не попадает
+LLM_CLOUD_MODEL=
 LLM_MAX_CALLS_PER_DOC=30
 LLM_TIMEOUT_S=30                  # таймаут одного запроса к LLM, с; float > 0; локально на CPU — 120
 LLM_REASONING_EFFORT=             # необязательно; "none" — выключить рассуждения локальной модели (Ollama: Qwen3.5, Gemma 4); облаку не задавать
 
 MAX_UPLOAD_MB=50
 REPORT_TTL_DAYS=7
+
+# OCR (контракт v3)
+OCR_LANG=rus+eng
+OCR_DPI=300
+OCR_MAX_PAGES=100
+OCR_LOW_WORD_CONF=0.6             # слово с уверенностью ниже — в low_confidence_spans
+OCR_LOW_PAGE_CONF=0.75            # страница со средней уверенностью ниже — в low_confidence_pages
+
+# Комплект документов (контракт v3)
+BATCH_MAX_DOCUMENTS=20
 ```
 
 ## История изменений
 
 | Дата | Что изменилось | Кто решил |
 |---|---|---|
+| 2026-11-11 | **Контракт v3: комплект и сводный отчёт, OCR, режимы нейросети (решение Данилы)**, T-070. Раздел 1: `OcrPage`, `OcrInfo`, `ExtractedDocument.ocr`, `Report.ocr`, `AuditInfo.llm_mode`, `LlmMode`, `LlmModeInfo`, `LlmModesResponse`, `BatchCreate`, `BatchCreated`, `BatchDocument`, `BatchRuleSummary`, `BatchSummary`; все новые поля старых моделей необязательные. Раздел 3: `extract` возвращает `ocr`, форматы изображений. Раздел 4: `/api/batches`, `/api/llm/modes`, поля `batch_id`/`llm_mode` в `POST /api/documents`, `llm_mode` в `QueryRequest`. Раздел 5: `LLM_DEFAULT_MODE`, `LLM_LOCAL_*`, `LLM_CLOUD_*`, `OCR_*`, `BATCH_MAX_DOCUMENTS` | Данила (тимлид) |
 | 2026-10-31 | Раздел 5: убран EMBEDDING_MODEL — модуль RAG (заглушка T-014) удалён; статьи законов открываются из data/legal | Данила (тимлид) |
 | 2026-10-30 | обезличенная копия .xml | Данила (тимлид) |
 | 2026-10-29 | .xml (выгрузки ЕИС) в POST /api/documents; обезличенная копия .xml — T-064b | Данила (тимлид) |

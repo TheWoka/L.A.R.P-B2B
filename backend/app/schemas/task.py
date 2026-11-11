@@ -5,6 +5,7 @@ from enum import Enum
 from pydantic import BaseModel, Field, field_validator
 
 from app.schemas.document import DocPurpose
+from app.schemas.llm import LlmMode
 
 
 class TaskStatus(str, Enum):
@@ -43,6 +44,7 @@ class QueryRequest(BaseModel):
 
     text: str = Field(min_length=1, max_length=200_000)
     purpose: DocPurpose
+    llm_mode: LlmMode | None = None  # None — режим по умолчанию сервера (контракт v3)
 
     @field_validator("text", mode="before")
     @classmethod
