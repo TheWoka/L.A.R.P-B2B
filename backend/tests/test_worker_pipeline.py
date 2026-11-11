@@ -24,7 +24,7 @@ from tests.test_extraction_ocr import image_pdf, make_line, mixed_image_pdf
 from tests.test_pipeline import NAME, TEXT, make_report
 
 
-def test_ocr_pipeline_progress_report_and_no_redaction(
+def test_ocr_pipeline_progress_and_report(
     session: Session, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from app.services.extraction import pdf
@@ -33,8 +33,6 @@ def test_ocr_pipeline_progress_report_and_no_redaction(
     image_pdf(path, Image.new("RGB", (100, 100), "white"), 2)
     task = create_task(session, path, path.name)
     monkeypatch.setattr(pdf, "ocr_image", lambda image: [make_line(("Синтетический", 0.5))])
-    redact = Mock(side_effect=AssertionError("OCR redaction belongs to T-072"))
-    monkeypatch.setattr(tasks, "redact", redact)
     stages: list[tuple[str, int]] = []
     original_extract = tasks.extract
 
@@ -61,28 +59,30 @@ def test_ocr_pipeline_progress_report_and_no_redaction(
     row = session.get(ReportRow, task.report_id)
     report = Report.model_validate(row.data)
     assert report.ocr is not None and [page.page for page in report.ocr.pages] == [1, 2]
-    assert not report.redacted_available and row.redacted is None
-    redact.assert_not_called()
     assert not path.exists()
 
 
-def test_mixed_page_pipeline_never_returns_redacted_copy(
+def test_mixed_page_pipeline_returns_pixel_redacted_copy(
     session: Session, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
     contact_image: Image.Image,
 ) -> None:
     path = tmp_path / "mixed-scan.pdf"
     mixed_image_pdf(path, contact_image)
     task = create_task(session, path, path.name)
-    redact = Mock(side_effect=AssertionError("Image redaction belongs to T-072"))
-    monkeypatch.setattr(tasks, "redact", redact)
     tasks.run_pipeline(task.id, session)
     assert task.status == "done" and task.error is None
     row = session.get(ReportRow, task.report_id)
     report = Report.model_validate(row.data)
     assert report.ocr is not None and [page.page for page in report.ocr.pages] == [1]
     assert {entity.type.value for entity in report.entities} >= {"PERSON", "PHONE"}
-    assert not report.redacted_available and row.redacted is None
-    redact.assert_not_called()
+    # T-072: копия смешанной страницы — пиксели под ПДн закрашены, самопроверка пройдена.
+    assert report.redacted_available and row.redacted_ext == "pdf"
+    from app.services.extraction.extract import extract as extract_copy
+
+    copy_path = tmp_path / "copy.pdf"
+    copy_path.write_bytes(row.redacted)
+    copy_text = extract_copy(copy_path, copy_path.name, "copy").text
+    assert "Тихонов" not in copy_text and "000-00-01" not in copy_text
     assert not path.exists()
 
 

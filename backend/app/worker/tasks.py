@@ -58,6 +58,9 @@ def make_redacted_copy(
     извлечением находит исходное значение ПДн, не отдаётся. В лог — только тип
     исключения, формат и число оставшихся значений (AGENTS.md, правило 4).
     """
+    if not scan_copy_allowed(doc):
+        logger.info("task_id=%s копия скана пропущена: %d страниц", task_id, ocr_page_count(doc))
+        return None
     if doc.ocr is not None:
         return None  # Обезличивание пикселей — T-072.
     try:
