@@ -8,9 +8,11 @@
 from dataclasses import dataclass
 from pathlib import Path
 
+from app.core.config import OCR_REDACT_MAX_PAGES, get_settings
 from app.schemas import Entity, ExtractedDocument
 from app.services.masking.masker import MASKED_CATEGORIES
 from app.services.redaction.docx import redact_docx
+from app.services.redaction.ocr_image import IMAGE_FORMATS, redact_image_file
 from app.services.redaction.pdf import redact_pdf
 from app.services.redaction.values import DEFAULT_LABEL, LABELS, PdValue, pd_values, replace_values
 from app.services.redaction.xlsx import redact_xlsx
@@ -22,13 +24,29 @@ MEDIA_TYPES: dict[str, str] = {
     "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "txt": "text/plain; charset=utf-8",
     "xml": "application/xml",
+    # Копии сканов-изображений (T-072, контракт v3, раздел 4.1).
+    "png": "image/png",
+    "jpg": "image/jpeg",
+    "jpeg": "image/jpeg",
+    "tif": "image/tiff",
+    "tiff": "image/tiff",
 }
 
 
 @dataclass(frozen=True)
 class RedactedFile:
     content: bytes
-    ext: str          # без точки: "docx", "xlsx", "pdf", "txt", "xml"
+    ext: str          # без точки: "docx", "xlsx", "pdf", "txt", "xml", "png", "jpg", "tiff"…
+
+
+def ocr_page_count(doc: ExtractedDocument) -> int:
+    """Сколько страниц документа распознано OCR; 0 — весь текст из текстового слоя."""
+    return len(doc.ocr.pages) if doc.ocr is not None else 0
+
+
+def scan_copy_allowed(doc: ExtractedDocument) -> bool:
+    """Копию скана делаем, только если OCR-страниц не больше OCR_REDACT_MAX_PAGES (T-072)."""
+    return ocr_page_count(doc) <= OCR_REDACT_MAX_PAGES
 
 
 def redact(source: Path, doc: ExtractedDocument, entities: list[Entity]) -> RedactedFile:
@@ -37,6 +55,7 @@ def redact(source: Path, doc: ExtractedDocument, entities: list[Entity]) -> Reda
     source — исходный файл (для текстового запроса — .txt с его текстом), doc — результат
     извлечения этого файла, entities — найденные сущности (координаты в doc.text).
     Формат определяется по расширению source. Неподдерживаемый формат — ValueError.
+    Изображение и страницы PDF из doc.ocr — закраска пикселей (T-072).
     """
     ext = source.suffix.lower().lstrip(".")
     values = pd_values(doc, entities)
@@ -47,7 +66,10 @@ def redact(source: Path, doc: ExtractedDocument, entities: list[Entity]) -> Reda
     elif ext == "xlsx":
         content = redact_xlsx(source, values)
     elif ext == "pdf":
-        content = redact_pdf(source, values)
+        ocr_pages = frozenset(page.page for page in doc.ocr.pages) if doc.ocr else frozenset()
+        content = redact_pdf(source, values, ocr_pages, get_settings().ocr_dpi)
+    elif ext in IMAGE_FORMATS:
+        content = redact_image_file(source, values)
     elif ext == "xml":
         content = redact_xml(source, values)
     else:

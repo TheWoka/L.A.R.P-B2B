@@ -12,6 +12,7 @@ from pathlib import Path
 
 import pymupdf
 
+from app.services.redaction.ocr_image import image_page_bytes, redact_image, render_page
 from app.services.redaction.values import PdValue, normalize_spaces, replace_values
 
 FILL = (0, 0, 0)          # чёрная плашка — явно видно, что здесь были ПДн
@@ -22,24 +23,55 @@ _AUTHOR_FIELDS = ("author", "creator", "producer")
 _PROPERTY_FIELDS = ("title", "subject", "keywords")
 
 
-def redact_pdf(source: Path, values: list[PdValue]) -> bytes:
+def redact_pdf(
+    source: Path, values: list[PdValue], ocr_pages: frozenset[int] = frozenset(), dpi: int = 300,
+) -> bytes:
     """Возвращает байты копии .pdf, где значения ПДн удалены и подписаны метками.
 
     Значение ищется на всех страницах: то же ФИО на другой странице детектор мог
     не отметить, а в копии его быть не должно. Метаданные (автор, XMP) очищаются,
     ссылки с ПДн в адресе (mailto:…) удаляются.
+
+    ocr_pages — номера страниц (с 1), текст которых распознан OCR (T-072): они
+    перерисовываются с dpi извлечения, пиксели под ПДн закрашиваются, и в копию идёт
+    новая страница только из этой картинки. Остальные страницы — редакция текста.
     """
     font = pymupdf.Font("helv")  # встроенный Nimbus Sans: есть кириллица для меток
     with pymupdf.open(source, filetype="pdf") as document:
         for page in document:
+            if page.number + 1 in ocr_pages:
+                continue
             hits = _redact_page(page, values)
             if hits:
                 page.insert_font(fontname=LABEL_FONT, fontbuffer=font.buffer)
                 for rect, label in hits:
                     _draw_label(page, rect, label, font)
             _remove_links(page, values)
+        if ocr_pages:
+            return _rebuild_with_scans(document, values, ocr_pages, dpi)
         _clean_metadata(document, values)
         return document.tobytes(garbage=4, deflate=True)
+
+
+def _rebuild_with_scans(
+    document: pymupdf.Document, values: list[PdValue], ocr_pages: frozenset[int], dpi: int,
+) -> bytes:
+    """Новый PDF: текстовые страницы копируются, скан-страницы — заново из картинок.
+
+    Собираем новый файл, а не правим старый: на месте скан-страницы не остаётся ни
+    исходной картинки, ни аннотаций, ни ссылок; метаданных у нового файла нет.
+    """
+    with pymupdf.open() as copy:
+        for page in document:
+            if page.number + 1 not in ocr_pages:
+                copy.insert_pdf(document, from_page=page.number, to_page=page.number)
+                continue
+            image = redact_image(render_page(page, dpi), values)
+            new_page = copy.new_page(width=page.rect.width, height=page.rect.height)
+            new_page.insert_image(new_page.rect, stream=image_page_bytes(image))
+        copy.set_metadata({})
+        copy.del_xml_metadata()
+        return copy.tobytes(garbage=4, deflate=True)
 
 
 def _redact_page(page: pymupdf.Page, values: list[PdValue]) -> list[tuple[pymupdf.Rect, str]]:
