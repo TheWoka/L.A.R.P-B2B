@@ -54,3 +54,16 @@ test("sends the selected text mode and preserves the default for older callers",
   expected = "local";
   await submitQuery({ text: "Синтетический документ", purpose: "internal", llm_mode: "local" });
 });
+
+test("sends batch_id and llm_mode together for a bundle upload", async (t) => {
+  t.mock.method(globalThis, "fetch", async (url, init) => {
+    assert.equal(url, "/api/documents");
+    assert.equal(init.body.get("batch_id"), "batch-synthetic");
+    assert.equal(init.body.get("llm_mode"), "local");
+    return Response.json(task, { status: 202 });
+  });
+  assert.deepEqual(
+    await uploadDocument(new File(["%PDF"], "synthetic.pdf"), "publication", { batchId: "batch-synthetic", llmMode: "local" }),
+    task,
+  );
+});
