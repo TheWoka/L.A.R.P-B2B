@@ -4,7 +4,8 @@
 1. `name.txt` с разметкой в тексте `[[TYPE:значение]]` (стартовый набор eval/seed, markup.py);
 2. `name.docx|pdf|xlsx|txt` + `name.json` (генератор T-011):
    `{"purpose": "...", "entities": [{"type", "category", "start", "end"}]}`, смещения —
-   в `ExtractedDocument.text`, который вернёт `extract()`.
+   в `ExtractedDocument.text`, который вернёт `extract()`. Корпус сканов (T-077b) добавляет
+   `"lost": true` — сущность потеряна OCR, `start == end`; она остаётся в эталоне пропуском.
 Если рядом с `name.txt` лежит `name.json` — это формат 2, разметка в тексте не ищется.
 """
 
@@ -43,10 +44,17 @@ def _read_document(path: Path) -> ExtractedDocument:
 
 
 def validate_gold(gold: list[GoldEntity], text_len: int, source: str) -> None:
-    """Границы в пределах текста, непустые отрезки, без пересечений → иначе ValueError."""
+    """Границы в пределах текста, непустые отрезки, без пересечений → иначе ValueError.
+
+    Нулевой отрезок допустим только у потерянной OCR сущности (lost=True, T-077b),
+    и наоборот: lost-сущность всегда нулевой длины.
+    """
     prev_end = 0
     for e in sorted(gold, key=lambda g: (g.start, g.end)):
-        if not 0 <= e.start < e.end <= text_len:
+        if e.lost:
+            if not 0 <= e.start == e.end <= text_len:
+                raise ValueError(f"{source}: {e.type.value} lost — нужен start == end в тексте")
+        elif not 0 <= e.start < e.end <= text_len:
             raise ValueError(f"{source}: {e.type.value} [{e.start}, {e.end}) вне текста")
         if e.start < prev_end:
             raise ValueError(f"{source}: эталонные сущности пересекаются в позиции {e.start}")
@@ -66,7 +74,10 @@ def _parse_json_entities(path: Path) -> list[GoldEntity]:
         category = CATEGORY_BY_TYPE[entity_type]
         if "category" in item and item["category"] != category.value:
             raise ValueError(f"{where}: категория {item['category']!r} не подходит к типу")
-        gold.append(GoldEntity(entity_type, category, start, end))
+        lost = item.get("lost", False)
+        if not isinstance(lost, bool):
+            raise ValueError(f"{where}: поле lost — true или false")
+        gold.append(GoldEntity(entity_type, category, start, end, lost=lost))
     return gold
 
 
