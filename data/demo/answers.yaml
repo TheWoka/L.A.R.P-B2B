@@ -82,3 +82,21 @@
   overall: red
   entities: {PERSON: 1, EMAIL: 1, PHONE: 1, TRADE_SECRET: 1}
   violations: [PD_IN_PUBLICATION, TRADE_SECRET_IN_PUBLICATION]
+
+# T-077a: независимые ожидания записаны ДО генерации и первого OCR-прогона.
+# Два разных человека: контактное лицо и руководитель; ИНН юрлица — не ПДн.
+# publication исключает CHECKLIST_NO_APPROVAL / CHECKLIST_NO_MARK.
+- file: 11_scan_application.pdf
+  purpose: publication
+  overall: red
+  entities: {PERSON: 2, PHONE: 1, EMAIL: 1, PASSPORT: 1, SNILS: 1, BIRTH_DATE: 1}
+  violations: [PD_IN_PUBLICATION, CHECKLIST_NO_RETENTION]
+  ocr: true
+
+# Особая категория относится к названному работнику; нет согласия и маркеров.
+- file: 12_scan_anketa.jpg
+  purpose: internal
+  overall: red
+  entities: {PERSON: 1, PHONE: 1, ADDRESS: 1, SPECIAL_CATEGORY: 1}
+  violations: [SPECIAL_PD_NO_CONSENT, CHECKLIST_NO_APPROVAL, CHECKLIST_NO_MARK, CHECKLIST_NO_RETENTION]
+  ocr: true
