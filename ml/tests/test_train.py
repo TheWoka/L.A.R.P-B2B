@@ -29,3 +29,10 @@ def test_params_with_path_list_are_json_serializable(tmp_path: Path) -> None:
     args = tr.parse_args(["--data", str(tmp_path / "a.jsonl"), str(tmp_path / "b.jsonl")])
     dumped = json.dumps(tr.vars_for_json(args))
     assert "a.jsonl" in dumped and "b.jsonl" in dumped
+
+
+def test_work_dir_sets_default_out(tmp_path: Path) -> None:
+    """--work ml/out/v3 → модель в <work>/best; явный --out важнее."""
+    assert tr.parse_args(["--work", str(tmp_path)]).out == tmp_path / "best"
+    assert tr.parse_args(["--work", str(tmp_path), "--out", str(tmp_path / "x")]).out == \
+        tmp_path / "x"

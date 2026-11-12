@@ -25,15 +25,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from common import (  # noqa: E402
     BASE_MODEL,
     BEST_DIR,
-    EVAL_SUMMARY_FILE,
     LABELS,
     MODEL_DIR,
     OUT_DIR,
     SEED,
-    THRESHOLDS_FILE,
-    TRAIN_DIR,
+    TRAIN_SETS,
     default_train_files,
     setup_logging,
+    train_file,
     write_json,
 )
 from predictors import OnnxPredictor, TorchPredictor  # noqa: E402
@@ -77,17 +76,23 @@ def quantize(fp32: Path, out: Path) -> dict[str, int]:
     return compress(fp32, out)
 
 
-def write_assets(model_dir: Path, target: Path) -> dict:
-    """tokenizer, labels.json, thresholds.json (без кривых) рядом с model.onnx."""
+def write_assets(model_dir: Path, target: Path, work: Path) -> dict:
+    """tokenizer, labels.json, thresholds.json (без кривых) рядом с model.onnx.
+
+    Если target совпадает с work (v3 лежит в ml/out/v3 целиком), кривые порогов уезжают
+    в thresholds_curves.json, а thresholds.json остаётся в формате конвейера.
+    """
     AutoTokenizer.from_pretrained(model_dir).save_pretrained(target)
     (target / "labels.json").write_text(json.dumps(list(LABELS)) + "\n", encoding="utf-8")
-    thresholds: dict = {}
-    if THRESHOLDS_FILE.is_file():
-        data = json.loads(THRESHOLDS_FILE.read_text(encoding="utf-8"))
-        thresholds = {k: v for k, v in data.items() if k != "curves"}
-        write_json(target / "thresholds.json", thresholds)
-    else:
-        logger.warning("Нет %s — сначала python ml/evaluate.py", THRESHOLDS_FILE)
+    source = work / "thresholds.json"
+    if not source.is_file():
+        logger.warning("Нет %s — сначала python ml/evaluate.py", source)
+        return {}
+    data = json.loads(source.read_text(encoding="utf-8"))
+    thresholds = {k: v for k, v in data.items() if k != "curves"}
+    if "curves" in data and source.resolve() == (target / "thresholds.json").resolve():
+        write_json(work / "thresholds_curves.json", data)
+    write_json(target / "thresholds.json", thresholds)
     return thresholds
 
 
@@ -143,11 +148,19 @@ def eval_table(summary: dict) -> list[str]:
     return lines
 
 
-def write_card(target: Path, check: dict, thresholds: dict) -> None:
+def data_note() -> str:
+    """«v1: 6136 шт., v2: 6350 шт., …» по stats.json имеющихся наборов."""
+    parts = []
+    for name in TRAIN_SETS:
+        stats = _load(train_file(name).with_name("stats.json"))
+        if stats:
+            parts.append(f"{name}: {stats.get('fragments', '?')} шт.")
+    return ", ".join(parts) or "?"
+
+
+def write_card(target: Path, check: dict, thresholds: dict, work: Path = OUT_DIR) -> None:
     """card.md: что это, на чём обучено, метрики dev/seed, ограничения, лицензия."""
-    stats, train = _load(TRAIN_DIR / "stats.json"), _load(OUT_DIR / "train_metrics.json")
-    stats_v2 = _load(TRAIN_DIR / "v2" / "stats.json")
-    v2_note = f", v2: {stats_v2['fragments']} шт." if stats_v2 else ""
+    train = _load(work / "train_metrics.json")
     best = train.get("best", {})
     lines = [
         "# grif-cls — классификатор фрагментов: коммерческая тайна / особые категории ПДн", "",
@@ -156,8 +169,8 @@ def write_card(target: Path, check: dict, thresholds: dict) -> None:
         "Вход — замаскированный текст ([PERSON_1] …), как в конвейере.",
         "- Формат: ONNX; эмбеддинги int8 (шкала на 26 чисел), веса MatMul fp16, вычисления fp32; "
         "CPU через onnxruntime, без ключа и GPU.",
-        "- Обучение (T-036a): дистилляция — облачная LLM сгенерировала и разметила синтетические "
-        f"фрагменты (v1: {stats.get('fragments', '?')} шт.{v2_note}; всего после дедупликации "
+        "- Обучение: дистилляция — облачная LLM сгенерировала и разметила синтетические "
+        f"фрагменты ({data_note()}; всего после дедупликации "
         f"{train.get('train', 0) + train.get('val', 0)}); реальных документов и ПДн в данных нет.",
         f"- Валидация (10% синтетики): macro-F1 {best.get('macro_f1', '?')}, эпоха "
         f"{best.get('epoch', '?')}.",
@@ -167,7 +180,7 @@ def write_card(target: Path, check: dict, thresholds: dict) -> None:
         *[f"- ⚠️ {label}: precision ≥ 0.75 на eval/dev не достигнут ни при одном пороге сетки."
           for label, ok in thresholds.get("constraint_met", {}).items() if not ok], "",
         "## Метрики на эталонных корпусах (правило совпадения run_eval)", "",
-        *eval_table(_load(EVAL_SUMMARY_FILE)), "",
+        *eval_table(_load(work / "eval" / "summary.json")), "",
         "eval/blind при обучении и выборе порогов не использовался.", "",
         "## ONNX", "",
         f"- Размер model.onnx: {check['size_mb']} МБ (fp32 — {check['fp32_size_mb']} МБ).",
@@ -187,11 +200,16 @@ def write_card(target: Path, check: dict, thresholds: dict) -> None:
 
 def parse_args(argv: list[str] | None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Экспорт классификатора в ONNX (T-036a)")
-    p.add_argument("--model", type=Path, default=BEST_DIR)
-    p.add_argument("--target", type=Path, default=MODEL_DIR)
+    p.add_argument("--work", type=Path, default=OUT_DIR,
+                   help="папка запуска: best/, thresholds.json, eval/ (v3: ml/out/v3)")
+    p.add_argument("--model", type=Path, default=None, help="по умолчанию <work>/best")
+    p.add_argument("--target", type=Path, default=MODEL_DIR,
+                   help="куда положить model.onnx (v3 до решения A/B: ml/out/v3)")
     p.add_argument("--card-only", action="store_true",
                    help="только пересобрать card.md (после evaluate.py --onnx)")
-    return p.parse_args(argv)
+    args = p.parse_args(argv)
+    args.model = args.model or args.work / BEST_DIR.name
+    return args
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -199,15 +217,15 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     if args.card_only:
         thresholds = _load(args.target / "thresholds.json")
-        write_card(args.target, _load(OUT_DIR / "onnx_check.json"), thresholds)
+        write_card(args.target, _load(args.work / "onnx_check.json"), thresholds, args.work)
         return 0
-    fp32 = OUT_DIR / "model_fp32.onnx"
+    fp32 = args.work / "model_fp32.onnx"
     export_fp32(args.model, fp32)
     logger.info("Сжатие: %s", quantize(fp32, args.target / "model.onnx"))
-    thresholds = write_assets(args.model, args.target)
+    thresholds = write_assets(args.model, args.target, args.work)
     check = verify(args.model, args.target, fp32)
-    write_json(OUT_DIR / "onnx_check.json", check)
-    write_card(args.target, check, thresholds)
+    write_json(args.work / "onnx_check.json", check)
+    write_card(args.target, check, thresholds, args.work)
     ok_delta, ok_size = check["max_delta_int8"] < MAX_DELTA, check["size_mb"] <= TARGET_MB
     logger.info("ONNX: %s | Δ < %.2f: %s | ≤ %d МБ: %s", check, MAX_DELTA, ok_delta,
                 TARGET_MB, ok_size)

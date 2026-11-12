@@ -194,22 +194,26 @@ def vars_for_json(args: argparse.Namespace) -> dict:
 def parse_args(argv: list[str] | None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Обучение классификатора фрагментов (T-036a)")
     p.add_argument("--data", type=Path, nargs="+", default=default_train_files(),
-                   help="один или несколько fragments.jsonl (по умолчанию v1 + v2)")
+                   help="один или несколько fragments.jsonl (по умолчанию v1 + v2 + v3)")
+    p.add_argument("--work", type=Path, default=OUT_DIR,
+                   help="папка запуска: best/ и train_metrics.json (v3: ml/out/v3)")
     p.add_argument("--base", default=BASE_MODEL, help="модель HF или локальная папка")
-    p.add_argument("--out", type=Path, default=BEST_DIR)
+    p.add_argument("--out", type=Path, default=None, help="по умолчанию <work>/best")
     p.add_argument("--epochs", type=int, default=4)
     p.add_argument("--batch", type=int, default=32)
     p.add_argument("--lr", type=float, default=5e-5)
     p.add_argument("--val-share", type=float, default=0.1)
     p.add_argument("--seed", type=int, default=SEED)
-    return p.parse_args(argv)
+    args = p.parse_args(argv)
+    args.out = args.out or args.work / BEST_DIR.name
+    return args
 
 
 def main(argv: list[str] | None = None) -> int:
     setup_logging()
     args = parse_args(argv)
     result = fit(args)
-    write_json(OUT_DIR / "train_metrics.json", result)
+    write_json(args.work / "train_metrics.json", result)
     best = result["best"]
     logger.info("Лучшая эпоха %d: macro-F1=%.4f %s → %s", best["epoch"], best["macro_f1"],
                 {k: v["f1-score"] for k, v in best["by_class"].items()}, args.out)

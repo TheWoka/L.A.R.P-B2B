@@ -13,6 +13,9 @@ precision ≥ 0.75); eval/seed — второй контроль; eval/blind н�
 Запуск (из корня репозитория, venv с ml/requirements-ml.txt и backend/requirements.txt):
     python ml/evaluate.py                    # пороги на dev, таблица dev/seed, скорость
     python ml/evaluate.py --onnx             # + вариант сжатой ONNX (после export_onnx.py)
+
+Сравнение с выпущенной моделью (T-080): --work ml/out/v3 --baseline-onnx data/models/grif-cls
+добавляет строки «словари + релиз» — та же ONNX и те же пороги, что в конвейере.
 """
 
 import argparse
@@ -29,13 +32,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from common import (  # noqa: E402
     BEST_DIR,
-    EVAL_SUMMARY_FILE,
     LABELS,
     MODEL_DIR,
     OUT_DIR,
     POSITIVE_LABELS,
     REPO_ROOT,
-    THRESHOLDS_FILE,
     ensure_app_importable,
     refuse_blind,
     setup_logging,
@@ -202,7 +203,7 @@ def markdown_table(rows: list[dict]) -> str:
 
 
 def select_thresholds(dev: list[DocCache], args: argparse.Namespace) -> dict:
-    """Пороги: из файла (--thresholds) или подбором на dev; результат → ml/out/thresholds.json."""
+    """Пороги: из файла (--thresholds) или подбором на dev; результат → <work>/thresholds.json."""
     if args.thresholds:
         return json.loads(args.thresholds.read_text(encoding="utf-8"))
     picked = {label: pick_threshold(dev, label) for label in POSITIVE_LABELS}
@@ -213,7 +214,7 @@ def select_thresholds(dev: list[DocCache], args: argparse.Namespace) -> dict:
         "constraint_met": {label: p["constraint_met"] for label, p in picked.items()},
         "curves": {label: p["curve"] for label, p in picked.items()},
     }
-    write_json(THRESHOLDS_FILE, data)
+    write_json(args.work / "thresholds.json", data)
     return data
 
 
@@ -236,18 +237,36 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Офлайн-оценка словари + классификатор (T-036a)")
     p.add_argument("--dev", type=Path, default=REPO_ROOT / "eval" / "dev")
     p.add_argument("--seed", type=Path, default=REPO_ROOT / "eval" / "seed")
-    p.add_argument("--model", type=Path, default=BEST_DIR, help="папка save_pretrained")
+    p.add_argument("--work", type=Path, default=OUT_DIR,
+                   help="папка запуска: best/, thresholds.json, eval/ (v3: ml/out/v3)")
+    p.add_argument("--model", type=Path, default=None,
+                   help="папка save_pretrained (по умолчанию <work>/best)")
+    p.add_argument("--baseline-onnx", type=Path, default=None,
+                   help="папка выпущенной модели (model.onnx + thresholds.json) для сравнения")
     p.add_argument("--onnx", action="store_true", help="добавить вариант сжатой ONNX")
     p.add_argument("--onnx-dir", type=Path, default=MODEL_DIR)
     p.add_argument("--thresholds", type=Path, help="взять пороги из файла, а не подбирать")
-    p.add_argument("--out", type=Path, default=OUT_DIR / "eval")
-    return p.parse_args(argv)
+    p.add_argument("--out", type=Path, default=None, help="по умолчанию <work>/eval")
+    args = p.parse_args(argv)
+    args.model = args.model or args.work / BEST_DIR.name
+    args.out = args.out or args.work / "eval"
+    return args
+
+
+def baseline_rows(docs: dict[str, list[CorpusDocument]], model_dir: Path, out: Path) -> list[dict]:
+    """Строки выпущенной ONNX-модели с её собственными порогами (как в конвейере)."""
+    data = json.loads((model_dir / "thresholds.json").read_text(encoding="utf-8"))
+    thresholds = {label: float(data[label]) for label in POSITIVE_LABELS}
+    predictor = OnnxPredictor(model_dir)
+    corpora = {name: build_cache(d, predictor) for name, d in docs.items()}
+    logger.info("Релиз %s: пороги %s", model_dir, thresholds)
+    return evaluate_variants(corpora, thresholds, "словари + релиз ONNX", out, with_base=False)
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     setup_logging()
-    for path in (args.dev, args.seed):
+    for path in (args.dev, args.seed, args.model, args.onnx_dir, args.out):
         refuse_blind(path)
     docs = {"dev": load_corpus(args.dev), "seed": load_corpus(args.seed)}
     torch_pred = TorchPredictor(args.model)
@@ -265,14 +284,17 @@ def main(argv: list[str] | None = None) -> int:
         rows += evaluate_variants(onnx_corpora, thresholds, "словари + модель ONNX",
                                   args.out, with_base=False)
         speeds.append(speed(onnx_pred, texts))
+    if args.baseline_onnx:
+        rows += baseline_rows(docs, args.baseline_onnx, args.out)
     rows.sort(key=lambda r: (r["corpus"], r["variant"]))
     table = markdown_table(rows)
     summary = {"thresholds": thresholds, "constraint_met": thr_data.get("constraint_met"),
                "rows": rows, "speed": speeds, "fragments": {
                    name: sum(len(c.fragments) for c in caches) for name, caches in corpora.items()}}
-    write_json(EVAL_SUMMARY_FILE, summary)
-    EVAL_SUMMARY_FILE.with_suffix(".md").write_text(table + "\n", encoding="utf-8")
-    logger.info("\n%s\n\nСкорость: %s\nИтог: %s", table, speeds, EVAL_SUMMARY_FILE)
+    summary_file = args.out / "summary.json"
+    write_json(summary_file, summary)
+    summary_file.with_suffix(".md").write_text(table + "\n", encoding="utf-8")
+    logger.info("\n%s\n\nСкорость: %s\nИтог: %s", table, speeds, summary_file)
     return 0
 
 

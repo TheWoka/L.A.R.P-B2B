@@ -17,6 +17,8 @@
 | `evaluate.py` | честная оценка dev/seed: пороги на dev, таблица «словари → словари + модель», скорость |
 | `export_onnx.py`, `quantize.py` | ONNX + сжатие → `data/models/grif-cls/` (model.onnx, tokenizer, labels, thresholds, card.md) |
 | `predictors.py`, `common.py` | предсказатели PyTorch/ONNX, пути и метки |
+| `demo_check.py` | демо 07–09 с моделью из другой папки (кандидат до замены выпущенной) |
+| `prompts/generate_v2.md`, `prompts/generate_v3.md` | промпты доборов v2 и v3 |
 | `tests/` | `python -m pytest ml/tests -q` |
 
 ## Честность метрики
@@ -46,7 +48,35 @@ docker-compose run --rm -e LLM_TIMEOUT_S=90 -v "${PWD}/ml:/ml" -v "${PWD}/data/t
 docker-compose run --rm -e LLM_MODEL=gpt-4.1 -e LLM_TIMEOUT_S=120 -v "${PWD}/ml:/ml" -v "${PWD}/data/train:/train" api python /ml/generate_data.py --plan v2 --out /train/v2 --price-in 2 --price-out 8 --max-usd 8 --dry-run
 ```
 
-Без `--dry-run` — генерация. `train.py` по умолчанию учится на v1 + v2 (дубли и конфликты меток убираются).
+Без `--dry-run` — генерация. `train.py` по умолчанию учится на всех имеющихся наборах (v1 + v2 + v3; дубли и
+конфликты меток убираются); воспроизвести v2: `--data data/train/fragments.jsonl data/train/v2/fragments.jsonl`.
+
+**1в. Добор v3** (T-080: коммерческая тайна без слов-ярлыков и с суммами словами, особые категории
+в трёх конструкциях, новые трудные NONE — технические характеристики, открытые цены и ставки,
+кадровые сведения; gpt-4.1-mini, 165 вызовов, ≈ 3 000 фрагментов, оценка ≈ 0,6 $, лимит 2 $):
+
+```powershell
+docker-compose run --rm -e LLM_MODEL=gpt-4.1-mini -e LLM_TIMEOUT_S=120 -v "${PWD}/ml:/ml" -v "${PWD}/data/train:/train" api python /ml/generate_data.py --plan v3 --out /train/v3 --price-in 0.4 --price-out 1.6 --max-usd 2 --dry-run
+```
+
+Без `--dry-run` — генерация. Фрагменты, совпавшие с v1 и v2 (`dedup_key`), отбрасываются; фрагменты
+TRADE_SECRET со словом-ярлыком в заданиях «без ярлыков» — тоже (`dropped.ts_keyword` в `stats.json`).
+
+**Кандидат v3 целиком в `ml/out/v3`** (выпущенная `data/models/grif-cls` не меняется до решения A/B):
+
+```powershell
+python ml/train.py --base ml/out/rubert-tiny2 --work ml/out/v3
+python ml/evaluate.py --work ml/out/v3 --baseline-onnx data/models/grif-cls
+python ml/export_onnx.py --work ml/out/v3 --target ml/out/v3
+python ml/evaluate.py --work ml/out/v3 --onnx --onnx-dir ml/out/v3 --thresholds ml/out/v3/thresholds.json --baseline-onnx data/models/grif-cls
+python ml/export_onnx.py --work ml/out/v3 --target ml/out/v3 --card-only
+python ml/demo_check.py --model-dir data/models/grif-cls
+python ml/demo_check.py --model-dir ml/out/v3
+```
+
+`--work` — папка запуска (`best/`, `train_metrics.json`, `thresholds.json`, `eval/`); по умолчанию
+`ml/out`, как раньше. `--baseline-onnx` добавляет в таблицу строки выпущенной модели с её порогами.
+Гиперпараметры v3 те же, что у v2 (значения по умолчанию `train.py`), подбирается только порог.
 
 **2. Окружение для обучения** (отдельный venv, в образ api не попадает):
 
