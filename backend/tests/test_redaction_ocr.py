@@ -214,6 +214,8 @@ def test_media_types_for_images() -> None:
 def test_demo_scans_copy_has_no_pd(repo_root: Path, filename: str) -> None:
     """Демо 11 и 12: копия есть, самопроверка чистая, OCR копии не видит ФИО, телефон, СНИЛС."""
     source = repo_root / "data" / "demo" / filename
+    if not source.is_file():
+        pytest.skip("data/demo недоступен (в образе api нет демо-файлов)")
     doc = extract(source, filename, "doc_demo")
     entities = detect(doc)
     redacted = redact(source, doc, entities)

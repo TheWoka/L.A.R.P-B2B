@@ -8,7 +8,6 @@
 Все данные синтетические (AGENTS.md, правило 2): случайные символы и выдуманные вставки.
 """
 
-import pytest
 from hypothesis import assume, example, given, settings
 from hypothesis import strategies as st
 
@@ -329,10 +328,6 @@ def _plain(start: int, end: int, etype: EntityType, detector: str) -> Entity:
     return make_entity("x" * 20, start, end, etype, detector, 0.9)
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "найдено T-085: merge_entities теряет сущность без конкурента — B уступила A, затем A "
-    "вытеснена C, а B не возвращается и остаётся немаскированной"
-))
 @PROPERTY
 @example([
     _plain(0, 10, T.ADDRESS, "ner"),    # A
