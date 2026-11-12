@@ -1,0 +1,90 @@
+{
+ "purpose": "scan",
+ "source": "10_возмещение.txt",
+ "entities": [
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 67,
+   "end": 88
+  },
+  {
+   "type": "BIRTH_DATE",
+   "category": "pd",
+   "start": 104,
+   "end": 114
+  },
+  {
+   "type": "PASSPORT",
+   "category": "pd",
+   "start": 124,
+   "end": 135
+  },
+  {
+   "type": "INN",
+   "category": "pd",
+   "start": 141,
+   "end": 153
+  },
+  {
+   "type": "SNILS",
+   "category": "pd",
+   "start": 161,
+   "end": 175
+  },
+  {
+   "type": "ADDRESS",
+   "category": "pd",
+   "start": 188,
+   "end": 228
+  },
+  {
+   "type": "PHONE",
+   "category": "pd",
+   "start": 245,
+   "end": 260
+  },
+  {
+   "type": "EMAIL",
+   "category": "pd",
+   "start": 268,
+   "end": 293
+  },
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 316,
+   "end": 329
+  },
+  {
+   "type": "CARD",
+   "category": "pd",
+   "start": 343,
+   "end": 359
+  },
+  {
+   "type": "BANK_ACCOUNT",
+   "category": "pd",
+   "start": 397,
+   "end": 417
+  },
+  {
+   "type": "FINANCIAL",
+   "category": "financial",
+   "start": 452,
+   "end": 507
+  },
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 526,
+   "end": 549
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 579,
+   "end": 662
+  }
+ ]
+}

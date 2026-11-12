@@ -1,0 +1,78 @@
+{
+ "purpose": "scan",
+ "source": "11_переговоры.txt",
+ "entities": [
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 75,
+   "end": 101
+  },
+  {
+   "type": "PHONE",
+   "category": "pd",
+   "start": 116,
+   "end": 132
+  },
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 177,
+   "end": 188
+  },
+  {
+   "type": "EMAIL",
+   "category": "pd",
+   "start": 225,
+   "end": 253
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 255,
+   "end": 332
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 333,
+   "end": 400
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 428,
+   "end": 530
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 532,
+   "end": 632
+  },
+  {
+   "type": "FINANCIAL",
+   "category": "financial",
+   "start": 634,
+   "end": 708
+  },
+  {
+   "type": "FINANCIAL",
+   "category": "financial",
+   "start": 734,
+   "end": 754
+  },
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 809,
+   "end": 822
+  },
+  {
+   "type": "PASSPORT",
+   "category": "pd",
+   "start": 832,
+   "end": 846
+  }
+ ]
+}

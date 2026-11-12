@@ -1,0 +1,72 @@
+{
+ "purpose": "scan",
+ "source": "09_допуск.txt",
+ "entities": [
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 78,
+   "end": 103
+  },
+  {
+   "type": "BIRTH_DATE",
+   "category": "pd",
+   "start": 119,
+   "end": 129
+  },
+  {
+   "type": "PASSPORT",
+   "category": "pd",
+   "start": 140,
+   "end": 154
+  },
+  {
+   "type": "ADDRESS",
+   "category": "pd",
+   "start": 214,
+   "end": 261
+  },
+  {
+   "type": "PHONE",
+   "category": "pd",
+   "start": 277,
+   "end": 295
+  },
+  {
+   "type": "EMAIL",
+   "category": "pd",
+   "start": 297,
+   "end": 322
+  },
+  {
+   "type": "SPECIAL_CATEGORY",
+   "category": "pd_special",
+   "start": 351,
+   "end": 415
+  },
+  {
+   "type": "SPECIAL_CATEGORY",
+   "category": "pd_special",
+   "start": 451,
+   "end": 511
+  },
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 542,
+   "end": 569
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 571,
+   "end": 636
+  },
+  {
+   "type": "FINANCIAL",
+   "category": "financial",
+   "start": 638,
+   "end": 718
+  }
+ ]
+}

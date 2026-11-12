@@ -1,0 +1,78 @@
+{
+ "purpose": "scan",
+ "source": "02_анкета.txt",
+ "entities": [
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 90,
+   "end": 115
+  },
+  {
+   "type": "BIRTH_DATE",
+   "category": "pd",
+   "start": 132,
+   "end": 142
+  },
+  {
+   "type": "SNILS",
+   "category": "pd",
+   "start": 151,
+   "end": 165
+  },
+  {
+   "type": "PASSPORT",
+   "category": "pd",
+   "start": 176,
+   "end": 187
+  },
+  {
+   "type": "ADDRESS",
+   "category": "pd",
+   "start": 253,
+   "end": 294
+  },
+  {
+   "type": "PHONE",
+   "category": "pd",
+   "start": 314,
+   "end": 329
+  },
+  {
+   "type": "EMAIL",
+   "category": "pd",
+   "start": 344,
+   "end": 373
+  },
+  {
+   "type": "SPECIAL_CATEGORY",
+   "category": "pd_special",
+   "start": 404,
+   "end": 457
+  },
+  {
+   "type": "SPECIAL_CATEGORY",
+   "category": "pd_special",
+   "start": 499,
+   "end": 507
+  },
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 546,
+   "end": 557
+  },
+  {
+   "type": "CARD",
+   "category": "pd",
+   "start": 602,
+   "end": 618
+  },
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 630,
+   "end": 647
+  }
+ ]
+}

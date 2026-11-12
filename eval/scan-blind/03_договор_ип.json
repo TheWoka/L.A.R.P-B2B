@@ -1,0 +1,72 @@
+{
+ "purpose": "scan",
+ "source": "03_договор_ип.txt",
+ "entities": [
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 86,
+   "end": 109
+  },
+  {
+   "type": "INN",
+   "category": "pd",
+   "start": 115,
+   "end": 127
+  },
+  {
+   "type": "ADDRESS",
+   "category": "pd",
+   "start": 178,
+   "end": 227
+  },
+  {
+   "type": "BANK_ACCOUNT",
+   "category": "pd",
+   "start": 243,
+   "end": 263
+  },
+  {
+   "type": "FINANCIAL",
+   "category": "financial",
+   "start": 335,
+   "end": 355
+  },
+  {
+   "type": "PHONE",
+   "category": "pd",
+   "start": 416,
+   "end": 432
+  },
+  {
+   "type": "EMAIL",
+   "category": "pd",
+   "start": 434,
+   "end": 459
+  },
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 483,
+   "end": 507
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 541,
+   "end": 598
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 634,
+   "end": 687
+  },
+  {
+   "type": "FINANCIAL",
+   "category": "financial",
+   "start": 689,
+   "end": 755
+  }
+ ]
+}

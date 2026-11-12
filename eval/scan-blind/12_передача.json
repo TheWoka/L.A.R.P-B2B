@@ -1,0 +1,90 @@
+{
+ "purpose": "scan",
+ "source": "12_передача.txt",
+ "entities": [
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 77,
+   "end": 102
+  },
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 112,
+   "end": 136
+  },
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 152,
+   "end": 166
+  },
+  {
+   "type": "PHONE",
+   "category": "pd",
+   "start": 243,
+   "end": 254
+  },
+  {
+   "type": "EMAIL",
+   "category": "pd",
+   "start": 256,
+   "end": 281
+  },
+  {
+   "type": "BIRTH_DATE",
+   "category": "pd",
+   "start": 326,
+   "end": 336
+  },
+  {
+   "type": "SNILS",
+   "category": "pd",
+   "start": 344,
+   "end": 358
+  },
+  {
+   "type": "ADDRESS",
+   "category": "pd",
+   "start": 384,
+   "end": 423
+  },
+  {
+   "type": "SPECIAL_CATEGORY",
+   "category": "pd_special",
+   "start": 458,
+   "end": 465
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 467,
+   "end": 518
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 520,
+   "end": 582
+  },
+  {
+   "type": "FINANCIAL",
+   "category": "financial",
+   "start": 584,
+   "end": 651
+  },
+  {
+   "type": "FINANCIAL",
+   "category": "financial",
+   "start": 669,
+   "end": 689
+  },
+  {
+   "type": "BANK_ACCOUNT",
+   "category": "pd",
+   "start": 770,
+   "end": 790
+  }
+ ]
+}
