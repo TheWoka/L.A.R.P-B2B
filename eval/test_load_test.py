@@ -223,3 +223,12 @@ def test_cli_output_and_startup_failure(tmp_path: Path) -> None:
         patch("eval.load_test.measure", side_effect=ValueError("unavailable")),
     ):
         assert main() == 1
+
+
+def test_demo_cycle_for_100_files(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    for index in range(1, 13):
+        (tmp_path / f"{index:02d}_demo.pdf").touch()
+    monkeypatch.setattr("eval.load_test.FILE_COUNT", 100)
+    files = demo_files(tmp_path)
+    assert len(files) == 100
+    assert files[96:] == files[:4]

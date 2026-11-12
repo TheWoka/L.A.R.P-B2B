@@ -1,6 +1,6 @@
 import type { DocPurpose, TaskCreated } from "../api/types";
 
-export const MAX_BATCH_FILES = 20;
+export const MAX_BATCH_FILES = 100;
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
 export const EXTENSIONS = [".pdf", ".docx", ".xlsx", ".xml", ".png", ".jpg", ".jpeg", ".tif", ".tiff"];
 
@@ -29,6 +29,7 @@ export async function submitBatchFiles(
   purpose: DocPurpose | ((file: File, index: number) => DocPurpose),
   upload: (file: File, purpose: DocPurpose, options?: { batchId?: string }) => Promise<TaskCreated>,
   batchId?: string,
+  onProgress?: (sent: number, total: number) => void,
 ): Promise<{ created: { id: string; name: string }[]; failed: { name: string; reason: string }[] }> {
   const created: { id: string; name: string }[] = [];
   const failed: { name: string; reason: string }[] = [];
@@ -39,6 +40,7 @@ export async function submitBatchFiles(
     } catch (error: unknown) {
       failed.push({ name: file.name, reason: error instanceof Error ? error.message : "Не удалось отправить файл" });
     }
+    onProgress?.(index + 1, files.length);
   }
   return { created, failed };
 }

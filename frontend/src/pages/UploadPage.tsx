@@ -65,6 +65,7 @@ export default function UploadPage() {
   const [queryPurpose, setQueryPurpose] = useState<DocPurpose>("publication");
   const [queryText, setQueryText] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [sentFiles, setSentFiles] = useState<{ sent: number; total: number } | null>(null);
   const [batchName, setBatchName] = useState("");
   const [batchId, setBatchId] = useState<string | null>(null);
   const [submittingQuery, setSubmittingQuery] = useState(false);
@@ -117,6 +118,7 @@ export default function UploadPage() {
     }
     setFileError(null);
     setUploading(true);
+    setSentFiles(null);
     try {
       if (files.length === 1 && !batchId) {
         const task = await uploadDocument(files[0], purposeAt(files[0], 0), { llmMode });
@@ -129,7 +131,7 @@ export default function UploadPage() {
           const result = await uploadDocument(file, purpose, { ...options, llmMode });
           accepted.add(entries[files.findIndex((candidate) => candidate === file)].uid);
           return result;
-        }, id);
+        }, id, (sent, total) => setSentFiles({ sent, total }));
         if (failed.length > 0) {
           setFileList((current) => current.filter((entry) => !accepted.has(entry.uid)));
           setRejectedFiles(failed.map((entry, index) => ({ ...entry, uid: `upload-failed-${index}` })));
@@ -276,7 +278,7 @@ export default function UploadPage() {
         {fileError && <Alert type="error" showIcon title={fileError} className="form-error" />}
         {batchId && <Link to={`/batches/${encodeURIComponent(batchId)}`}>Открыть сводный отчёт</Link>}
         <Button type="primary" size="large" loading={uploading} disabled={uploading || modesLoading} onClick={() => { void handleUpload(); }}>
-          {fileList.length > 1 ? `Проверить ${documentCountLabel(fileList.length)}` : "Начать проверку"}
+          {uploading && sentFiles ? `Отправлено ${sentFiles.sent} из ${sentFiles.total}` : fileList.length > 1 ? `Проверить ${documentCountLabel(fileList.length)}` : "Начать проверку"}
         </Button>
         <Typography.Text type="secondary">
           {fileList.length > 1 ? "Проверки пойдут по очереди" : "Обычно занимает меньше минуты"}
@@ -318,9 +320,9 @@ export default function UploadPage() {
     <div className="page-container upload-page">
       <header className="page-heading">
         <h1>Проверка документов</h1>
-        <p>{fileList.length > 0 ? "Один комплект — общий итог и приоритет исправлений." : "Загрузите до 20 документов и сканов — получите общий итог и отчёт по каждому."}</p>
+        <p>{fileList.length > 0 ? "Один комплект — общий итог и приоритет исправлений." : "Загрузите до 100 документов и сканов — получите общий итог и отчёт по каждому."}</p>
         <h1 className="mobile-upload-title">Проверка документов</h1>
-        <p className="mobile-upload-subtitle">Загрузите до 20 документов и сканов — получите общий итог и отчёт по каждому.</p>
+        <p className="mobile-upload-subtitle">Загрузите до 100 документов и сканов — получите общий итог и отчёт по каждому.</p>
       </header>
       <div className="upload-layout">
         <section className="upload-primary">

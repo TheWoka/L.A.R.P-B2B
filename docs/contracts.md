@@ -561,13 +561,14 @@ OCR_LOW_WORD_CONF=0.6             # слово с уверенностью ни�
 OCR_LOW_PAGE_CONF=0.75            # страница со средней уверенностью ниже — в low_confidence_pages
 
 # Комплект документов (контракт v3)
-BATCH_MAX_DOCUMENTS=20
+BATCH_MAX_DOCUMENTS=100
 ```
 
 ## История изменений
 
 | Дата | Что изменилось | Кто решил |
 |---|---|---|
+| 2026-11-12 | Раздел 5: `BATCH_MAX_DOCUMENTS` по умолчанию 20 → 100 (требование организаторов этапа 2), T-088. Схемы и эндпоинты не менялись | Данила (тимлид) |
 | 2026-11-11 | **Контракт v3: комплект и сводный отчёт, OCR, режимы нейросети (решение Данилы)**, T-070. Раздел 1: `OcrPage`, `OcrInfo`, `ExtractedDocument.ocr`, `Report.ocr`, `AuditInfo.llm_mode`, `LlmMode`, `LlmModeInfo`, `LlmModesResponse`, `BatchCreate`, `BatchCreated`, `BatchDocument`, `BatchRuleSummary`, `BatchSummary`; все новые поля старых моделей необязательные. Раздел 3: `extract` возвращает `ocr`, форматы изображений. Раздел 4: `/api/batches`, `/api/llm/modes`, поля `batch_id`/`llm_mode` в `POST /api/documents`, `llm_mode` в `QueryRequest`. Раздел 5: `LLM_DEFAULT_MODE`, `LLM_LOCAL_*`, `LLM_CLOUD_*`, `OCR_*`, `BATCH_MAX_DOCUMENTS` | Данила (тимлид) |
 | 2026-10-31 | Раздел 5: убран EMBEDDING_MODEL — модуль RAG (заглушка T-014) удалён; статьи законов открываются из data/legal | Данила (тимлид) |
 | 2026-10-30 | обезличенная копия .xml | Данила (тимлид) |

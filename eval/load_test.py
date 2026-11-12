@@ -1,4 +1,4 @@
-"""T-082: 20 synthetic demo files, mock LLM, host-side Docker memory sampling.
+"""T-082: 20 (or --files N, up to 100) synthetic demo files, mock LLM, host-side Docker memory sampling.
 
 Run from the repository root: python eval/load_test.py --concurrency 2
 The caller recreates worker with WORKER_CONCURRENCY first (see docs/local-llm.md).
@@ -239,7 +239,11 @@ def main() -> int:
     parser.add_argument("--concurrency", type=int, choices=(1, 2, 4), required=True)
     parser.add_argument("--timeout", type=float, default=1800)
     parser.add_argument("--out", type=Path)
+    parser.add_argument("--files", type=int, default=20, choices=range(1, 101), metavar="1..100",
+                        help="число файлов в комплекте; демо 01–12 повторяются по кругу")
     args = parser.parse_args()
+    global FILE_COUNT
+    FILE_COUNT = args.files
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     logging.getLogger("httpx").setLevel(logging.WARNING)
     try:
