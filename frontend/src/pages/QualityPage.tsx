@@ -202,7 +202,9 @@ function ScansTab() {
   const [corpus, setCorpus] = useState<"scan-dev" | "scan-blind">("scan-dev");
   return <><Radio.Group className="scan-corpus-picker" value={corpus} onChange={(event) => setCorpus(event.target.value)} aria-label="Набор сканов">
     <Radio.Button value="scan-dev">Набор для настройки</Radio.Button><Radio.Button value="scan-blind">Слепой набор</Radio.Button>
-  </Radio.Group><MetricsTab key={corpus} corpus={corpus} /></>;
+  </Radio.Group>
+    <Typography.Paragraph>Набор для настройки: документы eval/dev в виде сканов. Слепой набор: документы, которые разработчики не видели.</Typography.Paragraph>
+    <MetricsTab key={corpus} corpus={corpus} /></>;
 }
 
 export default function QualityPage() {
