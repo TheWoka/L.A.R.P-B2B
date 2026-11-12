@@ -2,6 +2,8 @@
 
 import importlib.util
 import json
+import logging
+from collections.abc import Iterator
 from pathlib import Path
 from types import ModuleType
 
@@ -204,6 +206,16 @@ def test_use_model_dir_fails_loudly_and_restores(tmp_path: Path) -> None:
 
 
 # ---------- Командная строка ----------
+
+@pytest.fixture(autouse=True)
+def restore_log_levels() -> Iterator[None]:
+    """ab_models.main() приглушает логгеры app и pymorphy2 на весь процесс — возвращаем уровни,
+    иначе тесты, которые после этого проверяют логи через caplog, ничего не увидят."""
+    saved = {name: logging.getLogger(name).level for name in ("app", "pymorphy2")}
+    yield
+    for name, level in saved.items():
+        logging.getLogger(name).setLevel(level)
+
 
 def load_cli() -> ModuleType:
     spec = importlib.util.spec_from_file_location("ab_models", AB_MODELS)
