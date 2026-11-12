@@ -114,7 +114,7 @@ export default function ReportView({ reportId, embedded = false }: { reportId: s
             </div>
             {!report.redacted_available && (
               <Typography.Paragraph type="secondary" style={{ margin: "8px 0 0" }}>
-                {report.ocr ? "Для сканов копия пока не формируется" : "Копия недоступна: в документе не нашлось персональных данных или её не удалось безопасно сделать."}
+                {report.ocr ? "Копия скана недоступна: персональных данных не нашлось, распознанных страниц больше 20 или самопроверка не подтвердила, что всё закрашено." : "Копия недоступна: в документе не нашлось персональных данных или её не удалось безопасно сделать."}
               </Typography.Paragraph>
             )}
             {report.redacted_available && (
