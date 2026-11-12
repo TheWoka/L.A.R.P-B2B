@@ -15,6 +15,7 @@ export interface HistoryItem {
 
 const STORAGE_KEY = "grif.history.v1";
 const MAX_ITEMS = 50;
+const HISTORY_EXTENSIONS = new Set([".pdf", ".docx", ".xlsx", ".xml", ".png", ".jpg", ".jpeg", ".tif", ".tiff"]);
 let storageUnavailable = false;
 
 function isHistoryItem(value: unknown): value is HistoryItem {
@@ -23,7 +24,7 @@ function isHistoryItem(value: unknown): value is HistoryItem {
   return typeof item.report_id === "string" && item.report_id.length > 0
     && (item.kind === "file" || item.kind === "text" || item.kind === "batch")
     && (item.kind !== "batch" || (typeof item.name === "string" && item.name.length <= 120 && typeof item.documents === "number" && Number.isSafeInteger(item.documents) && item.documents >= 0))
-    && (item.ext === null || item.ext === ".docx" || item.ext === ".pdf" || item.ext === ".xlsx")
+    && (item.ext === null || (typeof item.ext === "string" && HISTORY_EXTENSIONS.has(item.ext)))
     && (item.kind !== "text" || item.ext === null)
     && (item.purpose === "internal" || item.purpose === "publication" || item.purpose === "contract" || item.purpose === "international")
     && (item.overall === "red" || item.overall === "yellow" || item.overall === "green" || (item.kind === "batch" && item.overall === null))
@@ -62,7 +63,8 @@ function saveHistory(items: HistoryItem[]): void {
 
 export function addToHistory(report: Report): void {
   // Из имени берём только разрешённое расширение: в самом имени могут быть ПДн.
-  const ext = report.filename?.match(/\.(docx|pdf|xlsx)$/i)?.[0].toLowerCase() ?? null;
+  const candidate = report.filename?.match(/\.[^.]+$/)?.[0].toLowerCase();
+  const ext = candidate && HISTORY_EXTENSIONS.has(candidate) ? candidate : null;
   const item: HistoryItem = {
     report_id: report.report_id,
     kind: report.filename === null ? "text" : "file",
