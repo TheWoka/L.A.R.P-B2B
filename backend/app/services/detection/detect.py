@@ -30,21 +30,27 @@ def _better(a: Entity, b: Entity) -> bool:
 def merge_entities(*groups: list[Entity]) -> list[Entity]:
     """Сливает результаты нескольких детекторов в один список без пересечений.
 
-    Проход слева направо по (start, приоритет детектора, -длина). Если сущность
-    пересекается с последней оставленной, остаётся лучшая по (детектор, длина);
-    при полном равенстве — та, что левее. Результат отсортирован по start.
+    Жадный выбор «лучший первым»: сущности перебираются от лучшей к худшей по (точность
+    детектора, длина, левее), и каждая остаётся, если не пересекает уже оставленные.
+    Так сущность выбывает только из-за пересечения с более точной находкой, которая
+    сама осталась в результате (T-085: прежний проход слева направо терял сущность
+    в цепочке из трёх пересечений, и она уходила в LLM без маски). Результат
+    отсортирован по start.
     """
     ordered = sorted(
         (e for group in groups for e in group),
-        key=lambda e: (e.start, DETECTOR_PRIORITY[e.detector], e.start - e.end),
+        key=lambda e: (DETECTOR_PRIORITY[e.detector], e.start - e.end, e.start),
     )
     kept: list[Entity] = []
+    starts: list[int] = []
     for entity in ordered:
-        if kept and entity.start < kept[-1].end:
-            if _better(entity, kept[-1]):
-                kept[-1] = entity
+        index = bisect_right(starts, entity.start)
+        if index > 0 and kept[index - 1].end > entity.start:
             continue
-        kept.append(entity)
+        if index < len(kept) and kept[index].start < entity.end:
+            continue
+        kept.insert(index, entity)
+        starts.insert(index, entity.start)
     return kept
 
 
