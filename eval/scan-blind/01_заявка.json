@@ -1,0 +1,78 @@
+{
+ "purpose": "scan",
+ "source": "01_заявка.txt",
+ "entities": [
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 142,
+   "end": 170
+  },
+  {
+   "type": "BIRTH_DATE",
+   "category": "pd",
+   "start": 186,
+   "end": 196
+  },
+  {
+   "type": "PASSPORT",
+   "category": "pd",
+   "start": 221,
+   "end": 235
+  },
+  {
+   "type": "SNILS",
+   "category": "pd",
+   "start": 289,
+   "end": 303
+  },
+  {
+   "type": "INN",
+   "category": "pd",
+   "start": 327,
+   "end": 339
+  },
+  {
+   "type": "ADDRESS",
+   "category": "pd",
+   "start": 359,
+   "end": 406
+  },
+  {
+   "type": "PHONE",
+   "category": "pd",
+   "start": 426,
+   "end": 444
+  },
+  {
+   "type": "EMAIL",
+   "category": "pd",
+   "start": 446,
+   "end": 470
+  },
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 489,
+   "end": 501
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 558,
+   "end": 605
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 633,
+   "end": 659
+  },
+  {
+   "type": "FINANCIAL",
+   "category": "financial",
+   "start": 661,
+   "end": 714
+  }
+ ]
+}

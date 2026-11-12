@@ -1,0 +1,78 @@
+{
+ "purpose": "scan",
+ "source": "04_письмо.txt",
+ "entities": [
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 76,
+   "end": 101
+  },
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 110,
+   "end": 121
+  },
+  {
+   "type": "EMAIL",
+   "category": "pd",
+   "start": 160,
+   "end": 185
+  },
+  {
+   "type": "PHONE",
+   "category": "pd",
+   "start": 221,
+   "end": 232
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 234,
+   "end": 326
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 327,
+   "end": 378
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 411,
+   "end": 491
+  },
+  {
+   "type": "FINANCIAL",
+   "category": "financial",
+   "start": 493,
+   "end": 567
+  },
+  {
+   "type": "ADDRESS",
+   "category": "pd",
+   "start": 619,
+   "end": 657
+  },
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 685,
+   "end": 709
+  },
+  {
+   "type": "PASSPORT",
+   "category": "pd",
+   "start": 719,
+   "end": 733
+  },
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 748,
+   "end": 774
+  }
+ ]
+}

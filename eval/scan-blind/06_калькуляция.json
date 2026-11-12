@@ -1,0 +1,78 @@
+{
+ "purpose": "scan",
+ "source": "06_калькуляция.txt",
+ "entities": [
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 74,
+   "end": 101
+  },
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 113,
+   "end": 125
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 127,
+   "end": 228
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 229,
+   "end": 313
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 314,
+   "end": 375
+  },
+  {
+   "type": "TRADE_SECRET",
+   "category": "trade_secret",
+   "start": 400,
+   "end": 485
+  },
+  {
+   "type": "FINANCIAL",
+   "category": "financial",
+   "start": 487,
+   "end": 565
+  },
+  {
+   "type": "FINANCIAL",
+   "category": "financial",
+   "start": 601,
+   "end": 621
+  },
+  {
+   "type": "PHONE",
+   "category": "pd",
+   "start": 685,
+   "end": 700
+  },
+  {
+   "type": "EMAIL",
+   "category": "pd",
+   "start": 702,
+   "end": 729
+  },
+  {
+   "type": "PERSON",
+   "category": "pd",
+   "start": 753,
+   "end": 767
+  },
+  {
+   "type": "PASSPORT",
+   "category": "pd",
+   "start": 777,
+   "end": 791
+  }
+ ]
+}
