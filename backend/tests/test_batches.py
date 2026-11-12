@@ -213,13 +213,13 @@ def test_upload_missing_batch(
     api_db[1].assert_not_called()
 
 
-@pytest.mark.parametrize("limit", [20, 2])
+@pytest.mark.parametrize("limit", [100, 2])
 def test_document_limit(
     client: TestClient, api_db: tuple[Session, Mock], monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path, limit: int,
 ) -> None:
-    if limit == 20:
-        assert get_settings().batch_max_documents == 20
+    if limit == 100:
+        assert get_settings().batch_max_documents == 100
     monkeypatch.setattr(get_settings(), "batch_max_documents", limit)
     batch_id = create_batch(client)
     for _ in range(limit):

@@ -84,7 +84,7 @@ class Settings(BaseSettings):
 
     # --- Прочее ---
     max_upload_mb: int = 50
-    batch_max_documents: int = 20
+    batch_max_documents: int = 100
     report_ttl_days: int = 7
 
     # --- OCR ---

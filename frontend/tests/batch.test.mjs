@@ -59,6 +59,24 @@ test("accepts scans and propagates the batch id on every upload", async () => {
   assert.deepEqual(optionsSeen, [{batchId: "batch-123"}, {batchId: "batch-123"}]);
 });
 
-test("limits legacy task links to twenty unique valid ids", () => {
-  assert.equal(parseBatchTasks("?tasks=" + Array.from({length: 25}, (_, i) => `task-${i}`).join(",")).length, 20);
+test("limits legacy task links to the batch limit of unique valid ids", () => {
+  assert.equal(parseBatchTasks("?tasks=" + Array.from({length: 105}, (_, i) => `task-${i}`).join(",")).length, 100);
+});
+
+test("reports upload progress after every file, including failed ones", async () => {
+  const progress = [];
+  const files = [{ name: "a.pdf" }, { name: "b.pdf" }, { name: "c.pdf" }];
+  const upload = async (file) => {
+    if (file.name === "b.pdf") throw new Error("Сервер недоступен");
+    return { task_id: `task-${file.name}` };
+  };
+  const result = await submitBatchFiles(files, "internal", upload, "batch-1", (sent, total) => progress.push([sent, total]));
+  assert.deepEqual(progress, [[1, 3], [2, 3], [3, 3]]);
+  assert.equal(result.created.length, 2);
+  assert.equal(result.failed.length, 1);
+});
+
+test("allows a batch of 100 files", async () => {
+  const { MAX_BATCH_FILES } = await import("../src/lib/batch.ts");
+  assert.equal(MAX_BATCH_FILES, 100);
 });
