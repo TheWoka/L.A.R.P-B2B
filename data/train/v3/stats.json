@@ -1,0 +1,90 @@
+{
+  "fragments": 2990,
+  "by_label": {
+    "TRADE_SECRET": 974,
+    "NONE": 1435,
+    "SPECIAL_CATEGORY": 581
+  },
+  "by_kind": {
+    "contrast_ts_plain": 212,
+    "none_people": 359,
+    "none_public": 398,
+    "none_tech": 475,
+    "sc_form_v3": 121,
+    "sc_person": 554,
+    "ts_plain": 871
+  },
+  "by_doc_type": {
+    "certificate": 59,
+    "chat": 310,
+    "contract": 199,
+    "costing": 296,
+    "form": 180,
+    "letter": 429,
+    "memo": 338,
+    "minutes": 277,
+    "notice": 80,
+    "offer": 119,
+    "order": 216,
+    "price_list": 78,
+    "procurement_report": 140,
+    "reference": 133,
+    "tz": 136
+  },
+  "by_register": {
+    "abbrev": 986,
+    "casual": 1010,
+    "official": 994
+  },
+  "by_industry": {
+    "catering": 391,
+    "construction": 413,
+    "fuel": 393,
+    "furniture": 476,
+    "it": 453,
+    "logistics": 407,
+    "medicine": 457
+  },
+  "hard_negatives": 1417,
+  "dropped": {
+    "masked_pd": 1,
+    "ts_keyword": 14,
+    "duplicate": 133,
+    "duplicate_previous": 123,
+    "length": 1,
+    "meta_phrase": 34,
+    "label_conflict": 3
+  },
+  "length": {
+    "NONE": {
+      "n": 1435,
+      "min": 18,
+      "median": 75,
+      "mean": 75.1,
+      "max": 134
+    },
+    "TRADE_SECRET": {
+      "n": 974,
+      "min": 40,
+      "median": 90.0,
+      "mean": 91.5,
+      "max": 139
+    },
+    "SPECIAL_CATEGORY": {
+      "n": 581,
+      "min": 16,
+      "median": 66,
+      "mean": 64.6,
+      "max": 128
+    }
+  },
+  "llm": {
+    "calls": 166,
+    "cache_hits": 0,
+    "prompt_tokens": 401969,
+    "completion_tokens": 98981,
+    "failed": 0,
+    "usd": 0.3192,
+    "model": "gpt-4.1-mini"
+  }
+}

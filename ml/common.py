@@ -51,10 +51,17 @@ def dedup_key(text: str) -> str:
     return _SPACES.sub(" ", _NORM_DROP.sub(" ", low)).strip()
 
 
-def default_train_files() -> list[Path]:
-    """Все наборы синтетики: v1 (data/train) и, если есть, v2 (data/train/v2)."""
-    return [p for p in (TRAIN_DIR / "fragments.jsonl", TRAIN_DIR / "v2" / "fragments.jsonl")
-            if p.is_file()]
+TRAIN_SETS: tuple[str, ...] = ("v1", "v2", "v3")
+
+
+def train_file(name: str) -> Path:
+    """fragments.jsonl набора: v1 лежит в data/train, остальные — в data/train/<имя>."""
+    return TRAIN_DIR / "fragments.jsonl" if name == "v1" else TRAIN_DIR / name / "fragments.jsonl"
+
+
+def default_train_files(sets: tuple[str, ...] = TRAIN_SETS) -> list[Path]:
+    """Имеющиеся наборы синтетики из sets (по умолчанию v1 + v2 + v3)."""
+    return [p for p in map(train_file, sets) if p.is_file()]
 
 
 def read_jsonl(path: Path) -> list[dict]:

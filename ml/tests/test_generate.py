@@ -47,6 +47,56 @@ def test_plan_v2_within_budget_and_prefixed() -> None:
         gd.use_plan("v1")
 
 
+def test_plan_v3_size_budget_and_prompt() -> None:
+    """T-080: ≈ 3 000 фрагментов, gpt-4.1-mini (0,4 / 1,6 $ за 1M), лимит 2 $."""
+    try:
+        gd.use_plan("v3")
+        calls = gd.plan_calls(1.1)
+        assert calls == gd.plan_calls(1.1)
+        assert len(calls) <= 400 and all(c.call_id.startswith("v3-") for c in calls)
+        assert {c.kind for c in calls} == {k.name for k in gd.CALL_KINDS_V3}
+        items = sum(gd._kind(c.kind).items for c in calls)
+        assert 3000 <= items <= 3600
+        assert gd.estimate_cost(calls, 0.4, 1.6)["usd"] < 2.0
+        system, template = gd.load_prompt()
+        assert "$" not in gd.build_user(calls[0], template)
+        assert all(gd.DOC_TYPES[c.doc_type] for c in calls)
+        for word in ("г/м²", "двадцать одна тысяча", "семейное положение", "профсоюз"):
+            assert word in system
+    finally:
+        gd.use_plan("v1")
+
+
+def test_v3_doc_types_do_not_change_old_plans() -> None:
+    assert "tz" in gd.DOC_TYPES and "tz" not in gd.ALL_DOCS
+    assert all(c.doc_type in gd.ALL_DOCS for c in gd.plan_calls())
+
+
+def test_postprocess_v3_drops_previous_duplicates_and_keywords() -> None:
+    raw = [_batch("v3-a", [
+        ("Берём у них по 412 рублей за штуку.", "TRADE_SECRET"),
+        ("Себестоимость партии вышла 300 тысяч.", "TRADE_SECRET"),       # слово-ярлык
+        ("Себестоимость в отчёте не раскрывается.", "NONE"),              # NONE — можно
+        ("НМЦК по лоту составляет 1 500 000 руб.", "NONE"),               # уже было в v1/v2
+    ], kind="ts_plain")]
+    known = {gd.dedup_key("НМЦК по лоту составляет 1 200 000 руб.")}
+    try:
+        gd.use_plan("v3")
+        rows, drops = gd.postprocess(raw, lambda t: t, known)
+    finally:
+        gd.use_plan("v1")
+    assert [r["text"] for r in rows] == ["Берём у них по 412 рублей за штуку.",
+                                         "Себестоимость в отчёте не раскрывается."]
+    assert drops["ts_keyword"] == 1 and drops["duplicate_previous"] == 1
+
+
+def test_previous_keys_reads_sets_and_skips_missing(tmp_path: Path) -> None:
+    path = tmp_path / "fragments.jsonl"
+    path.write_text('{"text": "Наценка 14%.", "label": "TRADE_SECRET"}\n', encoding="utf-8")
+    assert gd.previous_keys([path, tmp_path / "missing.jsonl"]) == {gd.dedup_key("наценка 15 %")}
+    assert gd.previous_keys([]) == set()
+
+
 def test_doc_types_match_kind() -> None:
     for call in gd.plan_calls():
         if call.kind in ("trade_secret", "contrast_ts"):
@@ -176,3 +226,23 @@ def test_run_calls_with_mock_and_resume(mock_llm: Path) -> None:
 def test_main_dry_run_and_over_budget(monkeypatch: pytest.MonkeyPatch) -> None:
     assert gd.main(["--dry-run"]) == 0
     assert gd.main(["--dry-run", "--max-calls", "10"]) == 3
+
+
+def test_main_refuses_mock_generator(tmp_path: Path) -> None:
+    """Без облачной модели генерация не начинается (иначе набор собрался бы из заглушек)."""
+    assert gd.generator_model() is None
+    assert gd.main(["--out", str(tmp_path)]) == 4
+    assert not (tmp_path / "fragments.jsonl").exists()
+
+
+def test_long_answers_raises_token_cap_only_inside_block() -> None:
+    """Пакет из 20 фрагментов не помещается в потолок конвейера (400 токенов)."""
+    from app.core.config import get_settings
+    from app.services.llm import providers
+
+    before = providers.MAX_ANSWER_TOKENS
+    with gd.long_answers():
+        assert providers.MAX_ANSWER_TOKENS >= gd.GEN_ANSWER_TOKENS
+        body = providers.build_request_body(get_settings(), [])
+        assert body["max_tokens"] == providers.MAX_ANSWER_TOKENS
+    assert providers.MAX_ANSWER_TOKENS == before
