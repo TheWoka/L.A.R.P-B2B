@@ -79,7 +79,7 @@ services:
   worker:
     # Тот же Dockerfile, что у api: второй build берёт слои из кэша.
     build: ./backend
-    command: celery -A app.worker.celery_app worker -B --loglevel=info
+    command: celery -A app.worker.celery_app worker -B --loglevel=info --concurrency=${WORKER_CONCURRENCY:-2}
     healthcheck:
       test: ["CMD-SHELL", "celery -A app.worker.celery_app inspect ping -d celery@$$HOSTNAME --timeout=5"]
       interval: 30s
